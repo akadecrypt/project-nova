@@ -1,0 +1,1728 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - NOVA</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/design-system.css">
+    <style>
+        /* Background */
+        .bg-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .bg-animation::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: 
+                radial-gradient(ellipse at 25% 25%, rgba(99, 102, 241, 0.1) 0%, transparent 50%),
+                radial-gradient(ellipse at 75% 75%, rgba(139, 92, 246, 0.08) 0%, transparent 50%);
+            animation: bgPulse 20s ease-in-out infinite;
+        }
+
+        @keyframes bgPulse {
+            0%, 100% { transform: scale(1) rotate(0deg); }
+            50% { transform: scale(1.05) rotate(3deg); }
+        }
+
+        .app-container {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: rgba(18, 18, 26, 0.85);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            padding: 24px;
+            position: fixed;
+            height: 100vh;
+        }
+
+        [data-theme="light"] .sidebar {
+            background: rgba(255, 255, 255, 0.92);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 32px;
+            text-decoration: none;
+        }
+
+        .logo-icon {
+            width: 44px;
+            height: 44px;
+            background: var(--accent-gradient);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--shadow-glow);
+        }
+
+        .logo-icon svg {
+            width: 24px;
+            height: 24px;
+            fill: white;
+        }
+
+        .logo-text {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .logo-title {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .logo-subtitle {
+            font-size: 10px;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .nav-section { margin-bottom: 24px; }
+        .nav-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 12px;
+            padding-left: 4px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 14px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all var(--transition-normal);
+            margin-bottom: 4px;
+            color: var(--text-secondary);
+            text-decoration: none;
+        }
+
+        .nav-item:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+            transform: translateX(4px);
+        }
+
+        .nav-item.active {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .nav-icon { width: 20px; height: 20px; opacity: 0.7; }
+        .nav-item:hover .nav-icon, .nav-item.active .nav-icon { opacity: 1; }
+        .nav-badge {
+            margin-left: auto;
+            background: var(--accent-primary);
+            color: white;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            margin-left: var(--sidebar-width);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            padding: 20px 32px;
+            background: rgba(18, 18, 26, 0.7);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        [data-theme="light"] .header {
+            background: rgba(255, 255, 255, 0.85);
+        }
+
+        .page-title {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .page-desc {
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* Settings Layout */
+        .settings-layout {
+            display: flex;
+            flex: 1;
+        }
+
+        /* Settings Nav */
+        .settings-nav {
+            width: 250px;
+            padding: 24px;
+            border-right: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+        }
+
+        .settings-nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all var(--transition-normal);
+            margin-bottom: 4px;
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .settings-nav-item:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .settings-nav-item.active {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .settings-nav-item svg {
+            width: 20px;
+            height: 20px;
+            opacity: 0.7;
+        }
+
+        .settings-nav-item:hover svg,
+        .settings-nav-item.active svg {
+            opacity: 1;
+        }
+
+        /* Settings Content */
+        .settings-content {
+            flex: 1;
+            padding: 32px;
+            overflow-y: auto;
+        }
+
+        .settings-section {
+            max-width: 700px;
+            margin-bottom: 40px;
+            animation: fadeInUp 0.5s ease;
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .settings-section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .settings-section-desc {
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+        }
+
+        /* Settings Card */
+        .settings-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            overflow: hidden;
+        }
+
+        .settings-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border-color);
+            transition: background var(--transition-fast);
+        }
+
+        .settings-item:last-child {
+            border-bottom: none;
+        }
+
+        .settings-item:hover {
+            background: var(--bg-hover);
+        }
+
+        .settings-item-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .settings-item-title {
+            font-size: 15px;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .settings-item-desc {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        /* Toggle Switch */
+        .toggle {
+            position: relative;
+            width: 52px;
+            height: 28px;
+            flex-shrink: 0;
+        }
+
+        .toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 28px;
+            transition: all var(--transition-normal);
+        }
+
+        .toggle-slider::before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background: var(--text-muted);
+            border-radius: 50%;
+            transition: all var(--transition-normal);
+        }
+
+        .toggle input:checked + .toggle-slider {
+            background: var(--accent-gradient);
+            border-color: transparent;
+        }
+
+        .toggle input:checked + .toggle-slider::before {
+            transform: translateX(24px);
+            background: white;
+        }
+
+        /* Theme Selector */
+        .theme-selector {
+            display: flex;
+            gap: 12px;
+        }
+
+        .theme-option {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            padding: 16px;
+            background: var(--bg-tertiary);
+            border: 2px solid var(--border-color);
+            border-radius: 16px;
+            cursor: pointer;
+            transition: all var(--transition-normal);
+            min-width: 100px;
+        }
+
+        .theme-option:hover {
+            border-color: var(--accent-primary);
+        }
+
+        .theme-option.active {
+            border-color: var(--accent-primary);
+            background: var(--bg-hover);
+        }
+
+        .theme-preview {
+            width: 60px;
+            height: 40px;
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .theme-preview.dark {
+            background: #0a0a0f;
+        }
+
+        .theme-preview.dark::before {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 100%;
+            background: #12121a;
+        }
+
+        .theme-preview.dark::after {
+            content: '';
+            position: absolute;
+            width: 30px;
+            height: 8px;
+            background: linear-gradient(90deg, #6366f1, #8b5cf6);
+            bottom: 8px;
+            left: 24px;
+            border-radius: 4px;
+        }
+
+        .theme-preview.light {
+            background: #f8fafc;
+        }
+
+        .theme-preview.light::before {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 100%;
+            background: #ffffff;
+            border-right: 1px solid #e2e8f0;
+        }
+
+        .theme-preview.light::after {
+            content: '';
+            position: absolute;
+            width: 30px;
+            height: 8px;
+            background: linear-gradient(90deg, #4f46e5, #7c3aed);
+            bottom: 8px;
+            left: 24px;
+            border-radius: 4px;
+        }
+
+        .theme-preview.nutanix {
+            background: #0d1117;
+        }
+
+        .theme-preview.nutanix::before {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 100%;
+            background: #161b22;
+        }
+
+        .theme-preview.nutanix::after {
+            content: '';
+            position: absolute;
+            width: 30px;
+            height: 8px;
+            background: linear-gradient(90deg, #024da1, #0070c5);
+            bottom: 8px;
+            left: 24px;
+            border-radius: 4px;
+        }
+
+        .theme-name {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        /* Form Inputs */
+        .settings-select {
+            padding: 10px 40px 10px 14px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-family: var(--font-primary);
+            font-size: 14px;
+            cursor: pointer;
+            outline: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            transition: all var(--transition-normal);
+        }
+
+        .settings-select:hover,
+        .settings-select:focus {
+            border-color: var(--accent-primary);
+        }
+
+        .settings-input {
+            padding: 10px 14px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-family: var(--font-primary);
+            font-size: 14px;
+            outline: none;
+            width: 250px;
+            transition: all var(--transition-normal);
+        }
+
+        .settings-input:hover,
+        .settings-input:focus {
+            border-color: var(--accent-primary);
+        }
+
+        .settings-input:focus {
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        /* Button */
+        .settings-btn {
+            padding: 10px 20px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-family: var(--font-primary);
+            font-size: 14px;
+            cursor: pointer;
+            transition: all var(--transition-normal);
+        }
+
+        .settings-btn:hover {
+            background: var(--bg-hover);
+            border-color: var(--accent-primary);
+        }
+
+        .settings-btn.primary {
+            background: var(--accent-gradient);
+            border: none;
+            color: white;
+        }
+
+        .settings-btn.primary:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-glow);
+        }
+
+        .settings-btn.danger {
+            color: var(--error);
+            border-color: var(--error);
+        }
+
+        .settings-btn.danger:hover {
+            background: var(--error-bg);
+        }
+
+        /* Connection Status */
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 16px 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .connection-status.connected {
+            background: var(--success-bg);
+            border: 1px solid var(--success);
+        }
+
+        .connection-status.disconnected {
+            background: var(--error-bg);
+            border: 1px solid var(--error);
+        }
+
+        .connection-status.unknown {
+            background: var(--warning-bg);
+            border: 1px solid var(--warning);
+        }
+
+        .status-icon {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .connection-status.connected .status-icon {
+            background: var(--success);
+            box-shadow: 0 0 10px var(--success);
+        }
+
+        .connection-status.disconnected .status-icon {
+            background: var(--error);
+        }
+
+        .connection-status.unknown .status-icon {
+            background: var(--warning);
+        }
+
+        .status-text {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .connection-status.connected .status-text { color: var(--success); }
+        .connection-status.disconnected .status-text { color: var(--error); }
+        .connection-status.unknown .status-text { color: var(--warning); }
+
+        /* Form Group */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        .form-input-full {
+            width: 100%;
+            padding: 14px 16px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-family: var(--font-primary);
+            font-size: 15px;
+            outline: none;
+            transition: all var(--transition-normal);
+        }
+
+        .form-input-full:focus {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        .form-row {
+            display: flex;
+            gap: 16px;
+        }
+
+        .form-row .form-group {
+            flex: 1;
+        }
+
+        .form-hint {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+
+        /* API Key Item */
+        .api-key-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px 20px;
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+            margin-bottom: 12px;
+        }
+
+        .api-key-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--bg-primary);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--accent-primary);
+        }
+
+        .api-key-info { flex: 1; }
+        .api-key-name { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+        .api-key-value { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); }
+        .api-key-actions { display: flex; gap: 8px; }
+
+        .api-key-btn {
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: var(--bg-primary);
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+            transition: all var(--transition-fast);
+        }
+
+        .api-key-btn:hover { background: var(--bg-hover); color: var(--accent-primary); }
+        .api-key-btn.danger:hover { background: var(--error-bg); color: var(--error); }
+
+        /* Storage Meter */
+        .storage-meter { padding: 20px 24px; }
+        .storage-bar { height: 12px; background: var(--bg-primary); border-radius: 6px; overflow: hidden; margin-bottom: 16px; }
+        .storage-fill { height: 100%; background: var(--accent-gradient); border-radius: 6px; transition: width 1s ease; }
+        .storage-details { display: flex; justify-content: space-between; font-size: 14px; }
+        .storage-used { color: var(--text-primary); }
+        .storage-total { color: var(--text-muted); }
+
+        /* Profile Card */
+        .profile-card {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 24px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            margin-bottom: 24px;
+        }
+
+        .profile-avatar {
+            width: 80px;
+            height: 80px;
+            background: var(--accent-gradient);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            font-weight: 600;
+            color: white;
+            box-shadow: var(--shadow-glow);
+        }
+
+        .profile-info { flex: 1; }
+        .profile-name { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+        .profile-email { font-size: 14px; color: var(--text-muted); margin-bottom: 12px; }
+        
+        .profile-role {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            background: var(--success-bg);
+            color: var(--success);
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        /* Backend Status */
+        .backend-status {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px 20px;
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .backend-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--warning);
+        }
+
+        .backend-indicator.online {
+            background: var(--success);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+            50% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+        }
+
+        /* Footer */
+        .settings-footer {
+            padding: 24px;
+            border-top: 1px solid var(--border-color);
+            margin-top: auto;
+        }
+
+        .settings-footer-text {
+            font-size: 13px;
+            color: var(--text-muted);
+            text-align: center;
+        }
+
+        .settings-footer-text a {
+            color: var(--accent-primary);
+            text-decoration: none;
+        }
+
+        .settings-footer-text a:hover {
+            text-decoration: underline;
+        }
+
+        /* Toast Notification */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            padding: 16px 24px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: var(--shadow-lg);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+
+        .toast.visible {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast.success {
+            border-color: var(--success);
+        }
+
+        .toast.error {
+            border-color: var(--error);
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .settings-nav { width: 200px; }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar { display: none; }
+            .main-content { margin-left: 0; }
+            .settings-layout { flex-direction: column; }
+            .settings-nav {
+                width: 100%;
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
+                display: flex;
+                overflow-x: auto;
+                padding: 12px;
+            }
+            .settings-nav-item { white-space: nowrap; padding: 10px 14px; margin-bottom: 0; }
+            .settings-content { padding: 20px; }
+            .theme-selector { flex-wrap: wrap; }
+            .settings-input { width: 100%; }
+            .form-row { flex-direction: column; }
+            .profile-card { flex-direction: column; text-align: center; }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-animation"></div>
+
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <a href="index.html" class="logo">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                    </svg>
+                </div>
+                <div class="logo-text">
+                    <span class="logo-title">NOVA</span>
+                    <span class="logo-subtitle">Objects Assistant</span>
+                </div>
+            </a>
+
+            <div class="nav-section">
+                <div class="nav-label">Navigate</div>
+                <a href="index.html" class="nav-item">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    <span>Chat</span>
+                </a>
+                <a href="settings.html" class="nav-item active">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                    <span>Settings</span>
+                </a>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="header">
+                <h1 class="page-title">Settings</h1>
+                <p class="page-desc">Manage your preferences and Prism connection</p>
+            </header>
+
+            <!-- Settings Layout -->
+            <div class="settings-layout">
+                <!-- Settings Navigation -->
+                <nav class="settings-nav">
+                    <div class="settings-nav-item active" onclick="showSection('prism')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+                            <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+                            <line x1="6" y1="6" x2="6.01" y2="6"></line>
+                            <line x1="6" y1="18" x2="6.01" y2="18"></line>
+                        </svg>
+                        Prism Connection
+                    </div>
+                    <div class="settings-nav-item" onclick="showSection('llm')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2a10 10 0 0 1 10 10c0 5.52-4.48 10-10 10S2 17.52 2 12 6.48 2 12 2z"></path>
+                            <path d="M12 8v4l3 3"></path>
+                            <circle cx="12" cy="12" r="1"></circle>
+                        </svg>
+                        AI Provider
+                    </div>
+                    <div class="settings-nav-item" onclick="showSection('appearance')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="5"></circle>
+                            <line x1="12" y1="1" x2="12" y2="3"></line>
+                            <line x1="12" y1="21" x2="12" y2="23"></line>
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                            <line x1="1" y1="12" x2="3" y2="12"></line>
+                            <line x1="21" y1="12" x2="23" y2="12"></line>
+                        </svg>
+                        Appearance
+                    </div>
+                    <div class="settings-nav-item" onclick="showSection('account')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                        Account
+                    </div>
+                    <div class="settings-nav-item" onclick="showSection('api')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                        </svg>
+                        API Keys
+                    </div>
+                    <div class="settings-nav-item" onclick="showSection('advanced')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="16 18 22 12 16 6"></polyline>
+                            <polyline points="8 6 2 12 8 18"></polyline>
+                        </svg>
+                        Advanced
+                    </div>
+                </nav>
+
+                <!-- Settings Content -->
+                <div class="settings-content">
+                    <!-- Prism Connection Section -->
+                    <div class="settings-section" id="section-prism">
+                        <h2 class="settings-section-title">Prism Central Connection</h2>
+                        <p class="settings-section-desc">Configure connection to Nutanix Prism Central for Objects operations</p>
+
+                        <!-- Backend Status -->
+                        <div class="backend-status">
+                            <div class="backend-indicator" id="backendIndicator"></div>
+                            <div>
+                                <div style="font-size: 14px; font-weight: 500;" id="backendStatusText">Checking backend...</div>
+                                <div style="font-size: 12px; color: var(--text-muted);">NOVA Backend Server</div>
+                            </div>
+                        </div>
+
+                        <!-- Connection Status -->
+                        <div class="connection-status unknown" id="connectionStatus">
+                            <div class="status-icon"></div>
+                            <span class="status-text" id="connectionStatusText">Not configured</span>
+                        </div>
+
+                        <div class="settings-card">
+                            <form id="prismConfigForm">
+                                <div style="padding: 24px;">
+                                    <div class="form-group">
+                                        <label class="form-label">Prism Central IP Address *</label>
+                                        <input type="text" class="form-input-full" id="prismIp" placeholder="10.0.0.1" required>
+                                        <div class="form-hint">Enter the IP address or hostname of your Prism Central</div>
+                                    </div>
+
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label class="form-label">Port</label>
+                                            <input type="number" class="form-input-full" id="prismPort" value="9440" min="1" max="65535">
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="form-label">Username</label>
+                                            <input type="text" class="form-input-full" id="prismUsername" value="admin">
+                                        </div>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label class="form-label">Password</label>
+                                        <input type="password" class="form-input-full" id="prismPassword" placeholder="Enter password">
+                                        <div class="form-hint">Your Prism Central admin password</div>
+                                    </div>
+
+                                    <div style="display: flex; gap: 12px; margin-top: 24px;">
+                                        <button type="submit" class="settings-btn primary">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;">
+                                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                                                <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                                                <polyline points="7 3 7 8 15 8"></polyline>
+                                            </svg>
+                                            Save Configuration
+                                        </button>
+                                        <button type="button" class="settings-btn" onclick="testConnection()">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;">
+                                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                                            </svg>
+                                            Test Connection
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+
+                        <div class="settings-card" style="margin-top: 20px;">
+                            <div class="settings-item">
+                                <div class="settings-item-info">
+                                    <div class="settings-item-title">Objects Endpoint</div>
+                                    <div class="settings-item-desc" id="objectsEndpoint">Not available</div>
+                                </div>
+                                <button class="settings-btn" onclick="copyEndpoint()">Copy</button>
+                            </div>
+                            <div class="settings-item">
+                                <div class="settings-item-info">
+                                    <div class="settings-item-title">API Documentation</div>
+                                    <div class="settings-item-desc">View Prism API reference</div>
+                                </div>
+                                <a href="https://www.nutanix.dev/api_references/prism-central/" target="_blank" class="settings-btn">Open Docs</a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- LLM Provider Section -->
+                    <div class="settings-section" id="section-llm" style="display: none;">
+                        <h2 class="settings-section-title">AI Provider Configuration</h2>
+                        <p class="settings-section-desc">Choose how NOVA understands your commands. Ollama is FREE and runs locally!</p>
+
+                        <!-- LLM Status -->
+                        <div class="backend-status" id="llmStatus">
+                            <div class="backend-indicator" id="llmIndicator"></div>
+                            <div>
+                                <div style="font-size: 14px; font-weight: 500;" id="llmStatusText">Checking AI provider...</div>
+                                <div style="font-size: 12px; color: var(--text-muted);" id="llmProviderName">Loading...</div>
+                            </div>
+                        </div>
+
+                        <div class="settings-card">
+                            <div class="settings-item">
+                                <div class="settings-item-info">
+                                    <div class="settings-item-title">AI Provider</div>
+                                    <div class="settings-item-desc">Select which AI to use for understanding commands</div>
+                                </div>
+                                <select class="settings-select" id="llmProvider" onchange="onProviderChange()">
+                                    <option value="ollama">🦙 Ollama (FREE, Local)</option>
+                                    <option value="openai">🤖 OpenAI</option>
+                                    <option value="anthropic">🧠 Anthropic Claude</option>
+                                    <option value="groq">⚡ Groq (Fast)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Ollama Settings -->
+                        <div class="settings-card" style="margin-top: 20px;" id="ollamaSettings">
+                            <div style="padding: 24px;">
+                                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
+                                    <div style="font-size: 32px;">🦙</div>
+                                    <div>
+                                        <div style="font-size: 16px; font-weight: 600;">Ollama (Recommended)</div>
+                                        <div style="font-size: 13px; color: var(--text-muted);">Free, private, runs on your machine</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label class="form-label">Ollama Server URL</label>
+                                    <input type="text" class="form-input-full" id="ollamaUrl" value="http://localhost:11434">
+                                    <div class="form-hint">Default: http://localhost:11434</div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label">Model</label>
+                                    <select class="settings-select" id="ollamaModel" style="width: 100%;">
+                                        <option value="llama3.1">llama3.1 (recommended)</option>
+                                        <option value="llama3.2">llama3.2</option>
+                                        <option value="mistral">mistral</option>
+                                        <option value="codellama">codellama</option>
+                                    </select>
+                                    <div class="form-hint">Run: <code style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px;">ollama pull llama3.1</code></div>
+                                </div>
+
+                                <div style="background: var(--info-bg); border: 1px solid var(--info); border-radius: 12px; padding: 16px; margin-top: 16px;">
+                                    <div style="font-size: 14px; font-weight: 500; color: var(--info); margin-bottom: 8px;">💡 Quick Start</div>
+                                    <div style="font-size: 13px; color: var(--text-secondary);">
+                                        1. Install: <code>brew install ollama</code><br>
+                                        2. Pull model: <code>ollama pull llama3.1</code><br>
+                                        3. Run: <code>ollama serve</code>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- API Key Settings (for cloud providers) -->
+                        <div class="settings-card" style="margin-top: 20px; display: none;" id="apiKeySettings">
+                            <div style="padding: 24px;">
+                                <div class="form-group">
+                                    <label class="form-label">API Key</label>
+                                    <input type="password" class="form-input-full" id="llmApiKey" placeholder="Enter your API key">
+                                    <div class="form-hint" id="apiKeyHint">Get your API key from the provider's website</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 24px;">
+                            <button class="settings-btn primary" onclick="saveLLMConfig()">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;">
+                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                                    <polyline points="7 3 7 8 15 8"></polyline>
+                                </svg>
+                                Save AI Configuration
+                            </button>
+                            <button class="settings-btn" onclick="testLLMConnection()" style="margin-left: 12px;">
+                                Test Connection
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Appearance Section -->
+                    <div class="settings-section" id="section-appearance" style="display: none;">
+                        <h2 class="settings-section-title">Appearance</h2>
+                        <p class="settings-section-desc">Customize how NOVA looks and feels</p>
+
+                        <div class="settings-card">
+                            <div class="settings-item">
+                                <div class="settings-item-info">
+                                    <div class="settings-item-title">Theme</div>
+                                    <div class="settings-item-desc">Choose your preferred color theme</div>
+                                </div>
+                            </div>
+                            <div style="padding: 20px 24px;">
+                                <div class="theme-selector">
+                                    <div class="theme-option active" data-theme="dark" onclick="selectTheme('dark')">
+                                        <div class="theme-preview dark"></div>
+                                        <span class="theme-name">Dark</span>
+                                    </div>
+                                    <div class="theme-option" data-theme="light" onclick="selectTheme('light')">
+                                        <div class="theme-preview light"></div>
+                                        <span class="theme-name">Light</span>
+                                    </div>
+                                    <div class="theme-option" data-theme="nutanix" onclick="selectTheme('nutanix')">
+                                        <div class="theme-preview nutanix"></div>
+                                        <span class="theme-name">Nutanix</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="settings-card" style="margin-top: 20px;">
+                            <div class="settings-item">
+                                <div class="settings-item-info">
+                                    <div class="settings-item-title">Animated Backgrounds</div>
+                                    <div class="settings-item-desc">Show animated particles and gradients</div>
+                                </div>
+                                <label class="toggle">
+                                    <input type="checkbox" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Account Section -->
+                    <div class="settings-section" id="section-account" style="display: none;">
+                        <h2 class="settings-section-title">Account</h2>
+                        <p class="settings-section-desc">Manage your account information</p>
+
+                        <div class="profile-card">
+                            <div class="profile-avatar">AT</div>
+                            <div class="profile-info">
+                                <div class="profile-name">Apurv Todkar</div>
+                                <div class="profile-email">apurv.todkar@nutanix.com</div>
+                                <div class="profile-role">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                                    </svg>
+                                    Administrator
+                                </div>
+                            </div>
+                            <button class="settings-btn">Edit Profile</button>
+                        </div>
+                    </div>
+
+                    <!-- API Keys Section -->
+                    <div class="settings-section" id="section-api" style="display: none;">
+                        <h2 class="settings-section-title">API Keys</h2>
+                        <p class="settings-section-desc">Manage your API keys for programmatic access</p>
+
+                        <div class="api-key-item">
+                            <div class="api-key-icon">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                                </svg>
+                            </div>
+                            <div class="api-key-info">
+                                <div class="api-key-name">Production Key</div>
+                                <div class="api-key-value">nova_prod_••••••••••••••••x4kf</div>
+                            </div>
+                            <div class="api-key-actions">
+                                <button class="api-key-btn" title="Copy">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                    </svg>
+                                </button>
+                                <button class="api-key-btn danger" title="Revoke">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="3 6 5 6 21 6"></polyline>
+                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <button class="settings-btn primary" style="margin-top: 20px;">
+                            Generate New Key
+                        </button>
+                    </div>
+
+                    <!-- Advanced Section -->
+                    <div class="settings-section" id="section-advanced" style="display: none;">
+                        <h2 class="settings-section-title">Advanced</h2>
+                        <p class="settings-section-desc">Advanced settings for developers</p>
+
+                        <div class="settings-card">
+                            <div class="settings-item">
+                                <div class="settings-item-info">
+                                    <div class="settings-item-title">Backend API URL</div>
+                                    <div class="settings-item-desc">NOVA backend server endpoint</div>
+                                </div>
+                                <input type="text" class="settings-input" id="backendUrl" value="http://10.118.24.21:9360">
+                            </div>
+                            <div class="settings-item">
+                                <div class="settings-item-info">
+                                    <div class="settings-item-title">Debug Mode</div>
+                                    <div class="settings-item-desc">Enable verbose logging in console</div>
+                                </div>
+                                <label class="toggle">
+                                    <input type="checkbox" id="debugMode">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="settings-item">
+                                <div class="settings-item-info">
+                                    <div class="settings-item-title">Clear Local Data</div>
+                                    <div class="settings-item-desc">Reset all local settings and cache</div>
+                                </div>
+                                <button class="settings-btn danger" onclick="clearLocalData()">Clear Data</button>
+                            </div>
+                        </div>
+
+                        <div class="settings-card" style="margin-top: 20px;">
+                            <div class="settings-item">
+                                <div class="settings-item-info">
+                                    <div class="settings-item-title">Vector DB Stats</div>
+                                    <div class="settings-item-desc" id="vectorDbStats">Loading...</div>
+                                </div>
+                                <button class="settings-btn" onclick="refreshStats()">Refresh</button>
+                            </div>
+                            <div class="settings-item">
+                                <div class="settings-item-info">
+                                    <div class="settings-item-title">Seed Knowledge Base</div>
+                                    <div class="settings-item-desc">Add Nutanix Objects documentation</div>
+                                </div>
+                                <button class="settings-btn" onclick="seedKnowledge()">Seed DB</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="settings-footer">
+                <p class="settings-footer-text">
+                    NOVA v1.0.0 • <a href="#">Documentation</a> • <a href="https://www.nutanix.dev" target="_blank">Nutanix Developer Portal</a>
+                </p>
+            </div>
+        </main>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="toastIcon">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+        </svg>
+        <span id="toastMessage">Message</span>
+    </div>
+
+    <script>
+        // API Configuration
+        const API_BASE = localStorage.getItem('nova-backend-url') || 'http://10.118.24.21:9360';
+
+        // Load saved theme
+        const savedTheme = localStorage.getItem('nova-theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        document.querySelectorAll('.theme-option').forEach(option => {
+            option.classList.toggle('active', option.dataset.theme === savedTheme);
+        });
+
+        // Theme selection
+        function selectTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('nova-theme', theme);
+            document.querySelectorAll('.theme-option').forEach(option => {
+                option.classList.toggle('active', option.dataset.theme === theme);
+            });
+        }
+
+        // Show section
+        function showSection(sectionId) {
+            document.querySelectorAll('.settings-section').forEach(section => {
+                section.style.display = 'none';
+            });
+            document.getElementById('section-' + sectionId).style.display = 'block';
+            document.querySelectorAll('.settings-nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.target.closest('.settings-nav-item').classList.add('active');
+        }
+
+        // Toast notification
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toastMessage');
+            const toastIcon = document.getElementById('toastIcon');
+            
+            toastMessage.textContent = message;
+            toast.className = 'toast ' + type;
+            
+            if (type === 'success') {
+                toastIcon.innerHTML = '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>';
+            } else {
+                toastIcon.innerHTML = '<circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line>';
+            }
+            
+            toast.classList.add('visible');
+            setTimeout(() => toast.classList.remove('visible'), 3000);
+        }
+
+        // Check backend status
+        async function checkBackendStatus() {
+            const indicator = document.getElementById('backendIndicator');
+            const statusText = document.getElementById('backendStatusText');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/status`);
+                if (response.ok) {
+                    const data = await response.json();
+                    indicator.classList.add('online');
+                    statusText.textContent = 'Backend Online';
+                    return true;
+                }
+            } catch (e) {
+                console.log('Backend not available:', e);
+            }
+            
+            indicator.classList.remove('online');
+            statusText.textContent = 'Backend Offline - Start server on port 9360';
+            return false;
+        }
+
+        // Load Prism configuration
+        async function loadPrismConfig() {
+            try {
+                const response = await fetch(`${API_BASE}/api/config/prism`);
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    if (data.prism_ip) {
+                        document.getElementById('prismIp').value = data.prism_ip;
+                        document.getElementById('prismPort').value = data.prism_port || 9440;
+                        document.getElementById('prismUsername').value = data.prism_username || 'admin';
+                    }
+                    
+                    updateConnectionStatus(data.is_configured, data.connection_status);
+                    
+                    if (data.is_configured) {
+                        document.getElementById('objectsEndpoint').textContent = 
+                            `https://${data.prism_ip}:${data.prism_port}/oss/api/nutanix/v3`;
+                    }
+                }
+            } catch (e) {
+                console.log('Could not load Prism config:', e);
+                updateConnectionStatus(false, 'Backend not available');
+            }
+        }
+
+        // Update connection status display
+        function updateConnectionStatus(configured, status) {
+            const statusEl = document.getElementById('connectionStatus');
+            const statusText = document.getElementById('connectionStatusText');
+            
+            if (!configured) {
+                statusEl.className = 'connection-status unknown';
+                statusText.textContent = status || 'Not configured';
+            } else if (status === 'connected') {
+                statusEl.className = 'connection-status connected';
+                statusText.textContent = 'Connected to Prism Central';
+            } else {
+                statusEl.className = 'connection-status disconnected';
+                statusText.textContent = status || 'Connection failed';
+            }
+        }
+
+        // Save Prism configuration
+        document.getElementById('prismConfigForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const config = {
+                prism_ip: document.getElementById('prismIp').value,
+                prism_port: parseInt(document.getElementById('prismPort').value) || 9440,
+                prism_username: document.getElementById('prismUsername').value || 'admin',
+                prism_password: document.getElementById('prismPassword').value
+            };
+            
+            // Save to localStorage as backup
+            localStorage.setItem('nova-prism-ip', config.prism_ip);
+            localStorage.setItem('nova-prism-port', config.prism_port);
+            localStorage.setItem('nova-prism-username', config.prism_username);
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/config/prism`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    updateConnectionStatus(data.is_configured, data.connection_status);
+                    
+                    if (data.connection_status === 'connected') {
+                        showToast('Prism configuration saved and connected!', 'success');
+                        document.getElementById('objectsEndpoint').textContent = 
+                            `https://${config.prism_ip}:${config.prism_port}/oss/api/nutanix/v3`;
+                    } else {
+                        showToast('Configuration saved but connection failed: ' + data.connection_status, 'error');
+                    }
+                } else {
+                    showToast('Failed to save configuration', 'error');
+                }
+            } catch (e) {
+                showToast('Backend not available. Configuration saved locally.', 'error');
+            }
+        });
+
+        // Test connection
+        async function testConnection() {
+            try {
+                const response = await fetch(`${API_BASE}/api/config/prism/test`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateConnectionStatus(true, 'connected');
+                    showToast('Connection successful!', 'success');
+                } else {
+                    updateConnectionStatus(true, data.message);
+                    showToast('Connection failed: ' + data.message, 'error');
+                }
+            } catch (e) {
+                showToast('Backend not available', 'error');
+            }
+        }
+
+        // Copy endpoint
+        function copyEndpoint() {
+            const endpoint = document.getElementById('objectsEndpoint').textContent;
+            navigator.clipboard.writeText(endpoint);
+            showToast('Endpoint copied to clipboard', 'success');
+        }
+
+        // Clear local data
+        function clearLocalData() {
+            if (confirm('Are you sure you want to clear all local data?')) {
+                localStorage.clear();
+                showToast('Local data cleared', 'success');
+                setTimeout(() => location.reload(), 1000);
+            }
+        }
+
+        // Refresh vector DB stats
+        async function refreshStats() {
+            try {
+                const response = await fetch(`${API_BASE}/api/knowledge/stats`);
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('vectorDbStats').textContent = 
+                        `Knowledge: ${data.knowledge_count} docs | Commands: ${data.commands_count} | Conversations: ${data.conversations_count}`;
+                }
+            } catch (e) {
+                document.getElementById('vectorDbStats').textContent = 'Could not load stats';
+            }
+        }
+
+        // Seed knowledge base
+        async function seedKnowledge() {
+            try {
+                const response = await fetch(`${API_BASE}/api/knowledge/seed`, {
+                    method: 'POST'
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    showToast(`Added ${data.documents_added} documents to knowledge base`, 'success');
+                    refreshStats();
+                }
+            } catch (e) {
+                showToast('Failed to seed knowledge base', 'error');
+            }
+        }
+
+        // Load backend URL setting
+        document.getElementById('backendUrl').value = API_BASE;
+        document.getElementById('backendUrl').addEventListener('change', (e) => {
+            localStorage.setItem('nova-backend-url', e.target.value);
+            showToast('Backend URL updated. Refresh to apply.', 'success');
+        });
+
+        // ==================== LLM Configuration ====================
+        
+        // Load LLM configuration
+        async function loadLLMConfig() {
+            try {
+                const response = await fetch(`${API_BASE}/api/config/llm`);
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    document.getElementById('llmProvider').value = data.provider || 'ollama';
+                    document.getElementById('ollamaUrl').value = data.ollama_url || 'http://localhost:11434';
+                    document.getElementById('ollamaModel').value = data.ollama_model || 'llama3.1';
+                    
+                    updateLLMStatus(data.is_configured, data.status, data.provider);
+                    onProviderChange();
+                }
+            } catch (e) {
+                console.log('Could not load LLM config:', e);
+                updateLLMStatus(false, 'Backend not available', 'unknown');
+            }
+        }
+
+        // Update LLM status display
+        function updateLLMStatus(configured, status, provider) {
+            const indicator = document.getElementById('llmIndicator');
+            const statusText = document.getElementById('llmStatusText');
+            const providerName = document.getElementById('llmProviderName');
+            
+            const providerNames = {
+                'ollama': '🦙 Ollama (Local)',
+                'openai': '🤖 OpenAI',
+                'anthropic': '🧠 Anthropic Claude',
+                'groq': '⚡ Groq'
+            };
+            
+            providerName.textContent = providerNames[provider] || provider;
+            
+            if (status === 'running' || status === 'configured') {
+                indicator.classList.add('online');
+                statusText.textContent = 'AI Provider Active';
+            } else if (status === 'not running') {
+                indicator.classList.remove('online');
+                statusText.textContent = 'Ollama not running - start with: ollama serve';
+            } else {
+                indicator.classList.remove('online');
+                statusText.textContent = status || 'Not configured';
+            }
+        }
+
+        // Handle provider change
+        function onProviderChange() {
+            const provider = document.getElementById('llmProvider').value;
+            const ollamaSettings = document.getElementById('ollamaSettings');
+            const apiKeySettings = document.getElementById('apiKeySettings');
+            const apiKeyHint = document.getElementById('apiKeyHint');
+            
+            if (provider === 'ollama') {
+                ollamaSettings.style.display = 'block';
+                apiKeySettings.style.display = 'none';
+            } else {
+                ollamaSettings.style.display = 'none';
+                apiKeySettings.style.display = 'block';
+                
+                const hints = {
+                    'openai': 'Get your API key from platform.openai.com',
+                    'anthropic': 'Get your API key from console.anthropic.com',
+                    'groq': 'Get your FREE API key from console.groq.com'
+                };
+                apiKeyHint.textContent = hints[provider] || 'Enter your API key';
+            }
+        }
+
+        // Save LLM configuration
+        async function saveLLMConfig() {
+            const provider = document.getElementById('llmProvider').value;
+            const config = {
+                provider: provider,
+                ollama_url: document.getElementById('ollamaUrl').value,
+                ollama_model: document.getElementById('ollamaModel').value,
+                api_key: document.getElementById('llmApiKey').value || null
+            };
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/config/llm`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    updateLLMStatus(data.is_configured, data.status, data.provider);
+                    
+                    if (data.is_configured) {
+                        showToast('AI configuration saved!', 'success');
+                    } else {
+                        showToast('Configuration saved but provider not available: ' + data.status, 'error');
+                    }
+                } else {
+                    showToast('Failed to save configuration', 'error');
+                }
+            } catch (e) {
+                showToast('Backend not available', 'error');
+            }
+        }
+
+        // Test LLM connection
+        async function testLLMConnection() {
+            const provider = document.getElementById('llmProvider').value;
+            
+            if (provider === 'ollama') {
+                const url = document.getElementById('ollamaUrl').value;
+                try {
+                    const response = await fetch(`${url}/api/tags`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        const models = data.models?.map(m => m.name).join(', ') || 'No models found';
+                        showToast(`Ollama connected! Models: ${models}`, 'success');
+                        updateLLMStatus(true, 'running', 'ollama');
+                    } else {
+                        showToast('Ollama not responding. Run: ollama serve', 'error');
+                    }
+                } catch (e) {
+                    showToast('Cannot connect to Ollama. Run: ollama serve', 'error');
+                }
+            } else {
+                // For cloud providers, just check if API key is set
+                const apiKey = document.getElementById('llmApiKey').value;
+                if (apiKey) {
+                    showToast('API key configured. Save to test with actual requests.', 'success');
+                } else {
+                    showToast('Please enter an API key', 'error');
+                }
+            }
+        }
+
+        // Load available Ollama models
+        async function loadOllamaModels() {
+            const url = document.getElementById('ollamaUrl').value;
+            try {
+                const response = await fetch(`${url}/api/tags`);
+                if (response.ok) {
+                    const data = await response.json();
+                    const select = document.getElementById('ollamaModel');
+                    const currentValue = select.value;
+                    
+                    // Clear and repopulate
+                    select.innerHTML = '';
+                    
+                    if (data.models && data.models.length > 0) {
+                        data.models.forEach(model => {
+                            const option = document.createElement('option');
+                            option.value = model.name;
+                            option.textContent = model.name;
+                            select.appendChild(option);
+                        });
+                        select.value = currentValue || data.models[0].name;
+                    } else {
+                        select.innerHTML = '<option value="llama3.1">llama3.1 (pull with: ollama pull llama3.1)</option>';
+                    }
+                }
+            } catch (e) {
+                console.log('Could not load Ollama models');
+            }
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', async () => {
+            await checkBackendStatus();
+            await loadPrismConfig();
+            await loadLLMConfig();
+            await refreshStats();
+            loadOllamaModels();
+            
+            // Load saved prism config from localStorage if backend is down
+            const savedIp = localStorage.getItem('nova-prism-ip');
+            if (savedIp && !document.getElementById('prismIp').value) {
+                document.getElementById('prismIp').value = savedIp;
+                document.getElementById('prismPort').value = localStorage.getItem('nova-prism-port') || 9440;
+                document.getElementById('prismUsername').value = localStorage.getItem('nova-prism-username') || 'admin';
+            }
+        });
+    </script>
+</body>
+</html>

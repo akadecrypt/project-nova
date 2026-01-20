@@ -1,0 +1,1355 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Object Stores - NOVA</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/design-system.css">
+    <style>
+        /* Background */
+        .bg-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .bg-animation::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: 
+                radial-gradient(ellipse at 20% 30%, rgba(99, 102, 241, 0.12) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 70%, rgba(139, 92, 246, 0.08) 0%, transparent 50%);
+            animation: bgPulse 20s ease-in-out infinite;
+        }
+
+        @keyframes bgPulse {
+            0%, 100% { transform: scale(1) rotate(0deg); }
+            50% { transform: scale(1.05) rotate(3deg); }
+        }
+
+        /* App Container */
+        .app-container {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar - Same as other pages */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: rgba(18, 18, 26, 0.85);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            padding: 24px;
+            position: fixed;
+            height: 100vh;
+        }
+
+        [data-theme="light"] .sidebar {
+            background: rgba(255, 255, 255, 0.92);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 32px;
+            text-decoration: none;
+        }
+
+        .logo-icon {
+            width: 44px;
+            height: 44px;
+            background: var(--accent-gradient);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--shadow-glow);
+        }
+
+        .logo-icon svg {
+            width: 24px;
+            height: 24px;
+            fill: white;
+        }
+
+        .logo-text {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .logo-title {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .logo-subtitle {
+            font-size: 10px;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .nav-section { margin-bottom: 24px; }
+        .nav-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 12px;
+            padding-left: 4px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 14px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all var(--transition-normal);
+            margin-bottom: 4px;
+            color: var(--text-secondary);
+            text-decoration: none;
+        }
+
+        .nav-item:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+            transform: translateX(4px);
+        }
+
+        .nav-item.active {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .nav-icon { width: 20px; height: 20px; opacity: 0.7; }
+        .nav-item:hover .nav-icon, .nav-item.active .nav-icon { opacity: 1; }
+        .nav-badge {
+            margin-left: auto;
+            background: var(--accent-primary);
+            color: white;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            margin-left: var(--sidebar-width);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            padding: 20px 32px;
+            background: rgba(18, 18, 26, 0.7);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        [data-theme="light"] .header {
+            background: rgba(255, 255, 255, 0.85);
+        }
+
+        .page-title {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .action-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 20px;
+            background: var(--accent-gradient);
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-family: var(--font-primary);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all var(--transition-normal);
+            box-shadow: var(--shadow-glow);
+        }
+
+        .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px var(--accent-glow);
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            padding: 24px 32px;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            transition: all var(--transition-normal);
+        }
+
+        .stat-card:hover {
+            border-color: var(--accent-primary);
+            transform: translateY(-4px);
+            box-shadow: 0 8px 30px var(--accent-glow);
+        }
+
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+        }
+
+        .stat-icon.blue {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(99, 102, 241, 0.2));
+            color: #3b82f6;
+        }
+
+        .stat-icon.green {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.2));
+            color: #10b981;
+        }
+
+        .stat-icon.purple {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(124, 58, 237, 0.2));
+            color: #8b5cf6;
+        }
+
+        .stat-icon.orange {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(234, 88, 12, 0.2));
+            color: #f59e0b;
+        }
+
+        .stat-icon svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 4px;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        .stat-change {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 13px;
+            margin-top: 12px;
+        }
+
+        .stat-change.positive {
+            color: var(--success);
+        }
+
+        .stat-change.negative {
+            color: var(--error);
+        }
+
+        /* Content Area */
+        .content-area {
+            flex: 1;
+            padding: 0 32px 32px;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        /* Buckets Grid */
+        .buckets-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 20px;
+        }
+
+        .bucket-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 24px;
+            transition: all var(--transition-normal);
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .bucket-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--accent-gradient);
+            transform: scaleX(0);
+            transition: transform var(--transition-normal);
+        }
+
+        .bucket-card:hover {
+            border-color: var(--accent-primary);
+            transform: translateY(-6px);
+            box-shadow: 0 12px 40px var(--accent-glow);
+        }
+
+        .bucket-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .bucket-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .bucket-icon {
+            width: 56px;
+            height: 56px;
+            background: var(--accent-gradient);
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all var(--transition-normal);
+        }
+
+        .bucket-card:hover .bucket-icon {
+            transform: scale(1.1) rotate(-5deg);
+        }
+
+        .bucket-icon svg {
+            width: 28px;
+            height: 28px;
+            fill: none;
+            stroke: white;
+            stroke-width: 2;
+        }
+
+        .bucket-menu {
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+            transition: all var(--transition-fast);
+        }
+
+        .bucket-menu:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .bucket-name {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        .bucket-region {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+        }
+
+        .bucket-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .bucket-stat {
+            text-align: center;
+        }
+
+        .bucket-stat-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .bucket-stat-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .bucket-tags {
+            display: flex;
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .bucket-tag {
+            padding: 4px 10px;
+            font-size: 11px;
+            border-radius: 20px;
+            font-weight: 500;
+        }
+
+        .bucket-tag.versioning {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10b981;
+        }
+
+        .bucket-tag.encryption {
+            background: rgba(59, 130, 246, 0.15);
+            color: #3b82f6;
+        }
+
+        .bucket-tag.public {
+            background: rgba(245, 158, 11, 0.15);
+            color: #f59e0b;
+        }
+
+        .bucket-tag.lifecycle {
+            background: rgba(139, 92, 246, 0.15);
+            color: #8b5cf6;
+        }
+
+        /* Create Bucket Modal */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all var(--transition-normal);
+        }
+
+        .modal-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            padding: 32px;
+            width: 100%;
+            max-width: 500px;
+            transform: scale(0.95) translateY(20px);
+            transition: all var(--transition-normal);
+        }
+
+        .modal-overlay.visible .modal {
+            transform: scale(1) translateY(0);
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+        }
+
+        .modal-title {
+            font-size: 22px;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: var(--bg-tertiary);
+            border-radius: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+            transition: all var(--transition-fast);
+        }
+
+        .modal-close:hover {
+            background: var(--error-bg);
+            color: var(--error);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 14px 16px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-family: var(--font-primary);
+            font-size: 15px;
+            transition: all var(--transition-normal);
+            outline: none;
+        }
+
+        .form-input:focus {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        .form-select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 14px center;
+            padding-right: 44px;
+        }
+
+        .form-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px;
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+            margin-bottom: 12px;
+        }
+
+        .form-toggle-label {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .form-toggle-title {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .form-toggle-desc {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .toggle {
+            position: relative;
+            width: 48px;
+            height: 26px;
+            flex-shrink: 0;
+        }
+
+        .toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 26px;
+            transition: all var(--transition-normal);
+        }
+
+        .toggle-slider::before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background: var(--text-muted);
+            border-radius: 50%;
+            transition: all var(--transition-normal);
+        }
+
+        .toggle input:checked + .toggle-slider {
+            background: var(--accent-gradient);
+            border-color: transparent;
+        }
+
+        .toggle input:checked + .toggle-slider::before {
+            transform: translateX(22px);
+            background: white;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 28px;
+        }
+
+        .modal-btn {
+            flex: 1;
+            padding: 14px 20px;
+            border-radius: 12px;
+            font-family: var(--font-primary);
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all var(--transition-normal);
+        }
+
+        .modal-btn.secondary {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+
+        .modal-btn.secondary:hover {
+            background: var(--bg-hover);
+            border-color: var(--accent-primary);
+        }
+
+        .modal-btn.primary {
+            background: var(--accent-gradient);
+            border: none;
+            color: white;
+            box-shadow: var(--shadow-glow);
+        }
+
+        .modal-btn.primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px var(--accent-glow);
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                display: none;
+            }
+            
+            .main-content {
+                margin-left: 0;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+                padding: 16px;
+            }
+
+            .content-area {
+                padding: 16px;
+            }
+
+            .buckets-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .header {
+                padding: 16px;
+                flex-direction: column;
+                gap: 16px;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-animation"></div>
+
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <a href="index.html" class="logo">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                    </svg>
+                </div>
+                <div class="logo-text">
+                    <span class="logo-title">NOVA</span>
+                    <span class="logo-subtitle">Objects Assistant</span>
+                </div>
+            </a>
+
+            <div class="nav-section">
+                <div class="nav-label">Navigate</div>
+                <a href="index.html" class="nav-item">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    <span>Chat</span>
+                </a>
+                <a href="object-browser.html" class="nav-item">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    <span>Object Browser</span>
+                </a>
+                <a href="buckets.html" class="nav-item active">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                        <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+                        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+                    </svg>
+                    <span>Object Stores</span>
+                    <span class="nav-badge" id="nav-bucket-count">--</span>
+                </a>
+                <a href="settings.html" class="nav-item">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                    <span>Settings</span>
+                </a>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="header">
+                <h1 class="page-title">Object Stores & Buckets</h1>
+                <div class="header-actions">
+                    <button class="action-btn" onclick="openModal()" id="create-bucket-btn" style="display: none;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        Create Bucket
+                    </button>
+                </div>
+            </header>
+
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon purple">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+                            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+                        </svg>
+                    </div>
+                    <div class="stat-value" id="stat-stores">--</div>
+                    <div class="stat-label">Object Stores</div>
+                    <div class="stat-change" id="stat-stores-status">
+                        <span class="loading-dot"></span>
+                        Loading...
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon blue">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                        </svg>
+                    </div>
+                    <div class="stat-value" id="stat-buckets">--</div>
+                    <div class="stat-label">Total Buckets</div>
+                    <div class="stat-change" id="stat-buckets-status">
+                        <span class="loading-dot"></span>
+                        Loading...
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon green">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                        </svg>
+                    </div>
+                    <div class="stat-value" id="stat-objects">--</div>
+                    <div class="stat-label">Total Objects</div>
+                    <div class="stat-change" id="stat-objects-status">
+                        <span class="loading-dot"></span>
+                        Loading...
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon orange">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <circle cx="12" cy="12" r="3" fill="currentColor"></circle>
+                        </svg>
+                    </div>
+                    <div class="stat-value" id="stat-connection">--</div>
+                    <div class="stat-label">Connection</div>
+                    <div class="stat-change" id="stat-connection-status">
+                        <span class="loading-dot"></span>
+                        Checking...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Object Stores Section -->
+            <div class="content-area" id="object-stores-section">
+                <div class="section-header">
+                    <h2 class="section-title">Object Stores</h2>
+                    <p style="color: var(--text-secondary); margin-top: 0.5rem;">Select an Object Store to view its buckets</p>
+                </div>
+                <div class="object-stores-grid" id="object-stores-grid">
+                    <!-- Loading state -->
+                    <div class="loading-state" style="grid-column: 1/-1; text-align: center; padding: 3rem;">
+                        <div class="loading-spinner" style="margin: 0 auto 1rem;">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation: spin 1s linear infinite;">
+                                <circle cx="12" cy="12" r="10" stroke-opacity="0.25"></circle>
+                                <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"></path>
+                            </svg>
+                        </div>
+                        <p style="color: var(--text-secondary);">Loading Object Stores...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Buckets Section (hidden until object store selected) -->
+            <div class="content-area" id="buckets-section" style="display: none;">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <button class="back-btn" onclick="showObjectStores()" style="background: none; border: none; cursor: pointer; padding: 0; margin-right: 12px;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="15 18 9 12 15 6"></polyline>
+                            </svg>
+                        </button>
+                        <span id="selected-store-name">Buckets</span>
+                    </h2>
+                </div>
+
+                <div class="buckets-grid">
+                    <!-- Loading state - will be replaced by JavaScript -->
+                    <div class="loading-state" style="grid-column: 1/-1; text-align: center; padding: 3rem;">
+                        <div class="loading-spinner" style="margin: 0 auto 1rem;">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation: spin 1s linear infinite;">
+                                <circle cx="12" cy="12" r="10" stroke-opacity="0.25"></circle>
+                                <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"></path>
+                            </svg>
+                        </div>
+                        <p style="color: var(--text-secondary);">Loading buckets from Prism Central...</p>
+                    </div>
+                </div>
+                <style>
+                    @keyframes spin {
+                        to { transform: rotate(360deg); }
+                    }
+                    .loading-dot {
+                        display: inline-block;
+                        width: 6px;
+                        height: 6px;
+                        border-radius: 50%;
+                        background: var(--primary);
+                        animation: pulse 1s infinite;
+                    }
+                    @keyframes pulse {
+                        0%, 100% { opacity: 1; }
+                        50% { opacity: 0.3; }
+                    }
+                    .object-stores-grid {
+                        display: grid;
+                        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+                        gap: 20px;
+                    }
+                    .object-store-card:hover {
+                        transform: translateY(-4px);
+                        border-color: var(--accent-primary);
+                    }
+                    .back-btn {
+                        display: inline-flex;
+                        align-items: center;
+                        color: var(--text-secondary);
+                        transition: color 0.2s;
+                    }
+                    .back-btn:hover {
+                        color: var(--accent-primary);
+                    }
+                    .section-title {
+                        display: flex;
+                        align-items: center;
+                    }
+                </style>
+            </div>
+        </main>
+    </div>
+
+    <!-- Create Bucket Modal -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 class="modal-title">Create New Bucket</h2>
+                <button class="modal-close" onclick="closeModal()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+
+            <form id="createBucketForm">
+                <div class="form-group">
+                    <label class="form-label">Bucket Name</label>
+                    <input type="text" class="form-input" placeholder="my-bucket-name" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Region</label>
+                    <select class="form-input form-select">
+                        <option value="us-west-2">US West (Oregon)</option>
+                        <option value="us-east-1">US East (N. Virginia)</option>
+                        <option value="eu-west-1">EU (Ireland)</option>
+                        <option value="ap-southeast-1">Asia Pacific (Singapore)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Options</label>
+                    <div class="form-toggle">
+                        <div class="form-toggle-label">
+                            <span class="form-toggle-title">Enable Versioning</span>
+                            <span class="form-toggle-desc">Keep multiple versions of objects</span>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="form-toggle">
+                        <div class="form-toggle-label">
+                            <span class="form-toggle-title">Server-Side Encryption</span>
+                            <span class="form-toggle-desc">Encrypt objects at rest</span>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="form-toggle">
+                        <div class="form-toggle-label">
+                            <span class="form-toggle-title">Object Lock</span>
+                            <span class="form-toggle-desc">Prevent object deletion</span>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="modal-btn secondary" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="modal-btn primary">Create Bucket</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // API Configuration
+        const API_BASE = localStorage.getItem('nova-backend-url') || 'http://localhost:9360';
+        
+        // Load saved theme
+        const savedTheme = localStorage.getItem('nova-theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+
+        // Modal functions
+        function openModal() {
+            document.getElementById('modalOverlay').classList.add('visible');
+        }
+
+        function closeModal() {
+            document.getElementById('modalOverlay').classList.remove('visible');
+        }
+
+        // Close modal on overlay click
+        document.getElementById('modalOverlay').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) {
+                closeModal();
+            }
+        });
+
+        // Form submission
+        document.getElementById('createBucketForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const form = e.target;
+            const bucketName = form.querySelector('input[type="text"]').value;
+            const versioning = form.querySelector('input[type="checkbox"]').checked;
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/objects/buckets?name=${encodeURIComponent(bucketName)}&versioning=${versioning}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (response.ok) {
+                    closeModal();
+                    showNotification('Bucket created successfully!', 'success');
+                    loadStats(); // Refresh stats
+                } else {
+                    const data = await response.json();
+                    showNotification(data.detail || 'Failed to create bucket', 'error');
+                }
+            } catch (error) {
+                showNotification('Cannot connect to backend. Please configure Prism in Settings.', 'error');
+            }
+        });
+
+        // Close modal on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        });
+
+        // Format numbers
+        function formatNumber(num) {
+            if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+            if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+            return num.toString();
+        }
+
+        // Format bytes
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Show notification
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.innerHTML = `
+                <span>${message}</span>
+                <button onclick="this.parentElement.remove()">×</button>
+            `;
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 1rem 1.5rem;
+                border-radius: 8px;
+                background: ${type === 'success' ? 'var(--success)' : type === 'error' ? 'var(--danger)' : 'var(--primary)'};
+                color: white;
+                z-index: 10000;
+                display: flex;
+                align-items: center;
+                gap: 1rem;
+                animation: slideIn 0.3s ease;
+            `;
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 5000);
+        }
+
+        // State
+        let objectStores = [];
+        let selectedOssUuid = null;
+
+        // Create Object Store card HTML
+        function createObjectStoreCard(store) {
+            const name = store.name || 'Unknown';
+            const uuid = store.uuid || '';
+            const domain = store.domain || '';
+            const version = store.deployment_version || '';
+            
+            return `
+                <div class="bucket-card object-store-card" onclick="selectObjectStore('${uuid}', '${name}')" style="cursor: pointer;">
+                    <div class="bucket-header">
+                        <div class="bucket-icon" style="background: linear-gradient(135deg, #8b5cf6, #6366f1);">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                                <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+                                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+                            </svg>
+                        </div>
+                        <span class="badge" style="background: var(--success); color: white; padding: 4px 8px; border-radius: 12px; font-size: 11px;">Active</span>
+                    </div>
+                    <div class="bucket-name">${name}</div>
+                    <div class="bucket-meta">${domain || 'Nutanix Objects'}</div>
+                    <div class="bucket-stats">
+                        <div class="bucket-stat">
+                            <div class="bucket-stat-value" style="font-size: 12px;">${version || 'N/A'}</div>
+                            <div class="bucket-stat-label">Version</div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-color);">
+                        <span style="color: var(--accent-primary); font-size: 13px;">Click to view buckets →</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Create bucket card HTML
+        function createBucketCard(bucket, ossUuid) {
+            const name = bucket.name || 'Unknown';
+            const size = formatBytes(bucket.size_bytes || 0);
+            const objects = formatNumber(bucket.object_count || 0);
+            const versioning = bucket.versioning === 'Enabled';
+            
+            return `
+                <div class="bucket-card" onclick="window.location.href='object-browser.html?bucket=${encodeURIComponent(name)}&oss=${ossUuid}'">
+                    <div class="bucket-header">
+                        <div class="bucket-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                            </svg>
+                        </div>
+                        <button class="bucket-menu" onclick="event.stopPropagation()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="1"></circle>
+                                <circle cx="12" cy="5" r="1"></circle>
+                                <circle cx="12" cy="19" r="1"></circle>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="bucket-name">${name}</div>
+                    <div class="bucket-meta">In selected Object Store</div>
+                    <div class="bucket-stats">
+                        <div class="bucket-stat">
+                            <div class="bucket-stat-value">${size}</div>
+                            <div class="bucket-stat-label">Size</div>
+                        </div>
+                        <div class="bucket-stat">
+                            <div class="bucket-stat-value">${objects}</div>
+                            <div class="bucket-stat-label">Objects</div>
+                        </div>
+                    </div>
+                    ${versioning ? '<div class="bucket-tags"><span class="bucket-tag versioning">Versioning</span></div>' : ''}
+                </div>
+            `;
+        }
+
+        // Create no object stores state
+        function createNoObjectStoresState() {
+            return `
+                <div class="empty-state" style="grid-column: 1/-1; text-align: center; padding: 3rem;">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="opacity: 0.5; margin-bottom: 1rem;">
+                        <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                        <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+                        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+                    </svg>
+                    <h3 style="margin-bottom: 0.5rem; color: var(--text-primary);">No Object Stores Found</h3>
+                    <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+                        Create an Object Store in Prism Central first, then come back here to manage buckets.
+                    </p>
+                    <div style="display: flex; gap: 1rem; justify-content: center;">
+                        <a href="settings.html" class="action-btn" style="text-decoration: none;">Configure Prism</a>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Create empty buckets state
+        function createEmptyBucketsState() {
+            return `
+                <div class="empty-state" style="grid-column: 1/-1; text-align: center; padding: 3rem;">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="opacity: 0.5; margin-bottom: 1rem;">
+                        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                    </svg>
+                    <h3 style="margin-bottom: 0.5rem; color: var(--text-primary);">No Buckets Found</h3>
+                    <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">This Object Store has no buckets yet. Create one to get started.</p>
+                    <div style="display: flex; gap: 1rem; justify-content: center;">
+                        <button class="action-btn" onclick="openModal()">Create Bucket</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Show Object Stores view
+        function showObjectStores() {
+            document.getElementById('object-stores-section').style.display = 'block';
+            document.getElementById('buckets-section').style.display = 'none';
+            selectedOssUuid = null;
+        }
+
+        // Select an Object Store and show its buckets
+        async function selectObjectStore(ossUuid, ossName) {
+            selectedOssUuid = ossUuid;
+            document.getElementById('selected-store-name').textContent = `Buckets in "${ossName}"`;
+            document.getElementById('object-stores-section').style.display = 'none';
+            document.getElementById('buckets-section').style.display = 'block';
+            
+            const bucketsGrid = document.querySelector('.buckets-grid');
+            bucketsGrid.innerHTML = `
+                <div class="loading-state" style="grid-column: 1/-1; text-align: center; padding: 3rem;">
+                    <div class="loading-spinner" style="margin: 0 auto 1rem;">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation: spin 1s linear infinite;">
+                            <circle cx="12" cy="12" r="10" stroke-opacity="0.25"></circle>
+                            <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"></path>
+                        </svg>
+                    </div>
+                    <p style="color: var(--text-secondary);">Loading buckets...</p>
+                </div>
+            `;
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/objects/stores/${ossUuid}/buckets`);
+                const data = await response.json();
+                
+                if (data.buckets && data.buckets.length > 0) {
+                    bucketsGrid.innerHTML = data.buckets.map(b => createBucketCard(b, ossUuid)).join('');
+                } else {
+                    bucketsGrid.innerHTML = createEmptyBucketsState();
+                }
+            } catch (error) {
+                console.error('Failed to load buckets:', error);
+                bucketsGrid.innerHTML = `
+                    <div class="empty-state" style="grid-column: 1/-1; text-align: center; padding: 3rem;">
+                        <p style="color: var(--danger);">Failed to load buckets: ${error.message}</p>
+                        <button class="action-btn" onclick="selectObjectStore('${ossUuid}', '${ossName}')" style="margin-top: 1rem;">Retry</button>
+                    </div>
+                `;
+            }
+        }
+
+        // Load stats from API
+        async function loadStats() {
+            const statStores = document.getElementById('stat-stores');
+            const statBuckets = document.getElementById('stat-buckets');
+            const statObjects = document.getElementById('stat-objects');
+            const statConnection = document.getElementById('stat-connection');
+            const statStoresStatus = document.getElementById('stat-stores-status');
+            const statBucketsStatus = document.getElementById('stat-buckets-status');
+            const statObjectsStatus = document.getElementById('stat-objects-status');
+            const statConnectionStatus = document.getElementById('stat-connection-status');
+            const navBucketCount = document.getElementById('nav-bucket-count');
+            const objectStoresGrid = document.getElementById('object-stores-grid');
+
+            try {
+                const response = await fetch(`${API_BASE}/api/objects/stats`);
+                const data = await response.json();
+
+                if (data.connected) {
+                    objectStores = data.object_stores || [];
+                    
+                    // Update stats
+                    statStores.textContent = data.total_object_stores || objectStores.length;
+                    statBuckets.textContent = data.total_buckets;
+                    statObjects.textContent = formatNumber(data.total_objects);
+                    statConnection.textContent = 'Online';
+                    navBucketCount.textContent = data.total_object_stores || objectStores.length;
+
+                    // Update status messages
+                    statStoresStatus.innerHTML = '<span style="color: var(--success);">✓</span> Live data';
+                    statBucketsStatus.innerHTML = '<span style="color: var(--success);">✓</span> Live data';
+                    statObjectsStatus.innerHTML = '<span style="color: var(--success);">✓</span> Live data';
+                    statConnectionStatus.innerHTML = '<span style="color: var(--success);">✓</span> Prism connected';
+                    statConnectionStatus.classList.add('positive');
+
+                    // Render Object Store cards
+                    if (objectStores.length > 0) {
+                        objectStoresGrid.innerHTML = objectStores.map(createObjectStoreCard).join('');
+                    } else {
+                        objectStoresGrid.innerHTML = createNoObjectStoresState();
+                    }
+                } else {
+                    throw new Error(data.error || data.message || 'Not connected');
+                }
+            } catch (error) {
+                console.error('Failed to load stats:', error);
+                
+                // Show disconnected state
+                statStores.textContent = '0';
+                statBuckets.textContent = '0';
+                statObjects.textContent = '0';
+                statConnection.textContent = 'Offline';
+                navBucketCount.textContent = '0';
+
+                statStoresStatus.innerHTML = '<span style="color: var(--warning);">⚠</span> No data';
+                statBucketsStatus.innerHTML = '<span style="color: var(--warning);">⚠</span> No data';
+                statObjectsStatus.innerHTML = '<span style="color: var(--warning);">⚠</span> No data';
+                statConnectionStatus.innerHTML = '<span style="color: var(--danger);">✕</span> Configure Prism';
+                statConnectionStatus.classList.add('negative');
+
+                // Show empty state
+                objectStoresGrid.innerHTML = createNoObjectStoresState();
+            }
+        }
+
+        // Load stats on page load
+        document.addEventListener('DOMContentLoaded', loadStats);
+    </script>
+</body>
+</html>
