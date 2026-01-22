@@ -6,7 +6,7 @@ pydantic==2.5.3
 pydantic-settings==2.1.0
 
 # SQLite fix for older systems (must be before chromadb)
-# pysqlite3-binary  # Only needed on Linux with SQLite < 3.35.0
+pysqlite3-binary; sys_platform == "linux"
 
 # Vector Database
 chromadb==0.4.22

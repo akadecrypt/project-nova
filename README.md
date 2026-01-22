@@ -164,7 +164,7 @@ POST /api/knowledge/add
 
 ## 📄 License
 
-MIT License - Built for Nutanix Hackathon 2024
+MIT License - Built for Nutanix Hackathon 2026
 
 ---
 
