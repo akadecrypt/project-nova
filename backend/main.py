@@ -487,6 +487,48 @@ async def set_llm_config_endpoint(request: LLMConfigRequest):
     )
 
 
+@app.get("/api/config/llm/test-ollama")
+async def test_ollama_connection(url: str = "http://localhost:11434"):
+    """Test Ollama connection and get available models (proxied to avoid CORS)"""
+    import httpx
+    
+    try:
+        # Normalize URL
+        base_url = url.rstrip('/')
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(f"{base_url}/api/tags")
+            if response.status_code == 200:
+                data = response.json()
+                models = [m["name"] for m in data.get("models", [])]
+                return {
+                    "success": True,
+                    "status": "running",
+                    "models": models,
+                    "url": base_url
+                }
+            else:
+                return {
+                    "success": False,
+                    "status": "error",
+                    "error": f"Ollama returned status {response.status_code}",
+                    "models": []
+                }
+    except httpx.ConnectError:
+        return {
+            "success": False,
+            "status": "not_running",
+            "error": "Cannot connect to Ollama. Make sure it's running: ollama serve",
+            "models": []
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "status": "error",
+            "error": str(e),
+            "models": []
+        }
+
+
 @app.get("/api/config/llm/providers")
 async def get_available_providers():
     """Get list of available LLM providers and their status"""
@@ -494,11 +536,15 @@ async def get_available_providers():
     
     providers = []
     
+    # Get configured Ollama URL from saved config
+    llm_config = load_llm_config()
+    ollama_url = llm_config.get("ollama_url", "http://localhost:11434")
+    
     # Check Ollama
     ollama_status = "not running"
     ollama_models = []
     try:
-        response = httpx.get("http://localhost:11434/api/tags", timeout=2.0)
+        response = httpx.get(f"{ollama_url}/api/tags", timeout=2.0)
         if response.status_code == 200:
             ollama_status = "running"
             data = response.json()

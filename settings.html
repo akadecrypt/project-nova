@@ -1652,19 +1652,26 @@
             const provider = document.getElementById('llmProvider').value;
             
             if (provider === 'ollama') {
-                const url = document.getElementById('ollamaUrl').value;
+                const ollamaUrl = document.getElementById('ollamaUrl').value;
                 try {
-                    const response = await fetch(`${url}/api/tags`);
+                    // Use backend proxy to avoid CORS issues
+                    const response = await fetch(`${BACKEND_URL}/api/config/llm/test-ollama?url=${encodeURIComponent(ollamaUrl)}`);
                     if (response.ok) {
                         const data = await response.json();
-                        const models = data.models?.map(m => m.name).join(', ') || 'No models found';
-                        showToast(`Ollama connected! Models: ${models}`, 'success');
-                        updateLLMStatus(true, 'running', 'ollama');
+                        if (data.success) {
+                            const models = data.models?.join(', ') || 'No models found';
+                            showToast(`Ollama connected! Models: ${models}`, 'success');
+                            updateLLMStatus(true, 'running', 'ollama');
+                            // Refresh the model dropdown
+                            loadOllamaModels();
+                        } else {
+                            showToast(data.error || 'Ollama not responding. Run: ollama serve', 'error');
+                        }
                     } else {
-                        showToast('Ollama not responding. Run: ollama serve', 'error');
+                        showToast('Backend error testing Ollama connection', 'error');
                     }
                 } catch (e) {
-                    showToast('Cannot connect to Ollama. Run: ollama serve', 'error');
+                    showToast('Cannot connect to backend to test Ollama', 'error');
                 }
             } else {
                 // For cloud providers, just check if API key is set
@@ -1679,9 +1686,10 @@
 
         // Load available Ollama models
         async function loadOllamaModels() {
-            const url = document.getElementById('ollamaUrl').value;
+            const ollamaUrl = document.getElementById('ollamaUrl').value;
             try {
-                const response = await fetch(`${url}/api/tags`);
+                // Use backend proxy to avoid CORS issues
+                const response = await fetch(`${BACKEND_URL}/api/config/llm/test-ollama?url=${encodeURIComponent(ollamaUrl)}`);
                 if (response.ok) {
                     const data = await response.json();
                     const select = document.getElementById('ollamaModel');
@@ -1690,20 +1698,20 @@
                     // Clear and repopulate
                     select.innerHTML = '';
                     
-                    if (data.models && data.models.length > 0) {
-                        data.models.forEach(model => {
+                    if (data.success && data.models && data.models.length > 0) {
+                        data.models.forEach(modelName => {
                             const option = document.createElement('option');
-                            option.value = model.name;
-                            option.textContent = model.name;
+                            option.value = modelName;
+                            option.textContent = modelName;
                             select.appendChild(option);
                         });
-                        select.value = currentValue || data.models[0].name;
+                        select.value = currentValue || data.models[0];
                     } else {
                         select.innerHTML = '<option value="llama3.1">llama3.1 (pull with: ollama pull llama3.1)</option>';
                     }
                 }
             } catch (e) {
-                console.log('Could not load Ollama models');
+                console.log('Could not load Ollama models via backend');
             }
         }
 
