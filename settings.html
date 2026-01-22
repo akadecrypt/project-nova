@@ -1655,7 +1655,7 @@
                 const ollamaUrl = document.getElementById('ollamaUrl').value;
                 try {
                     // Use backend proxy to avoid CORS issues
-                    const response = await fetch(`${BACKEND_URL}/api/config/llm/test-ollama?url=${encodeURIComponent(ollamaUrl)}`);
+                    const response = await fetch(`${API_BASE}/api/config/llm/test-ollama?url=${encodeURIComponent(ollamaUrl)}`);
                     if (response.ok) {
                         const data = await response.json();
                         if (data.success) {
@@ -1689,7 +1689,7 @@
             const ollamaUrl = document.getElementById('ollamaUrl').value;
             try {
                 // Use backend proxy to avoid CORS issues
-                const response = await fetch(`${BACKEND_URL}/api/config/llm/test-ollama?url=${encodeURIComponent(ollamaUrl)}`);
+                const response = await fetch(`${API_BASE}/api/config/llm/test-ollama?url=${encodeURIComponent(ollamaUrl)}`);
                 if (response.ok) {
                     const data = await response.json();
                     const select = document.getElementById('ollamaModel');
