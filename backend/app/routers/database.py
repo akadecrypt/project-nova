@@ -8,8 +8,16 @@ from pydantic import BaseModel
 from typing import Optional, List, Any
 
 from ..tools.sql_tools import execute_sql, list_tables, get_table_schema, get_database_summary
+from ..config import get_sql_agent_url
 
 router = APIRouter(prefix="/api/database", tags=["database"])
+
+
+def check_sql_configured():
+    """Check if SQL agent is configured"""
+    url = get_sql_agent_url()
+    if not url:
+        return {"success": False, "error": "SQL Agent not configured. Go to Settings > SQL Agent Configuration."}
 
 
 class QueryRequest(BaseModel):
@@ -30,6 +38,10 @@ class QueryResponse(BaseModel):
 @router.get("/tables")
 async def get_tables():
     """List all tables in the database"""
+    config_check = check_sql_configured()
+    if config_check:
+        return config_check
+    
     result = list_tables()
     
     if result.get("status") == "error":
@@ -103,6 +115,10 @@ async def get_table_data(table_name: str, limit: int = 100, offset: int = 0):
 @router.post("/query")
 async def run_query(request: QueryRequest):
     """Execute a SQL query"""
+    config_check = check_sql_configured()
+    if config_check:
+        return {**config_check, "columns": [], "rows": []}
+    
     sql = request.sql.strip()
     
     # Only allow SELECT queries for safety
@@ -140,6 +156,10 @@ async def run_query(request: QueryRequest):
 @router.get("/summary")
 async def get_summary():
     """Get database summary with all tables and their info"""
+    config_check = check_sql_configured()
+    if config_check:
+        return config_check
+    
     result = get_database_summary()
     
     if result.get("status") == "error":

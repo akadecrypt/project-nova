@@ -681,7 +681,12 @@
                 `).join('');
                 
             } catch (e) {
-                container.innerHTML = `<div class="error-message">Cannot connect to database</div>`;
+                container.innerHTML = `
+                    <div class="error-message">
+                        <strong>Cannot connect to database</strong><br>
+                        Make sure the SQL Agent is configured in <a href="settings.html" style="color: var(--accent-primary);">Settings</a>
+                    </div>
+                `;
             }
         }
         
