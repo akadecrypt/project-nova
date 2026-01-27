@@ -498,9 +498,9 @@
         }
 
         .message-content {
-            padding: 18px 22px;
-            border-radius: 18px;
-            max-width: min(650px, calc(100vw - 180px));
+            padding: 16px 20px;
+            border-radius: 16px;
+            max-width: min(700px, calc(100vw - 160px));
             overflow: hidden;
         }
 
@@ -516,20 +516,33 @@
         }
 
         .message-text {
-            font-size: 15px;
-            line-height: 1.7;
-            overflow-x: auto;
-            overflow-y: hidden;
+            font-size: 14px;
+            line-height: 1.6;
+            overflow-x: visible;
+            overflow-y: visible;
+        }
+        
+        /* Section headers within messages */
+        .message-text strong:first-child {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
         }
         
         /* Scrollable container for wide content */
         .message-text .table-wrapper {
             overflow-x: auto;
             overflow-y: hidden;
-            margin: 12px -8px;
-            padding: 0 8px;
+            margin: 16px 0;
+            padding: 0;
             scrollbar-width: thin;
             scrollbar-color: var(--accent-primary) transparent;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+        }
+        
+        .message-text .table-wrapper + .table-wrapper {
+            margin-top: 20px;
         }
         
         .message-text .table-wrapper::-webkit-scrollbar {
@@ -537,7 +550,8 @@
         }
         
         .message-text .table-wrapper::-webkit-scrollbar-track {
-            background: transparent;
+            background: var(--bg-tertiary);
+            border-radius: 0 0 8px 8px;
         }
         
         .message-text .table-wrapper::-webkit-scrollbar-thumb {
@@ -586,31 +600,48 @@
 
         /* Data Tables */
         .data-table {
-            width: max-content;
-            min-width: 100%;
+            width: auto;
             border-collapse: collapse;
             margin: 0;
             font-size: 13px;
             background: var(--bg-primary);
-            border-radius: 8px;
+            table-layout: auto;
         }
         .data-table th {
             background: var(--bg-tertiary);
-            padding: 10px 14px;
+            padding: 8px 12px;
             text-align: left;
             font-weight: 600;
+            font-size: 12px;
             color: var(--text-primary);
             border-bottom: 1px solid var(--border-color);
+            border-right: 1px solid var(--border-color);
             white-space: nowrap;
         }
+        .data-table th:last-child {
+            border-right: none;
+        }
         .data-table td {
-            padding: 10px 14px;
+            padding: 6px 12px;
             border-bottom: 1px solid var(--border-color);
+            border-right: 1px solid var(--border-color);
             color: var(--text-secondary);
-            white-space: nowrap;
+            font-size: 12px;
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .data-table td:last-child {
+            border-right: none;
         }
         .data-table tr:last-child td {
             border-bottom: none;
+        }
+        .data-table tr:nth-child(even) td {
+            background: rgba(0,0,0,0.02);
+        }
+        [data-theme="dark"] .data-table tr:nth-child(even) td {
+            background: rgba(255,255,255,0.02);
         }
         .data-table tr:hover td {
             background: var(--bg-hover);
@@ -618,6 +649,7 @@
         .data-table .num {
             text-align: right;
             font-family: var(--font-mono);
+            white-space: nowrap;
         }
 
         /* Typing Indicator */
@@ -1167,22 +1199,37 @@
         }
 
         function formatMessage(text) {
-            // Try to detect and format tables first
-            const tableFormatted = detectAndFormatTable(text);
-            if (tableFormatted) {
-                return tableFormatted
-                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                    .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                    .replace(/`([^`]+)`/g, '<code>$1</code>')
-                    .replace(/\n/g, '<br>');
+            // Split by double newlines to handle multiple sections/tables
+            const sections = text.split(/\n\n+/);
+            let formattedSections = [];
+            
+            for (const section of sections) {
+                if (!section.trim()) continue;
+                
+                // Try to detect and format tables
+                const tableFormatted = detectAndFormatTable(section);
+                if (tableFormatted) {
+                    formattedSections.push(
+                        tableFormatted
+                            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                            .replace(/`([^`]+)`/g, '<code>$1</code>')
+                            .replace(/\n/g, '<br>')
+                    );
+                } else {
+                    // Regular text formatting
+                    formattedSections.push(
+                        section
+                            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                            .replace(/`([^`]+)`/g, '<code>$1</code>')
+                            .replace(/\n/g, '<br>')
+                    );
+                }
             }
             
-            // Convert markdown-like formatting
-            return text
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                .replace(/`([^`]+)`/g, '<code>$1</code>')
-                .replace(/\n/g, '<br>');
+            // Join sections with proper spacing
+            return formattedSections.join('<div style="margin: 16px 0; border-top: 1px solid var(--border-color); opacity: 0.3;"></div>');
         }
 
         function scrollToBottom(force = false) {
