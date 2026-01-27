@@ -1,0 +1,183 @@
+"""
+SQL Tools for NOVA Backend
+
+Implements SQL query execution against the metadata database.
+"""
+import requests
+from typing import Optional, List, Dict, Any
+
+from ..config import get_sql_agent_url
+
+
+def execute_sql(sql: str, timeout: int = 10) -> dict:
+    """
+    Execute a SQL query on the object store metadata database.
+    
+    Args:
+        sql: SQL query to execute
+        timeout: Request timeout in seconds
+        
+    Returns:
+        Result dictionary with status, columns, rows, etc.
+    """
+    try:
+        url = get_sql_agent_url()
+        
+        response = requests.post(
+            url,
+            json={"sql": sql},
+            timeout=timeout
+        )
+        
+        if response.status_code != 200:
+            return {
+                "status": "error",
+                "error": f"SQL agent returned status {response.status_code}",
+                "response": response.text[:500]
+            }
+        
+        return response.json()
+        
+    except requests.exceptions.ConnectionError:
+        return {
+            "status": "error",
+            "error": "Cannot connect to SQL agent. Make sure it's running."
+        }
+    except requests.exceptions.Timeout:
+        return {
+            "status": "error",
+            "error": f"SQL query timed out after {timeout} seconds"
+        }
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+
+def get_table_schema(table_name: str) -> dict:
+    """
+    Get schema information for a specific table.
+    
+    Args:
+        table_name: Name of the table
+        
+    Returns:
+        Result dictionary with column information
+    """
+    result = execute_sql(f"PRAGMA table_info({table_name})")
+    
+    if result.get("status") == "error":
+        return result
+    
+    columns = []
+    for row in result.get("rows", []):
+        columns.append({
+            "cid": row[0],
+            "name": row[1],
+            "type": row[2],
+            "notnull": bool(row[3]),
+            "default": row[4],
+            "primary_key": bool(row[5])
+        })
+    
+    return {
+        "status": "success",
+        "table": table_name,
+        "columns": columns
+    }
+
+
+def list_tables() -> dict:
+    """
+    List all tables in the database.
+    
+    Returns:
+        Result dictionary with table names
+    """
+    result = execute_sql("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+    
+    if result.get("status") == "error":
+        return result
+    
+    tables = [row[0] for row in result.get("rows", [])]
+    
+    return {
+        "status": "success",
+        "tables": tables,
+        "count": len(tables)
+    }
+
+
+def get_database_summary() -> dict:
+    """
+    Get a summary of the database structure.
+    
+    Returns:
+        Result dictionary with database overview
+    """
+    tables_result = list_tables()
+    
+    if tables_result.get("status") == "error":
+        return tables_result
+    
+    summary = {
+        "status": "success",
+        "tables": []
+    }
+    
+    for table_name in tables_result.get("tables", []):
+        schema = get_table_schema(table_name)
+        
+        # Get row count
+        count_result = execute_sql(f"SELECT COUNT(*) FROM {table_name}")
+        row_count = 0
+        if count_result.get("status") != "error" and count_result.get("rows"):
+            row_count = count_result["rows"][0][0]
+        
+        summary["tables"].append({
+            "name": table_name,
+            "columns": schema.get("columns", []) if schema.get("status") != "error" else [],
+            "row_count": row_count
+        })
+    
+    return summary
+
+
+def generate_schema_context() -> str:
+    """
+    Generate a markdown context document from the actual database schema.
+    
+    Returns:
+        Markdown string describing the database schema
+    """
+    summary = get_database_summary()
+    
+    if summary.get("status") == "error":
+        return f"# SQL Database Schema\n\nError retrieving schema: {summary.get('error')}"
+    
+    lines = [
+        "# SQL Analytics Database Schema",
+        "",
+        "## Overview",
+        "Object store metadata is stored in a SQLite database for analytics and historical tracking.",
+        "",
+        "## Tables",
+        ""
+    ]
+    
+    for table in summary.get("tables", []):
+        table_name = table["name"]
+        row_count = table["row_count"]
+        columns = table["columns"]
+        
+        lines.append(f"### {table_name}")
+        lines.append(f"*{row_count} rows*")
+        lines.append("")
+        lines.append("| Column | Type | Primary Key | Description |")
+        lines.append("|--------|------|-------------|-------------|")
+        
+        for col in columns:
+            pk = "Yes" if col["primary_key"] else ""
+            lines.append(f"| {col['name']} | {col['type']} | {pk} | |")
+        
+        lines.append("")
+    
+    return "\n".join(lines)

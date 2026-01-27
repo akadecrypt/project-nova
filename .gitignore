@@ -1,2 +1,35 @@
-/backend/venv
-/backend/data
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+
+# Environment
+.env
+backend/.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+backend/venv/
+backend/data/
+*.log
+
+# Config with secrets - use config.json.sample as template
+backend/config.json

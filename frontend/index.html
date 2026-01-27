@@ -848,8 +848,8 @@
     </div>
 
     <script>
-        // Configuration
-        const API_BASE = localStorage.getItem('nova-backend-url') || 'http://localhost:9360';
+        // Configuration - Auto-detect backend URL based on current hostname
+        const API_BASE = localStorage.getItem('nova-backend-url') || `http://${window.location.hostname}:9360`;
         let currentSessionId = `session-${Date.now()}`;
         let chatSessions = JSON.parse(localStorage.getItem('nova-chat-sessions') || '{}');
 

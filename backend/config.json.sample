@@ -1,0 +1,27 @@
+{
+  "llm": {
+    "provider": "nutanix-ai",
+    "hackathon_api_key": "your-hackathon-api-key",
+    "base_url": "https://hkn12.ai.nutanix.com/enterpriseai/v1/",
+    "model": "hack-reason"
+  },
+  "prism_central": {
+    "ip": "10.x.x.x",
+    "port": 9440,
+    "username": "admin",
+    "password": "your-password"
+  },
+  "s3": {
+    "endpoint": "http://10.x.x.x:80",
+    "access_key": "your-access-key",
+    "secret_key": "your-secret-key",
+    "region": "us-east-1"
+  },
+  "sql_agent": {
+    "url": "http://10.x.x.x:9001/execute"
+  },
+  "background": {
+    "sql_refresh_interval_seconds": 300,
+    "enable_background_refresh": true
+  }
+}

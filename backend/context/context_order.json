@@ -1,0 +1,11 @@
+{
+  "description": "Order in which context files are included in the system prompt. New .md files are automatically loaded and appended if not listed here.",
+  "order": [
+    "system_prompt",
+    "product_knowledge",
+    "sql_schema",
+    "api_reference",
+    "troubleshooting",
+    "best_practices"
+  ]
+}

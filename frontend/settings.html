@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - NOVA</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/design-system.css">
+    <style>
+        .bg-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .bg-animation::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: 
+                radial-gradient(ellipse at 25% 25%, rgba(99, 102, 241, 0.1) 0%, transparent 50%),
+                radial-gradient(ellipse at 75% 75%, rgba(139, 92, 246, 0.08) 0%, transparent 50%);
+            animation: bgPulse 20s ease-in-out infinite;
+        }
+
+        @keyframes bgPulse {
+            0%, 100% { transform: scale(1) rotate(0deg); }
+            50% { transform: scale(1.05) rotate(3deg); }
+        }
+
+        .app-container {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            width: var(--sidebar-width);
+            background: rgba(18, 18, 26, 0.85);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            padding: 24px;
+            position: fixed;
+            height: 100vh;
+        }
+
+        [data-theme="light"] .sidebar {
+            background: rgba(255, 255, 255, 0.92);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 32px;
+            text-decoration: none;
+        }
+
+        .logo-icon {
+            width: 44px;
+            height: 44px;
+            background: var(--accent-gradient);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--shadow-glow);
+        }
+
+        .logo-icon svg { width: 24px; height: 24px; fill: white; }
+
+        .logo-text { display: flex; flex-direction: column; }
+
+        .logo-title {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .logo-subtitle {
+            font-size: 10px;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .nav-section { margin-bottom: 24px; }
+        .nav-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 12px;
+            padding-left: 4px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 14px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all var(--transition-normal);
+            margin-bottom: 4px;
+            color: var(--text-secondary);
+            text-decoration: none;
+        }
+
+        .nav-item:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .nav-item.active {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .nav-icon { width: 20px; height: 20px; opacity: 0.7; }
+
+        .main-content {
+            flex: 1;
+            margin-left: var(--sidebar-width);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .header {
+            padding: 20px 32px;
+            background: rgba(18, 18, 26, 0.7);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        [data-theme="light"] .header {
+            background: rgba(255, 255, 255, 0.85);
+        }
+
+        .page-title { font-size: 24px; font-weight: 600; }
+        .page-desc { font-size: 14px; color: var(--text-muted); margin-top: 4px; }
+
+        .settings-container {
+            flex: 1;
+            padding: 32px;
+            max-width: 900px;
+        }
+
+        .settings-section {
+            margin-bottom: 32px;
+            animation: fadeInUp 0.5s ease;
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .section-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--bg-tertiary);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .section-icon svg {
+            width: 20px;
+            height: 20px;
+            stroke: var(--accent-primary);
+        }
+
+        .section-title { font-size: 18px; font-weight: 600; }
+        .section-desc { font-size: 13px; color: var(--text-muted); }
+
+        .settings-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+        }
+
+        .form-group { margin-bottom: 20px; }
+        .form-group:last-child { margin-bottom: 0; }
+
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 16px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-family: var(--font-primary);
+            font-size: 14px;
+            outline: none;
+            transition: all var(--transition-normal);
+        }
+
+        .form-input:focus {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        .form-input::placeholder { color: var(--text-muted); }
+
+        .form-hint {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 500;
+            font-family: var(--font-primary);
+            cursor: pointer;
+            transition: all var(--transition-normal);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn svg { width: 16px; height: 16px; }
+
+        .btn-primary {
+            background: var(--accent-gradient);
+            border: none;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-glow);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-hover);
+            border-color: var(--accent-primary);
+        }
+
+        .btn-danger {
+            background: transparent;
+            border: 1px solid var(--error);
+            color: var(--error);
+        }
+
+        .btn-danger:hover {
+            background: var(--error-bg);
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-badge.success {
+            background: var(--success-bg);
+            color: var(--success);
+        }
+
+        .status-badge.error {
+            background: var(--error-bg);
+            color: var(--error);
+        }
+
+        .status-badge.warning {
+            background: var(--warning-bg);
+            color: var(--warning);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            padding: 16px 24px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: var(--shadow-lg);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+
+        .toast.visible { transform: translateY(0); opacity: 1; }
+        .toast.success { border-color: var(--success); }
+        .toast.error { border-color: var(--error); }
+
+        .backend-status {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px 20px;
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+            margin-bottom: 24px;
+        }
+
+        .backend-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--warning);
+        }
+
+        .backend-indicator.online {
+            background: var(--success);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+            50% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+        }
+
+        .theme-selector {
+            display: flex;
+            gap: 12px;
+        }
+
+        .theme-option {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            padding: 16px;
+            background: var(--bg-tertiary);
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all var(--transition-normal);
+            min-width: 90px;
+        }
+
+        .theme-option:hover { border-color: var(--accent-primary); }
+        .theme-option.active {
+            border-color: var(--accent-primary);
+            background: var(--bg-hover);
+        }
+
+        .theme-preview {
+            width: 50px;
+            height: 35px;
+            border-radius: 6px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .theme-preview.dark { background: #0a0a0f; }
+        .theme-preview.light { background: #f8fafc; }
+        .theme-preview.nutanix { background: #0d1117; }
+
+        .theme-name { font-size: 12px; font-weight: 500; }
+
+        @media (max-width: 768px) {
+            .sidebar { display: none; }
+            .main-content { margin-left: 0; }
+            .settings-container { padding: 20px; }
+            .form-row { grid-template-columns: 1fr; }
+            .theme-selector { flex-wrap: wrap; }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-animation"></div>
+
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <a href="index.html" class="logo">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                    </svg>
+                </div>
+                <div class="logo-text">
+                    <span class="logo-title">NOVA</span>
+                    <span class="logo-subtitle">Objects Assistant</span>
+                </div>
+            </a>
+
+            <div class="nav-section">
+                <div class="nav-label">Navigate</div>
+                <a href="index.html" class="nav-item">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    <span>Chat</span>
+                </a>
+                <a href="settings.html" class="nav-item active">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1"></path>
+                    </svg>
+                    <span>Settings</span>
+                </a>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="header">
+                <h1 class="page-title">Settings</h1>
+                <p class="page-desc">Configure NOVA connections and preferences</p>
+            </header>
+
+            <div class="settings-container">
+                <!-- Backend Status -->
+                <div class="backend-status">
+                    <div class="backend-indicator" id="backendIndicator"></div>
+                    <div>
+                        <div style="font-size: 14px; font-weight: 500;" id="backendStatusText">Checking backend...</div>
+                        <div style="font-size: 12px; color: var(--text-muted);" id="backendStatusDetail">NOVA Backend Server</div>
+                    </div>
+                </div>
+
+                <!-- LLM Configuration -->
+                <div class="settings-section">
+                    <div class="section-header">
+                        <div class="section-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <path d="M12 6v6l4 2"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="section-title">AI Provider</div>
+                            <div class="section-desc">Configure the LLM for NOVA</div>
+                        </div>
+                        <span class="status-badge" id="llmStatus">
+                            <span class="status-dot"></span>
+                            <span>Checking...</span>
+                        </span>
+                    </div>
+                    <div class="settings-card">
+                        <div class="form-group">
+                            <label class="form-label">Hackathon API Key</label>
+                            <input type="password" class="form-input" id="llmApiKey" placeholder="Enter your API key">
+                            <div class="form-hint">Nutanix Hackathon AI API key</div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Base URL</label>
+                                <input type="text" class="form-input" id="llmBaseUrl" value="https://hkn12.ai.nutanix.com/enterpriseai/v1/">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Model</label>
+                                <input type="text" class="form-input" id="llmModel" value="hack-reason">
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button class="btn btn-primary" onclick="saveLLMConfig()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                                </svg>
+                                Save
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Prism Central Configuration -->
+                <div class="settings-section">
+                    <div class="section-header">
+                        <div class="section-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+                                <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+                                <line x1="6" y1="6" x2="6.01" y2="6"></line>
+                                <line x1="6" y1="18" x2="6.01" y2="18"></line>
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="section-title">Prism Central</div>
+                            <div class="section-desc">Connect to Nutanix Prism Central</div>
+                        </div>
+                        <span class="status-badge" id="prismStatus">
+                            <span class="status-dot"></span>
+                            <span>Checking...</span>
+                        </span>
+                    </div>
+                    <div class="settings-card">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">IP Address</label>
+                                <input type="text" class="form-input" id="prismIp" placeholder="10.0.0.1">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Port</label>
+                                <input type="number" class="form-input" id="prismPort" value="9440">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Username</label>
+                                <input type="text" class="form-input" id="prismUsername" placeholder="admin">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Password</label>
+                                <input type="password" class="form-input" id="prismPassword" placeholder="••••••••">
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button class="btn btn-primary" onclick="savePrismConfig()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                                </svg>
+                                Save
+                            </button>
+                            <button class="btn btn-secondary" onclick="testPrismConnection()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                                </svg>
+                                Test Connection
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- S3 Configuration -->
+                <div class="settings-section">
+                    <div class="section-header">
+                        <div class="section-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+                                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="section-title">S3 / Object Storage</div>
+                            <div class="section-desc">Configure Nutanix Objects S3 endpoint</div>
+                        </div>
+                        <span class="status-badge" id="s3Status">
+                            <span class="status-dot"></span>
+                            <span>Checking...</span>
+                        </span>
+                    </div>
+                    <div class="settings-card">
+                        <div class="form-group">
+                            <label class="form-label">S3 Endpoint URL</label>
+                            <input type="text" class="form-input" id="s3Endpoint" placeholder="http://10.0.0.1:80">
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Access Key</label>
+                                <input type="text" class="form-input" id="s3AccessKey" placeholder="Access key ID">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Secret Key</label>
+                                <input type="password" class="form-input" id="s3SecretKey" placeholder="••••••••">
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button class="btn btn-primary" onclick="saveS3Config()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                                </svg>
+                                Save
+                            </button>
+                            <button class="btn btn-secondary" onclick="testS3Connection()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                                </svg>
+                                Test Connection
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Appearance -->
+                <div class="settings-section">
+                    <div class="section-header">
+                        <div class="section-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="5"></circle>
+                                <line x1="12" y1="1" x2="12" y2="3"></line>
+                                <line x1="12" y1="21" x2="12" y2="23"></line>
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="section-title">Appearance</div>
+                            <div class="section-desc">Customize the look and feel</div>
+                        </div>
+                    </div>
+                    <div class="settings-card">
+                        <div class="form-group">
+                            <label class="form-label">Theme</label>
+                            <div class="theme-selector">
+                                <div class="theme-option active" data-theme="dark" onclick="selectTheme('dark')">
+                                    <div class="theme-preview dark"></div>
+                                    <span class="theme-name">Dark</span>
+                                </div>
+                                <div class="theme-option" data-theme="light" onclick="selectTheme('light')">
+                                    <div class="theme-preview light"></div>
+                                    <span class="theme-name">Light</span>
+                                </div>
+                                <div class="theme-option" data-theme="nutanix" onclick="selectTheme('nutanix')">
+                                    <div class="theme-preview nutanix"></div>
+                                    <span class="theme-name">Nutanix</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Data Management -->
+                <div class="settings-section">
+                    <div class="section-header">
+                        <div class="section-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="section-title">Data Management</div>
+                            <div class="section-desc">Manage local data and cache</div>
+                        </div>
+                    </div>
+                    <div class="settings-card">
+                        <div class="form-actions" style="border-top: none; padding-top: 0; margin-top: 0;">
+                            <button class="btn btn-danger" onclick="clearChatHistory()">
+                                Clear Chat History
+                            </button>
+                            <button class="btn btn-danger" onclick="clearAllData()">
+                                Reset All Settings
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="toastIcon">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+        </svg>
+        <span id="toastMessage">Message</span>
+    </div>
+
+    <script>
+        // Auto-detect backend URL based on current hostname
+        const API_BASE = localStorage.getItem('nova-backend-url') || `http://${window.location.hostname}:9360`;
+
+        // Load saved theme
+        const savedTheme = localStorage.getItem('nova-theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        document.querySelectorAll('.theme-option').forEach(opt => {
+            opt.classList.toggle('active', opt.dataset.theme === savedTheme);
+        });
+
+        function selectTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('nova-theme', theme);
+            document.querySelectorAll('.theme-option').forEach(opt => {
+                opt.classList.toggle('active', opt.dataset.theme === theme);
+            });
+            showToast('Theme updated', 'success');
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toastMessage');
+            const toastIcon = document.getElementById('toastIcon');
+            
+            toastMessage.textContent = message;
+            toast.className = 'toast ' + type;
+            
+            if (type === 'success') {
+                toastIcon.innerHTML = '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>';
+            } else {
+                toastIcon.innerHTML = '<circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line>';
+            }
+            
+            toast.classList.add('visible');
+            setTimeout(() => toast.classList.remove('visible'), 3000);
+        }
+
+        function updateStatusBadge(id, configured, text = null) {
+            const badge = document.getElementById(id);
+            if (configured) {
+                badge.className = 'status-badge success';
+                badge.innerHTML = '<span class="status-dot"></span><span>' + (text || 'Configured') + '</span>';
+            } else {
+                badge.className = 'status-badge warning';
+                badge.innerHTML = '<span class="status-dot"></span><span>' + (text || 'Not configured') + '</span>';
+            }
+        }
+
+        // Check backend status
+        async function checkBackendStatus() {
+            const indicator = document.getElementById('backendIndicator');
+            const statusText = document.getElementById('backendStatusText');
+            const statusDetail = document.getElementById('backendStatusDetail');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/status`);
+                if (response.ok) {
+                    const data = await response.json();
+                    indicator.classList.add('online');
+                    statusText.textContent = 'Backend Online';
+                    statusDetail.textContent = `v${data.version} | LLM: ${data.llm_provider}`;
+                    
+                    updateStatusBadge('llmStatus', data.llm_configured);
+                    updateStatusBadge('prismStatus', data.prism_central_configured);
+                    updateStatusBadge('s3Status', data.s3_configured);
+                    
+                    return true;
+                }
+            } catch (e) {
+                console.log('Backend not available:', e);
+            }
+            
+            indicator.classList.remove('online');
+            statusText.textContent = 'Backend Offline';
+            statusDetail.textContent = 'Start with: ./start_server.sh';
+            
+            updateStatusBadge('llmStatus', false, 'Offline');
+            updateStatusBadge('prismStatus', false, 'Offline');
+            updateStatusBadge('s3Status', false, 'Offline');
+            
+            return false;
+        }
+
+        // Load configurations
+        async function loadConfigurations() {
+            try {
+                // Load LLM config
+                const llmRes = await fetch(`${API_BASE}/api/config/llm`);
+                if (llmRes.ok) {
+                    const llm = await llmRes.json();
+                    document.getElementById('llmBaseUrl').value = llm.base_url || '';
+                    document.getElementById('llmModel').value = llm.model || 'hack-reason';
+                }
+                
+                // Load Prism config
+                const prismRes = await fetch(`${API_BASE}/api/config/prism`);
+                if (prismRes.ok) {
+                    const prism = await prismRes.json();
+                    document.getElementById('prismIp').value = prism.ip || '';
+                    document.getElementById('prismPort').value = prism.port || 9440;
+                    document.getElementById('prismUsername').value = prism.username || '';
+                }
+                
+                // Load S3 config
+                const s3Res = await fetch(`${API_BASE}/api/config/s3`);
+                if (s3Res.ok) {
+                    const s3 = await s3Res.json();
+                    document.getElementById('s3Endpoint').value = s3.endpoint || '';
+                    document.getElementById('s3AccessKey').value = s3.access_key || '';
+                }
+            } catch (e) {
+                console.log('Could not load configurations:', e);
+            }
+        }
+
+        // Save LLM config
+        async function saveLLMConfig() {
+            const config = {
+                provider: 'nutanix-ai',
+                hackathon_api_key: document.getElementById('llmApiKey').value,
+                base_url: document.getElementById('llmBaseUrl').value,
+                model: document.getElementById('llmModel').value
+            };
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/config/llm`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+                
+                if (response.ok) {
+                    showToast('LLM configuration saved', 'success');
+                    updateStatusBadge('llmStatus', true);
+                } else {
+                    showToast('Failed to save configuration', 'error');
+                }
+            } catch (e) {
+                showToast('Backend not available', 'error');
+            }
+        }
+
+        // Save Prism config
+        async function savePrismConfig() {
+            const config = {
+                ip: document.getElementById('prismIp').value,
+                port: parseInt(document.getElementById('prismPort').value) || 9440,
+                username: document.getElementById('prismUsername').value,
+                password: document.getElementById('prismPassword').value
+            };
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/config/prism`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+                
+                if (response.ok) {
+                    showToast('Prism Central configuration saved', 'success');
+                    updateStatusBadge('prismStatus', true);
+                } else {
+                    showToast('Failed to save configuration', 'error');
+                }
+            } catch (e) {
+                showToast('Backend not available', 'error');
+            }
+        }
+
+        // Test Prism connection
+        async function testPrismConnection() {
+            try {
+                const response = await fetch(`${API_BASE}/api/config/prism/test`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showToast('Connected to Prism Central!', 'success');
+                    updateStatusBadge('prismStatus', true, 'Connected');
+                } else {
+                    showToast(data.message || 'Connection failed', 'error');
+                    updateStatusBadge('prismStatus', false, 'Failed');
+                }
+            } catch (e) {
+                showToast('Backend not available', 'error');
+            }
+        }
+
+        // Save S3 config
+        async function saveS3Config() {
+            const config = {
+                endpoint: document.getElementById('s3Endpoint').value,
+                access_key: document.getElementById('s3AccessKey').value,
+                secret_key: document.getElementById('s3SecretKey').value,
+                region: 'us-east-1'
+            };
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/config/s3`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+                
+                if (response.ok) {
+                    showToast('S3 configuration saved', 'success');
+                    updateStatusBadge('s3Status', true);
+                } else {
+                    showToast('Failed to save configuration', 'error');
+                }
+            } catch (e) {
+                showToast('Backend not available', 'error');
+            }
+        }
+
+        // Test S3 connection
+        async function testS3Connection() {
+            try {
+                const response = await fetch(`${API_BASE}/api/config/s3/test`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showToast('Connected to S3!', 'success');
+                    updateStatusBadge('s3Status', true, 'Connected');
+                } else {
+                    showToast(data.message || 'Connection failed', 'error');
+                    updateStatusBadge('s3Status', false, 'Failed');
+                }
+            } catch (e) {
+                showToast('Backend not available', 'error');
+            }
+        }
+
+        // Clear chat history
+        function clearChatHistory() {
+            if (confirm('Delete all chat history?')) {
+                localStorage.removeItem('nova-chat-sessions');
+                showToast('Chat history cleared', 'success');
+            }
+        }
+
+        // Clear all data
+        function clearAllData() {
+            if (confirm('Reset all local settings? This cannot be undone.')) {
+                localStorage.clear();
+                showToast('All settings reset', 'success');
+                setTimeout(() => location.reload(), 1000);
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', async () => {
+            await checkBackendStatus();
+            await loadConfigurations();
+        });
+    </script>
+</body>
+</html>
