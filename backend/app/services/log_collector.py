@@ -43,6 +43,9 @@ class LogCollector:
     then uses allssh to collect logs from all nodes.
     """
     
+    # Full path to mspctl on PCVM (not in default PATH)
+    MSPCTL = "/usr/local/nutanix/cluster/bin/mspctl"
+    
     def __init__(self):
         self.enabled = is_auto_collect_enabled()
         self.interval_hours = get_collection_interval_hours()
@@ -118,27 +121,30 @@ class LogCollector:
             return -1, "", str(e)
     
     def _scp_from_prism(self, remote_path: str, local_path: str, timeout: int = 300) -> bool:
-        """Copy a file from Prism Central via SCP"""
+        """Copy a file from Prism Central via SSH + cat (SCP/SFTP not supported on PCVM)"""
         if not self.has_sshpass:
             return False
         
-        scp_cmd = [
+        # Use ssh + cat instead of scp since PCVM doesn't support sftp subsystem
+        ssh_cmd = [
             "sshpass", "-p", self.cluster_password,
-            "scp", "-o", "StrictHostKeyChecking=no",
+            "ssh", "-o", "StrictHostKeyChecking=no",
             "-o", "ConnectTimeout=30",
-            f"{self.cluster_user}@{self.prism_ip}:{remote_path}",
-            local_path
+            f"{self.cluster_user}@{self.prism_ip}",
+            f"cat {remote_path}"
         ]
         
         try:
-            result = subprocess.run(
-                scp_cmd,
-                capture_output=True,
-                text=True,
-                timeout=timeout
-            )
-            return result.returncode == 0
-        except:
+            with open(local_path, 'wb') as f:
+                result = subprocess.run(
+                    ssh_cmd,
+                    stdout=f,
+                    stderr=subprocess.PIPE,
+                    timeout=timeout
+                )
+            return result.returncode == 0 and os.path.getsize(local_path) > 0
+        except Exception as e:
+            print(f"⚠️ Download error: {e}")
             return False
     
     def _get_msp_cluster_name(self, object_store_name: str) -> Optional[str]:
@@ -148,7 +154,7 @@ class LogCollector:
         """
         print(f"🔍 Looking up MSP cluster name for {object_store_name}...")
         
-        rc, stdout, stderr = self._run_prism_ssh_command("mspctl cls ls", timeout=60)
+        rc, stdout, stderr = self._run_prism_ssh_command(f"{self.MSPCTL} cls ls", timeout=60)
         
         if rc != 0:
             print(f"❌ Failed to list MSP clusters: {stderr}")
@@ -221,67 +227,54 @@ class LogCollector:
         timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
         archive_name = f"{object_store_name}-{timestamp}.tar.gz"
         local_archive = os.path.join(temp_dir, archive_name)
-        remote_archive = f"/tmp/{archive_name}"
+        # Use home directory on PCVM instead of /tmp (which is only 238MB)
+        remote_archive = f"/home/nutanix/{archive_name}"
         
         print(f"📦 Collecting logs from {object_store_name} via mspctl...")
         
-        # Build log file patterns
-        log_patterns = []
-        for pod in self.pods_to_scan:
-            pod_lower = pod.lower()
-            log_patterns.extend([
-                f"data/logs/{pod_lower}*.log*",
-                f"data/logs/{pod_lower.upper()}*.log*",
-                f"/home/nutanix/data/logs/{pod_lower}*.log*"
-            ])
-        
-        patterns_str = " ".join(log_patterns)
-        
-        # Command to run inside the object store cluster via mspctl
-        # Using allssh to collect from all nodes, then tar them up
-        collect_script = f'''
-# Create collection directory
-COLLECT_DIR="/tmp/nova_log_collect_{timestamp}"
-mkdir -p $COLLECT_DIR
-
-# Use allssh to collect logs from all nodes
-echo "Collecting logs from all nodes..."
-allssh "hostname && tar -czf /tmp/node_logs.tar.gz --ignore-failed-read {patterns_str} 2>/dev/null || true"
-
-# Gather all node logs
-for node in $(allssh "hostname" 2>/dev/null | grep -v "^="); do
-    echo "Fetching from $node..."
-    scp -o StrictHostKeyChecking=no $node:/tmp/node_logs.tar.gz $COLLECT_DIR/$node-logs.tar.gz 2>/dev/null || true
-done
-
-# Create final archive
-cd $COLLECT_DIR && tar -czf {remote_archive} *.tar.gz 2>/dev/null
-
-# Cleanup
-rm -rf $COLLECT_DIR
-allssh "rm -f /tmp/node_logs.tar.gz" 2>/dev/null || true
-
-# Check result
-ls -la {remote_archive}
-'''
-        
-        # Execute via mspctl cls ssh
-        # The command needs to be run inside the MSP cluster
-        full_cmd = f'''mspctl cls ssh {msp_cluster} << 'EOFMSP'
-{collect_script}
-EOFMSP'''
+        # Object store logs are in /var/log/ctrlog/default/
+        # Components: oc (Object Controller), ms (Metadata Service), atlas, zookeeper, etc.
+        log_dirs = [
+            "/var/log/ctrlog/default/oc",
+            "/var/log/ctrlog/default/ms", 
+            "/var/log/ctrlog/default/atlas",
+            "/var/log/ctrlog/default/zookeeper",
+            "/var/log/ctrlog/default/bucketstools"
+        ]
+        log_dirs_str = " ".join(log_dirs)
         
         print(f"🔗 Connecting to {msp_cluster} via Prism Central...")
-        rc, stdout, stderr = self._run_prism_ssh_command(full_cmd, timeout=900)
         
-        if rc != 0:
-            print(f"⚠️ mspctl command returned error: {stderr[:500]}")
-            # Try alternative approach - direct execution
-            print("🔄 Trying alternative collection method...")
-            
-            # Simpler approach: just get logs from the first accessible node
-            alt_cmd = f'''mspctl cls ssh {msp_cluster} "tar -czf {remote_archive} --ignore-failed-read {patterns_str} 2>/dev/null; ls -la {remote_archive}"'''
-            rc, stdout, stderr = self._run_prism_ssh_command(alt_cmd, timeout=600)
+        # Create tar archive of logs on the object store node
+        # Logs are in /var/log/ctrlog/default/<component>/
+        tar_cmd = f"tar -czf /tmp/nova_logs_{timestamp}.tar.gz {log_dirs_str} 2>/dev/null"
+        
+        print(f"📥 Creating log archive on object store node...")
+        rc, stdout, stderr = self._run_prism_ssh_command(
+            f'{self.MSPCTL} cls ssh {msp_cluster} --cmd "{tar_cmd}"',
+            timeout=300
+        )
+        
+        # Check if archive was created
+        check_cmd = f'{self.MSPCTL} cls ssh {msp_cluster} --cmd "ls -la /tmp/nova_logs_{timestamp}.tar.gz"'
+        rc, stdout, stderr = self._run_prism_ssh_command(check_cmd, timeout=30)
+        
+        if "nova_logs_" not in stdout:
+            print(f"⚠️ Archive not created on node: {stderr[:200]}")
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            return None
+        
+        print(f"✅ Archive created on node")
+        
+        # Copy archive from object store node to PCVM using cat + redirect
+        # Must wrap in bash -c to get proper redirect behavior
+        print(f"📥 Copying archive to PCVM...")
+        copy_cmd = f'bash -c "{self.MSPCTL} cls ssh {msp_cluster} --cmd \\"cat /tmp/nova_logs_{timestamp}.tar.gz\\" > {remote_archive} 2>/dev/null"'
+        rc, stdout, stderr = self._run_prism_ssh_command(copy_cmd, timeout=600)
+        
+        # Cleanup temp file on object store node
+        cleanup_cmd = f'{self.MSPCTL} cls ssh {msp_cluster} --cmd "rm -f /tmp/nova_logs_{timestamp}.tar.gz"'
+        self._run_prism_ssh_command(cleanup_cmd, timeout=30)
         
         # Check if archive exists on Prism
         check_cmd = f"ls -la {remote_archive} 2>/dev/null"
