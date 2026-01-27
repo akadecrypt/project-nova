@@ -1,80 +1,107 @@
 {
   "tools": [
     {
-      "name": "create_bucket",
-      "description": "Create a new bucket in Nutanix Object Store. Bucket names must be unique, lowercase, 3-63 characters.",
-      "category": "bucket_management",
+      "name": "execute_sql",
+      "description": "PRIMARY TOOL FOR ALL READ OPERATIONS. Execute SQL queries on the analytics database to list buckets, get stats, analyze trends, view storage data. Use this for ANY request that asks to 'list', 'show', 'get', 'display', 'what are', 'how many'. Tables: bucket (bucket_name, created_at, versioning_enabled, worm_enabled, lifecycle_enabled), bucket_stats (bucket_id, size_gb, object_count, timestamp).",
+      "category": "read_analytics",
+      "mode": "read",
       "parameters": {
         "type": "object",
         "properties": {
-          "bucket_name": {
+          "sql": {
             "type": "string",
-            "description": "Name of the bucket to create. If not provided, generates a unique name."
+            "description": "SQL query to execute. Common queries: 'SELECT * FROM bucket' for buckets, 'SELECT b.bucket_name, bs.size_gb, bs.object_count FROM bucket b JOIN bucket_stats bs ON b.bucket_id = bs.bucket_id' for stats"
           }
-        }
+        },
+        "required": ["sql"]
       },
       "examples": [
-        "Create a bucket called 'my-data'",
-        "Create a new bucket for logs",
-        "Make a bucket named 'backups-2024'"
+        "List all buckets → SELECT bucket_name, created_at FROM bucket",
+        "Show bucket sizes → SELECT b.bucket_name, bs.size_gb FROM bucket b JOIN bucket_stats bs...",
+        "Which buckets have WORM? → SELECT bucket_name FROM bucket WHERE worm_enabled = 1",
+        "Storage growth this week → SELECT bucket_name, size_gb, timestamp FROM bucket_stats WHERE timestamp >= datetime('now', '-7 days')"
       ]
     },
     {
-      "name": "list_buckets",
-      "description": "List all buckets in the Nutanix Object Store with their creation dates.",
-      "category": "bucket_management",
+      "name": "get_table_schema",
+      "description": "Get the schema (columns and types) for a database table. Use before writing complex SQL queries.",
+      "category": "read_analytics",
+      "mode": "read",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "table_name": {
+            "type": "string",
+            "description": "Name of the table: 'bucket', 'bucket_stats', etc."
+          }
+        },
+        "required": ["table_name"]
+      },
+      "examples": [
+        "Describe the bucket table",
+        "What columns are in bucket_stats?"
+      ]
+    },
+    {
+      "name": "list_tables",
+      "description": "List all tables available in the analytics database for SQL queries.",
+      "category": "read_analytics",
+      "mode": "read",
       "parameters": {
         "type": "object",
         "properties": {}
       },
       "examples": [
-        "List all buckets",
-        "Show me the buckets",
-        "What buckets do we have?"
+        "What tables are available for analytics?"
       ]
     },
     {
-      "name": "list_objects",
-      "description": "List objects in a bucket with their keys and sizes. Supports prefix filtering.",
-      "category": "object_management",
+      "name": "get_database_summary",
+      "description": "Get complete database overview with all tables, columns, and row counts.",
+      "category": "read_analytics",
+      "mode": "read",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "examples": [
+        "Give me a database overview"
+      ]
+    },
+    {
+      "name": "create_bucket",
+      "description": "ACTION: Create a new S3 bucket via API. Only use for CREATE requests, NOT for listing.",
+      "category": "write_action",
+      "mode": "write",
       "parameters": {
         "type": "object",
         "properties": {
           "bucket_name": {
             "type": "string",
-            "description": "Name of the bucket to list objects from"
-          },
-          "prefix": {
-            "type": "string",
-            "description": "Optional prefix to filter objects (like a folder path)"
-          },
-          "max_keys": {
-            "type": "integer",
-            "description": "Maximum number of objects to return (default: 1000)"
+            "description": "Name of the bucket to create (lowercase, 3-63 chars)"
           }
-        },
-        "required": ["bucket_name"]
+        }
       },
       "examples": [
-        "List objects in bucket 'my-data'",
-        "Show files in the backups bucket",
-        "List objects with prefix 'logs/2024/'"
+        "Create a bucket called 'my-data'",
+        "Make a new bucket for backups"
       ]
     },
     {
       "name": "put_object",
-      "description": "Upload a text object to a bucket. For binary/large files, use the web UI upload.",
-      "category": "object_management",
+      "description": "ACTION: Upload an object to a bucket via S3 API. Only use for upload/write requests.",
+      "category": "write_action",
+      "mode": "write",
       "parameters": {
         "type": "object",
         "properties": {
           "bucket_name": {
             "type": "string",
-            "description": "Name of the bucket to upload to"
+            "description": "Target bucket name"
           },
           "key": {
             "type": "string",
-            "description": "Object key (filename/path) for the uploaded object"
+            "description": "Object key (filename/path)"
           },
           "content": {
             "type": "string",
@@ -84,41 +111,21 @@
         "required": ["bucket_name", "key", "content"]
       },
       "examples": [
-        "Upload a file called 'test.txt' with content 'Hello World'",
-        "Create config.json in the settings bucket",
-        "Put a README in the docs bucket"
-      ]
-    },
-    {
-      "name": "get_bucket_info",
-      "description": "Get detailed information about a specific bucket including object count and total size.",
-      "category": "bucket_management",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "bucket_name": {
-            "type": "string",
-            "description": "Name of the bucket"
-          }
-        },
-        "required": ["bucket_name"]
-      },
-      "examples": [
-        "Get info about bucket 'my-data'",
-        "Show details for the logs bucket",
-        "How big is the backups bucket?"
+        "Upload test.txt to my-bucket",
+        "Create a config file in settings bucket"
       ]
     },
     {
       "name": "delete_object",
-      "description": "Delete an object from a bucket.",
-      "category": "object_management",
+      "description": "ACTION: Delete an object from a bucket via S3 API. Confirm with user first!",
+      "category": "write_action",
+      "mode": "write",
       "parameters": {
         "type": "object",
         "properties": {
           "bucket_name": {
             "type": "string",
-            "description": "Name of the bucket"
+            "description": "Bucket containing the object"
           },
           "key": {
             "type": "string",
@@ -128,163 +135,134 @@
         "required": ["bucket_name", "key"]
       },
       "examples": [
-        "Delete file.txt from bucket 'my-data'",
-        "Remove old-config.json from settings bucket"
+        "Delete old-file.txt from bucket"
       ]
     },
     {
-      "name": "execute_sql",
-      "description": "Execute a SQL query on the object store metadata database for analytics. Supports SELECT queries on bucket and bucket_stats tables.",
-      "category": "analytics",
+      "name": "list_objects",
+      "description": "List objects currently in a specific bucket via S3 API. Use when user asks for LIVE/CURRENT objects in a specific bucket.",
+      "category": "read_realtime",
+      "mode": "read",
       "parameters": {
         "type": "object",
         "properties": {
-          "sql": {
+          "bucket_name": {
             "type": "string",
-            "description": "SQL query to execute (SELECT only)"
+            "description": "Bucket name to list objects from"
+          },
+          "prefix": {
+            "type": "string",
+            "description": "Optional prefix filter"
+          },
+          "max_keys": {
+            "type": "integer",
+            "description": "Max objects to return (default: 1000)"
           }
         },
-        "required": ["sql"]
+        "required": ["bucket_name"]
       },
       "examples": [
-        "Show me storage growth over the last week",
-        "Which buckets have WORM enabled?",
-        "List top 10 buckets by size",
-        "How many objects were added today?",
-        "Show buckets with versioning enabled"
+        "List objects in bucket 'my-data'",
+        "Show files in logs bucket"
+      ]
+    },
+    {
+      "name": "get_bucket_info",
+      "description": "Get live bucket info (object count, size) via S3 API for a specific bucket.",
+      "category": "read_realtime",
+      "mode": "read",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "bucket_name": {
+            "type": "string",
+            "description": "Bucket name"
+          }
+        },
+        "required": ["bucket_name"]
+      },
+      "examples": [
+        "Get info about my-data bucket"
       ]
     },
     {
       "name": "get_object_stores",
-      "description": "Get all Object Store configurations from Prism Central including capacity, status, and configuration.",
-      "category": "object_store_management",
+      "description": "Get Object Store configurations from Prism Central (name, domain, capacity, status).",
+      "category": "read_realtime",
+      "mode": "read",
       "parameters": {
         "type": "object",
-        "properties": {
-          "verify_ssl": {
-            "type": "boolean",
-            "description": "Whether to verify SSL certificate (default: false)"
-          }
-        }
+        "properties": {}
       },
       "examples": [
-        "List all object stores",
-        "Show object store configurations",
-        "What object stores are configured?",
-        "Get object store capacity information"
+        "List object stores",
+        "Show object store configurations"
       ]
     },
     {
       "name": "fetch_object_store_stats_v4",
-      "description": "Fetch real-time statistics for an object store using Prism Central v4 API. Supports time range queries for metrics like IOPS, throughput, capacity, and object counts.",
-      "category": "analytics",
+      "description": "Fetch real-time IOPS, throughput, capacity stats from Prism Central v4 API. Use for live performance metrics.",
+      "category": "read_realtime",
+      "mode": "read",
       "parameters": {
         "type": "object",
         "properties": {
           "object_store_ext_id": {
             "type": "string",
-            "description": "External ID (UUID) of the object store"
+            "description": "Object store UUID (get from get_object_stores)"
           },
           "start_time": {
             "type": "string",
-            "description": "Start time in ISO 8601 format (e.g., '2024-01-01T00:00:00Z')"
+            "description": "Start time ISO 8601 (e.g., '2024-01-01T00:00:00Z')"
           },
           "end_time": {
             "type": "string",
-            "description": "End time in ISO 8601 format"
+            "description": "End time ISO 8601"
           },
           "select_stats": {
             "type": "array",
             "items": {"type": "string"},
-            "description": "List of stats: totalObjectCount, totalBucketCount, totalCapacityBytes, usedCapacityBytes, readIops, writeIops, readThroughputBps, writeThroughputBps"
-          },
-          "sampling_interval": {
-            "type": "integer",
-            "description": "Sampling interval in seconds"
-          },
-          "stat_type": {
-            "type": "string",
-            "description": "Type of statistics to retrieve"
+            "description": "Stats: totalObjectCount, totalBucketCount, totalCapacityBytes, usedCapacityBytes, readIops, writeIops"
           }
         },
         "required": ["object_store_ext_id", "start_time", "end_time"]
       },
       "examples": [
-        "Get stats for object store in the last 24 hours",
-        "Show IOPS for the main object store today",
-        "What's the capacity usage trend this week?",
-        "Get throughput metrics for the last hour"
-      ]
-    },
-    {
-      "name": "get_table_schema",
-      "description": "Get the schema (columns and types) for a specific database table.",
-      "category": "analytics",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "table_name": {
-            "type": "string",
-            "description": "Name of the table to describe"
-          }
-        },
-        "required": ["table_name"]
-      },
-      "examples": [
-        "Describe the bucket table",
-        "What columns are in bucket_stats?",
-        "Show schema for the alerts table"
-      ]
-    },
-    {
-      "name": "list_tables",
-      "description": "List all tables available in the analytics database.",
-      "category": "analytics",
-      "parameters": {
-        "type": "object",
-        "properties": {}
-      },
-      "examples": [
-        "What tables are available?",
-        "List database tables",
-        "Show me what data I can query"
-      ]
-    },
-    {
-      "name": "get_database_summary",
-      "description": "Get a summary of the entire database including all tables, their columns, and row counts.",
-      "category": "analytics",
-      "parameters": {
-        "type": "object",
-        "properties": {}
-      },
-      "examples": [
-        "Give me a database overview",
-        "Summarize the analytics database",
-        "What data is available for analysis?"
+        "Get IOPS for the last hour",
+        "Show throughput metrics today"
       ]
     }
   ],
   "categories": {
-    "bucket_management": {
-      "name": "Bucket Management",
-      "description": "Create, list, and configure S3 buckets",
-      "icon": "bucket"
+    "read_analytics": {
+      "name": "Analytics (SQL Database)",
+      "description": "PRIMARY for all read/list/stats operations - query the SQL analytics database",
+      "icon": "database",
+      "mode": "read"
     },
-    "object_management": {
-      "name": "Object Management", 
-      "description": "Upload, list, download, and delete objects within buckets",
-      "icon": "file"
+    "read_realtime": {
+      "name": "Real-time Queries (API)",
+      "description": "Live object listing and Prism Central metrics",
+      "icon": "refresh",
+      "mode": "read"
     },
-    "object_store_management": {
-      "name": "Object Store Management",
-      "description": "Configure and monitor Nutanix Object Stores via Prism Central",
-      "icon": "server"
+    "write_action": {
+      "name": "Actions (API)",
+      "description": "Create, upload, delete operations via S3/Prism API",
+      "icon": "edit",
+      "mode": "write"
+    }
+  },
+  "mode_rules": {
+    "read": {
+      "primary_tool": "execute_sql",
+      "description": "Use SQL database for all list/show/get/stats requests",
+      "keywords": ["list", "show", "get", "display", "what", "which", "how many", "stats", "analytics", "trend", "growth"]
     },
-    "analytics": {
-      "name": "Analytics & Reporting",
-      "description": "Query metadata database, analyze trends, generate insights and reports",
-      "icon": "chart"
+    "write": {
+      "tools": ["create_bucket", "put_object", "delete_object"],
+      "description": "Use API for create/upload/delete/modify operations",
+      "keywords": ["create", "make", "upload", "put", "delete", "remove", "modify", "update", "configure"]
     }
   }
 }
