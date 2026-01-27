@@ -56,19 +56,12 @@ def search_logs(
     
     where_clause = " AND ".join(conditions) if conditions else "1=1"
     
-    sql = f"""
-        SELECT log_id, timestamp, pod, node_name, severity, event_type, 
-               message, object_store_name, bucket_name, raw_log_file, raw_line_number
-        FROM logs 
-        WHERE {where_clause}
-        ORDER BY timestamp DESC
-        LIMIT {limit}
-    """
+    sql = f"SELECT log_id, timestamp, pod, node_name, severity, event_type, message, object_store_name, bucket_name, raw_log_file, raw_line_number FROM logs WHERE {where_clause} ORDER BY timestamp DESC LIMIT {limit}"
     
     result = execute_sql(sql)
     
-    if result.get('status') == 'error':
-        return {"status": "error", "error": result.get('error')}
+    if result.get('status') == 'error' or result.get('error'):
+        return {"status": "error", "error": result.get('error', result.get('status'))}
     
     # Format rows
     logs = []

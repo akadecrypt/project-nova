@@ -60,12 +60,15 @@ class LogProcessor:
             ('{s3_key}', '{s3_url}', '{cluster_name}', {period_start}, {period_end}, 'PENDING', {now})
         """)
         
-        if result.get('status') == 'error':
-            print(f"Error creating upload record: {result.get('error')}")
+        # SQL agent returns {"type":"write","rows_affected":1} on success
+        # or {"error":"..."} on failure
+        if result.get('error') or result.get('status') == 'error':
+            print(f"Error creating upload record: {result.get('error', result)}")
             return None
         
-        # Get the last inserted ID
-        id_result = execute_sql("SELECT last_insert_rowid()")
+        # Get the last inserted ID by querying for max upload_id with matching s3_key
+        # (last_insert_rowid doesn't work across separate HTTP requests)
+        id_result = execute_sql(f"SELECT MAX(upload_id) FROM log_uploads WHERE s3_key = '{s3_key}'")
         if id_result.get('rows'):
             row = id_result['rows'][0]
             if isinstance(row, dict):
