@@ -64,12 +64,21 @@ async def lifespan(app: FastAPI):
     
     yield
     
-    # Cleanup
-    background_task.cancel()
-    try:
-        await background_task
-    except asyncio.CancelledError:
-        pass
+    # Cleanup - background_task is a list of tasks
+    if isinstance(background_task, list):
+        for task in background_task:
+            if task and not task.done():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+    elif background_task:
+        background_task.cancel()
+        try:
+            await background_task
+        except asyncio.CancelledError:
+            pass
     
     print("👋 NOVA Backend shutdown complete")
 
