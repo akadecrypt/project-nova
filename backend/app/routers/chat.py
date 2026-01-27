@@ -107,19 +107,30 @@ def format_tool_result(tool_name: str, result: dict) -> str:
         return "\n".join(lines)
     
     elif tool_name == "execute_sql":
-        columns = result.get("columns", [])
-        rows = result.get("rows", [])
+        # Handle different response formats from SQL agent
+        columns = result.get("columns", result.get("column_names", []))
+        rows = result.get("rows", result.get("data", result.get("results", [])))
+        
+        # If still no columns, try to infer from first row
+        if not columns and rows and isinstance(rows[0], (list, tuple)):
+            columns = [f"Col{i+1}" for i in range(len(rows[0]))]
+        elif not columns and rows and isinstance(rows[0], dict):
+            columns = list(rows[0].keys())
+            rows = [[r.get(c) for c in columns] for r in rows]
+        
         if not rows:
             return "Query returned no results."
-        lines = ["**Query Results:**\n"]
+        
+        lines = [f"**Query Results ({len(rows)} rows):**\n"]
         # Create table header
         lines.append("| " + " | ".join(str(c) for c in columns) + " |")
         lines.append("|" + "|".join(["---"] * len(columns)) + "|")
-        # Add rows (limit to 20)
-        for row in rows[:20]:
-            lines.append("| " + " | ".join(str(v) for v in row) + " |")
-        if len(rows) > 20:
-            lines.append(f"\n*... and {len(rows) - 20} more rows*")
+        # Add rows (limit to 30)
+        for row in rows[:30]:
+            row_values = row if isinstance(row, (list, tuple)) else [row]
+            lines.append("| " + " | ".join(str(v) if v is not None else "NULL" for v in row_values) + " |")
+        if len(rows) > 30:
+            lines.append(f"\n*... and {len(rows) - 30} more rows*")
         return "\n".join(lines)
     
     elif tool_name == "create_bucket":
@@ -155,8 +166,42 @@ def format_tool_result(tool_name: str, result: dict) -> str:
 - Objects: {result.get('object_count', 'N/A')}
 - Size: {result.get('total_size', 'N/A')}"""
     
-    # Default: return JSON formatted
-    return f"**Result:**\n```json\n{json.dumps(result, indent=2)}\n```"
+    elif tool_name == "fetch_object_store_stats_v4":
+        # Handle Object Store stats
+        stats = result.get("stats", result)
+        if isinstance(stats, dict):
+            lines = ["**Object Store Statistics:**\n"]
+            for key, value in stats.items():
+                if key != "status":
+                    formatted_key = key.replace("_", " ").title()
+                    if isinstance(value, (int, float)) and value > 1000000:
+                        value = _format_bytes(int(value))
+                    lines.append(f"- **{formatted_key}**: {value}")
+            return "\n".join(lines)
+    
+    # Default: format as readable output
+    if isinstance(result, dict):
+        # Remove status field and format nicely
+        display_result = {k: v for k, v in result.items() if k != "status"}
+        if display_result:
+            lines = ["**Result:**\n"]
+            for key, value in display_result.items():
+                formatted_key = key.replace("_", " ").title()
+                if isinstance(value, list) and value:
+                    lines.append(f"**{formatted_key}:**")
+                    for item in value[:20]:
+                        lines.append(f"  - {item}")
+                    if len(value) > 20:
+                        lines.append(f"  - *... and {len(value) - 20} more*")
+                elif isinstance(value, dict):
+                    lines.append(f"**{formatted_key}:**")
+                    for k, v in value.items():
+                        lines.append(f"  - {k}: {v}")
+                else:
+                    lines.append(f"- **{formatted_key}**: {value}")
+            return "\n".join(lines)
+    
+    return f"```json\n{json.dumps(result, indent=2, default=str)}\n```"
 
 
 @router.post("", response_model=ChatResponse)
@@ -236,14 +281,39 @@ async def chat(request: ChatMessage):
                 )
                 final_msg = final_response.choices[0].message
                 final_content = final_msg.content
+                print(f"[NOVA] Tool results: {[tr['tool'] for tr in tool_results]}")
+                print(f"[NOVA] LLM response length: {len(final_content) if final_content else 0}")
+                print(f"[NOVA] LLM response preview: {final_content[:200] if final_content else 'None'}...")
             except Exception as e:
-                print(f"Error getting final response: {e}")
+                print(f"[NOVA] Error getting final response: {e}")
                 final_content = None
             
             intent = assistant_msg.tool_calls[0].function.name
             
-            # If LLM didn't provide a good response, format the results ourselves
-            if not final_content or final_content.strip() in ["", "Operation completed.", "Done.", "Completed."]:
+            # Check if LLM's response is too generic or missing actual data
+            needs_formatting = False
+            if not final_content:
+                needs_formatting = True
+            else:
+                content_lower = final_content.strip().lower()
+                # Check for generic completion messages
+                generic_patterns = [
+                    "operation completed", "done", "completed", "finished",
+                    "executed successfully", "query executed", "has been executed",
+                    "here is the", "here are the", "i have",
+                    "the results", "the data"
+                ]
+                # If response is short and generic, format it ourselves
+                if len(final_content.strip()) < 100:
+                    for pattern in generic_patterns:
+                        if pattern in content_lower:
+                            needs_formatting = True
+                            break
+                # Also check if response contains SQL query instead of results
+                if "SELECT" in final_content.upper() and "|" not in final_content:
+                    needs_formatting = True
+            
+            if needs_formatting:
                 formatted_results = []
                 for tr in tool_results:
                     formatted_results.append(format_tool_result(tr["tool"], tr["result"]))

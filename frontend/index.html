@@ -275,7 +275,9 @@
             margin-left: var(--sidebar-width);
             display: flex;
             flex-direction: column;
-            min-height: 100vh;
+            height: 100vh;
+            max-height: 100vh;
+            overflow: hidden;
         }
 
         /* Header */
@@ -1185,21 +1187,21 @@
 
         function scrollToBottom(force = false) {
             const chatArea = document.getElementById('chatArea');
+            if (!chatArea) return;
             
-            // Use requestAnimationFrame for smoother scrolling
             const doScroll = () => {
-                chatArea.scrollTo({
-                    top: chatArea.scrollHeight,
-                    behavior: force ? 'auto' : 'smooth'
-                });
+                // Force immediate scroll using scrollTop
+                chatArea.scrollTop = chatArea.scrollHeight + 1000;
             };
             
-            // Multiple attempts to ensure scroll happens after DOM updates
-            requestAnimationFrame(() => {
-                doScroll();
-                setTimeout(doScroll, 100);
-                setTimeout(doScroll, 300);
-            });
+            // Immediate scroll
+            doScroll();
+            
+            // Multiple delayed attempts to catch DOM updates
+            setTimeout(doScroll, 50);
+            setTimeout(doScroll, 150);
+            setTimeout(doScroll, 300);
+            setTimeout(doScroll, 500);
         }
 
         function addMessage(content, isUser = false, isHtml = false) {
@@ -1352,6 +1354,22 @@
             checkStatus();
             loadChatHistory();
             setInterval(checkStatus, 30000);
+            
+            // Set up MutationObserver to auto-scroll when content is added
+            const chatArea = document.getElementById('chatArea');
+            const observer = new MutationObserver((mutations) => {
+                // Check if we should auto-scroll (user hasn't scrolled up significantly)
+                const isNearBottom = chatArea.scrollHeight - chatArea.scrollTop - chatArea.clientHeight < 200;
+                if (isNearBottom || isProcessing) {
+                    scrollToBottom();
+                }
+            });
+            
+            observer.observe(chatArea, { 
+                childList: true, 
+                subtree: true,
+                characterData: true
+            });
         });
     </script>
 </body>
