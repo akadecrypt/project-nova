@@ -13,6 +13,7 @@ from ..models import (
 from ..config import load_config, save_config
 from ..tools.prism_tools import test_prism_connection, get_s3_endpoint_from_prism, auto_configure_s3_from_prism
 from ..tools.s3_tools import get_s3_client
+from ..learning import get_learning_manager
 
 router = APIRouter(prefix="/api/config", tags=["config"])
 
@@ -288,3 +289,37 @@ async def test_sql():
         "success": True, 
         "message": f"Connected! Found {len(tables)} tables"
     }
+
+
+# Learning/Training endpoints
+@router.get("/learning")
+async def get_learning_stats():
+    """Get learning statistics"""
+    learning_manager = get_learning_manager()
+    return learning_manager.get_stats()
+
+
+@router.get("/learning/examples")
+async def get_learned_examples():
+    """Get all learned examples"""
+    learning_manager = get_learning_manager()
+    return {
+        "examples": dict(learning_manager.examples),
+        "query_patterns": learning_manager.query_patterns
+    }
+
+
+@router.delete("/learning")
+async def clear_learning():
+    """Clear all learned examples"""
+    learning_manager = get_learning_manager()
+    learning_manager.clear()
+    return {"success": True, "message": "Learning data cleared"}
+
+
+@router.post("/learning/save")
+async def save_learning():
+    """Force save learning data to disk"""
+    learning_manager = get_learning_manager()
+    learning_manager.save()
+    return {"success": True, "message": "Learning data saved"}

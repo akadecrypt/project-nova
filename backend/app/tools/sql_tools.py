@@ -56,38 +56,41 @@ def get_table_schema(table_name: str) -> dict:
     """
     Get schema information for a specific table.
     
+    Since PRAGMA is not allowed, we infer schema from a sample row.
+    
     Args:
         table_name: Name of the table
         
     Returns:
         Result dictionary with column information
     """
-    result = execute_sql(f"PRAGMA table_info({table_name})")
+    # Get a sample row to infer column names
+    result = execute_sql(f"SELECT * FROM {table_name} LIMIT 1")
     
     if result.get("status") == "error":
         return result
     
     columns = []
-    for row in result.get("rows", []):
-        # Handle dict rows from SQL agent
-        if isinstance(row, dict):
-            values = list(row.values())
+    rows = result.get("rows", [])
+    
+    if rows and isinstance(rows[0], dict):
+        # Dict format: extract column names from keys
+        for idx, (col_name, value) in enumerate(rows[0].items()):
+            # Infer type from value
+            if isinstance(value, int):
+                col_type = "INTEGER"
+            elif isinstance(value, float):
+                col_type = "REAL"
+            else:
+                col_type = "TEXT"
+            
             columns.append({
-                "cid": values[0] if len(values) > 0 else 0,
-                "name": values[1] if len(values) > 1 else "",
-                "type": values[2] if len(values) > 2 else "TEXT",
-                "notnull": bool(values[3]) if len(values) > 3 else False,
-                "default": values[4] if len(values) > 4 else None,
-                "primary_key": bool(values[5]) if len(values) > 5 else False
-            })
-        else:
-            columns.append({
-                "cid": row[0],
-                "name": row[1],
-                "type": row[2],
-                "notnull": bool(row[3]),
-                "default": row[4],
-                "primary_key": bool(row[5])
+                "cid": idx,
+                "name": col_name,
+                "type": col_type,
+                "notnull": False,
+                "default": None,
+                "primary_key": col_name.endswith("_id") or col_name.endswith("_uuid")
             })
     
     return {

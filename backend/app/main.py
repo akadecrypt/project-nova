@@ -16,7 +16,7 @@ from .config import (
 from .context import initialize_context_manager, get_context_manager
 from .tools import initialize_tool_manager, get_tool_manager
 from .llm import get_llm_client
-from .background import start_background_tasks
+from .background import start_background_tasks, generate_dynamic_schema
 from .routers import (
     chat_router,
     config_router,
@@ -36,6 +36,14 @@ async def lifespan(app: FastAPI):
     # Initialize context manager
     context_manager = initialize_context_manager()
     print(f"📄 Context files loaded: {len(context_manager.contexts)}")
+    
+    # Load dynamic SQL schema from database (replaces static sql_schema.md)
+    try:
+        dynamic_schema = generate_dynamic_schema()
+        context_manager.set_context("sql_schema", dynamic_schema)
+        print("📊 Dynamic SQL schema loaded from database")
+    except Exception as e:
+        print(f"⚠️ Could not load dynamic schema: {e}")
     
     # Initialize tool manager
     tool_manager = initialize_tool_manager()

@@ -2,6 +2,7 @@
 Chat Router for NOVA Backend
 
 Handles chat endpoints and conversation management.
+Integrates with learning module for continuous improvement.
 """
 import json
 from typing import Dict, List, Any
@@ -14,6 +15,7 @@ from ..context import get_context_manager
 from ..tools import get_tool_manager, execute_tool
 from ..llm import get_llm_client
 from ..config import get_llm_model
+from ..learning import get_learning_manager
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -223,9 +225,15 @@ async def chat(request: ChatMessage):
     # Get managers
     context_manager = get_context_manager()
     tool_manager = get_tool_manager()
+    learning_manager = get_learning_manager()
     
-    # Build dynamic system prompt
+    # Build dynamic system prompt with learned examples
     system_prompt = context_manager.build_system_prompt()
+    
+    # Add learned context based on user's query
+    learned_context = learning_manager.build_learning_context(user_message)
+    if learned_context:
+        system_prompt += f"\n\n---\n\n# Learned Patterns\n\n{learned_context}"
     
     # Initialize or update session
     if session_id not in chat_sessions:
@@ -263,7 +271,17 @@ async def chat(request: ChatMessage):
                 
                 # Execute the tool
                 result = execute_tool(tool_name, tool_args)
-                tool_results.append({"tool": tool_name, "result": result})
+                tool_results.append({"tool": tool_name, "args": tool_args, "result": result})
+                
+                # Learn from this interaction
+                was_successful = result.get("status") != "error"
+                learning_manager.learn_from_interaction(
+                    user_query=user_message,
+                    tool_name=tool_name,
+                    tool_args=tool_args,
+                    tool_result=result,
+                    was_successful=was_successful
+                )
                 
                 # Add tool result to messages
                 chat_sessions[session_id].append({
