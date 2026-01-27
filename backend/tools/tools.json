@@ -2,7 +2,7 @@
   "tools": [
     {
       "name": "execute_sql",
-      "description": "PRIMARY TOOL FOR ALL READ OPERATIONS. Execute SQL queries on the analytics database to list buckets, get stats, analyze trends, view storage data. Use this for ANY request that asks to 'list', 'show', 'get', 'display', 'what are', 'how many'. Tables: bucket (bucket_name, created_at, versioning_enabled, worm_enabled, lifecycle_enabled), bucket_stats (bucket_id, size_gb, object_count, timestamp).",
+      "description": "DEFAULT AND PRIMARY TOOL FOR ALL READ OPERATIONS. Use this for ANY 'list', 'show', 'get', 'stats', 'analytics' request. Tables: bucket (bucket_id, bucket_name, bucket_owner, versioning, worm, created_at), bucket_stats (bucket_id, object_count, size_gb, timestamp). Examples: 'list buckets' = SELECT * FROM bucket; 'show stats' = SELECT b.bucket_name, bs.size_gb, bs.object_count FROM bucket b JOIN bucket_stats bs ON b.bucket_id = bs.bucket_id; 'object store stats' = same SQL query.",
       "category": "read_analytics",
       "mode": "read",
       "parameters": {
@@ -187,7 +187,7 @@
     },
     {
       "name": "get_object_stores",
-      "description": "Get Object Store configurations from Prism Central (name, domain, capacity, status).",
+      "description": "Get Object Store configurations (name, domain, UUID) from Prism Central. Use only when user asks about 'object store configuration' or 'which object stores exist'. For bucket stats or analytics, use execute_sql instead.",
       "category": "read_realtime",
       "mode": "read",
       "parameters": {
@@ -195,13 +195,13 @@
         "properties": {}
       },
       "examples": [
-        "List object stores",
-        "Show object store configurations"
+        "What object stores are configured?",
+        "Show object store domains"
       ]
     },
     {
       "name": "fetch_object_store_stats_v4",
-      "description": "Fetch real-time IOPS, throughput, capacity stats from Prism Central v4 API. Use for live performance metrics.",
+      "description": "ONLY USE when user EXPLICITLY asks for 'IOPS' or 'throughput' metrics. DO NOT use for general 'stats' or 'show stats' requests - use execute_sql instead! This tool is ONLY for real-time performance metrics like readIops, writeIops, readThroughputBps, writeThroughputBps.",
       "category": "read_realtime",
       "mode": "read",
       "parameters": {
@@ -209,27 +209,27 @@
         "properties": {
           "object_store_ext_id": {
             "type": "string",
-            "description": "Object store UUID (get from get_object_stores)"
+            "description": "Object store UUID (get from get_object_stores first)"
           },
           "start_time": {
             "type": "string",
-            "description": "Start time ISO 8601 (e.g., '2024-01-01T00:00:00Z')"
+            "description": "Start time ISO 8601 (e.g., '2024-01-20T00:00:00Z')"
           },
           "end_time": {
             "type": "string",
-            "description": "End time ISO 8601"
+            "description": "End time ISO 8601 (e.g., '2024-01-20T23:59:59Z')"
           },
           "select_stats": {
             "type": "array",
             "items": {"type": "string"},
-            "description": "Stats: totalObjectCount, totalBucketCount, totalCapacityBytes, usedCapacityBytes, readIops, writeIops"
+            "description": "ONLY: readIops, writeIops, readThroughputBps, writeThroughputBps"
           }
         },
         "required": ["object_store_ext_id", "start_time", "end_time"]
       },
       "examples": [
-        "Get IOPS for the last hour",
-        "Show throughput metrics today"
+        "What is the current IOPS?",
+        "Show read/write throughput"
       ]
     }
   ],
