@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NOVA - Database Browser</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/design-system.css">
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: var(--font-primary);
+        }
+        
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        
+        /* Header */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 24px;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+        }
+        
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            background: var(--accent-gradient);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .logo-icon svg {
+            width: 20px;
+            height: 20px;
+            fill: white;
+        }
+        
+        .logo-text {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        
+        .page-title {
+            font-size: 14px;
+            color: var(--text-muted);
+            padding-left: 16px;
+            border-left: 1px solid var(--border-color);
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .nav-link {
+            padding: 8px 16px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+        
+        .nav-link:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+        
+        /* Main Layout */
+        .main-content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        
+        /* Sidebar - Tables List */
+        .sidebar {
+            width: 260px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .sidebar-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .tables-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+        
+        .table-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 4px;
+        }
+        
+        .table-item:hover {
+            background: var(--bg-hover);
+        }
+        
+        .table-item.active {
+            background: var(--accent-primary);
+            color: white;
+        }
+        
+        .table-icon {
+            width: 28px;
+            height: 28px;
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .table-item.active .table-icon {
+            background: rgba(255,255,255,0.2);
+        }
+        
+        .table-icon svg {
+            width: 14px;
+            height: 14px;
+            stroke: var(--text-muted);
+        }
+        
+        .table-item.active .table-icon svg {
+            stroke: white;
+        }
+        
+        .table-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .table-name {
+            font-size: 13px;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .table-rows {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+        
+        .table-item.active .table-rows {
+            color: rgba(255,255,255,0.7);
+        }
+        
+        /* Main Panel */
+        .main-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        /* Query Editor */
+        .query-section {
+            padding: 16px;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .query-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+        
+        .query-editor {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .query-input {
+            flex: 1;
+            padding: 12px 16px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            font-size: 13px;
+            resize: none;
+            min-height: 60px;
+        }
+        
+        .query-input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+        }
+        
+        .query-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-family: var(--font-primary);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        
+        .btn-primary {
+            background: var(--accent-gradient);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px var(--accent-glow);
+        }
+        
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+        }
+        
+        .btn-secondary:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+        
+        .btn svg {
+            width: 16px;
+            height: 16px;
+        }
+        
+        /* Results Section */
+        .results-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            padding: 16px;
+        }
+        
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .results-info {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+        
+        .results-info strong {
+            color: var(--text-primary);
+        }
+        
+        .results-container {
+            flex: 1;
+            overflow: auto;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+        }
+        
+        /* Data Table */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        
+        .data-table th {
+            position: sticky;
+            top: 0;
+            background: var(--bg-tertiary);
+            padding: 10px 14px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border-color);
+            white-space: nowrap;
+        }
+        
+        .data-table td {
+            padding: 8px 14px;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .data-table tr:hover td {
+            background: var(--bg-hover);
+        }
+        
+        .data-table .null-value {
+            color: var(--text-muted);
+            font-style: italic;
+        }
+        
+        /* Schema View */
+        .schema-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        
+        .schema-table th {
+            background: var(--bg-tertiary);
+            padding: 12px 16px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .schema-table td {
+            padding: 10px 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .schema-table .col-name {
+            font-family: var(--font-mono);
+            color: var(--accent-primary);
+        }
+        
+        .schema-table .col-type {
+            font-family: var(--font-mono);
+            color: var(--text-muted);
+        }
+        
+        .schema-table .pk-badge {
+            background: var(--warning);
+            color: #000;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+        
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 4px;
+            padding: 0 16px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .tab {
+            padding: 12px 20px;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-family: var(--font-primary);
+            font-size: 13px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            transition: all 0.2s;
+        }
+        
+        .tab:hover {
+            color: var(--text-primary);
+        }
+        
+        .tab.active {
+            color: var(--accent-primary);
+            border-bottom-color: var(--accent-primary);
+        }
+        
+        /* Empty State */
+        .empty-state {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        .empty-icon {
+            width: 80px;
+            height: 80px;
+            background: var(--bg-tertiary);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        
+        .empty-icon svg {
+            width: 40px;
+            height: 40px;
+            stroke: var(--text-muted);
+        }
+        
+        .empty-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        
+        .empty-desc {
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+        
+        /* Loading */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+        }
+        
+        .spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Error */
+        .error-message {
+            background: var(--error-bg);
+            border: 1px solid var(--error);
+            color: var(--error);
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin: 16px;
+            font-size: 13px;
+        }
+        
+        /* Pagination */
+        .pagination {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px;
+            border-top: 1px solid var(--border-color);
+        }
+        
+        .pagination-btn {
+            padding: 6px 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-secondary);
+            font-size: 12px;
+            cursor: pointer;
+        }
+        
+        .pagination-btn:hover:not(:disabled) {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+        
+        .pagination-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .pagination-info {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin: 0 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <a href="index.html" class="logo">
+                    <div class="logo-icon">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                        </svg>
+                    </div>
+                    <span class="logo-text">NOVA</span>
+                </a>
+                <span class="page-title">Database Browser</span>
+            </div>
+            <div class="nav-links">
+                <a href="index.html" class="nav-link">Chat</a>
+                <a href="settings.html" class="nav-link">Settings</a>
+            </div>
+        </header>
+        
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Sidebar - Tables -->
+            <aside class="sidebar">
+                <div class="sidebar-header">Tables</div>
+                <div class="tables-list" id="tablesList">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                    </div>
+                </div>
+            </aside>
+            
+            <!-- Main Panel -->
+            <main class="main-panel">
+                <!-- Query Editor -->
+                <div class="query-section">
+                    <div class="query-label">SQL Query</div>
+                    <div class="query-editor">
+                        <textarea class="query-input" id="queryInput" placeholder="SELECT * FROM bucket LIMIT 100"></textarea>
+                        <div class="query-actions">
+                            <button class="btn btn-primary" onclick="executeQuery()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                </svg>
+                                Run
+                            </button>
+                            <button class="btn btn-secondary" onclick="clearQuery()">Clear</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Tabs -->
+                <div class="tabs">
+                    <button class="tab active" data-tab="data" onclick="switchTab('data')">Data</button>
+                    <button class="tab" data-tab="schema" onclick="switchTab('schema')">Schema</button>
+                </div>
+                
+                <!-- Results -->
+                <div class="results-section">
+                    <div class="results-header">
+                        <div class="results-info" id="resultsInfo">Select a table or run a query</div>
+                    </div>
+                    <div class="results-container" id="resultsContainer">
+                        <div class="empty-state">
+                            <div class="empty-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                                    <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+                                    <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+                                </svg>
+                            </div>
+                            <div class="empty-title">No Data</div>
+                            <div class="empty-desc">Select a table from the sidebar or run a SQL query</div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+    
+    <script>
+        const API_BASE = localStorage.getItem('nova-backend-url') || `http://${window.location.hostname}:9360`;
+        
+        let currentTable = null;
+        let currentTab = 'data';
+        let currentOffset = 0;
+        const PAGE_SIZE = 100;
+        
+        // Load tables on page load
+        document.addEventListener('DOMContentLoaded', loadTables);
+        
+        // Handle Enter key in query input
+        document.getElementById('queryInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && e.ctrlKey) {
+                e.preventDefault();
+                executeQuery();
+            }
+        });
+        
+        async function loadTables() {
+            const container = document.getElementById('tablesList');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/database/summary`);
+                const data = await response.json();
+                
+                if (!data.success) {
+                    container.innerHTML = `<div class="error-message">${data.error || 'Failed to load tables'}</div>`;
+                    return;
+                }
+                
+                if (!data.tables || data.tables.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state" style="padding: 20px;">
+                            <div class="empty-desc">No tables found</div>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                container.innerHTML = data.tables.map(table => `
+                    <div class="table-item" onclick="selectTable('${table.name}')" data-table="${table.name}">
+                        <div class="table-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                <line x1="3" y1="9" x2="21" y2="9"></line>
+                                <line x1="9" y1="21" x2="9" y2="9"></line>
+                            </svg>
+                        </div>
+                        <div class="table-info">
+                            <div class="table-name">${table.name}</div>
+                            <div class="table-rows">${table.row_count.toLocaleString()} rows</div>
+                        </div>
+                    </div>
+                `).join('');
+                
+            } catch (e) {
+                container.innerHTML = `<div class="error-message">Cannot connect to database</div>`;
+            }
+        }
+        
+        async function selectTable(tableName) {
+            currentTable = tableName;
+            currentOffset = 0;
+            
+            // Update active state
+            document.querySelectorAll('.table-item').forEach(item => {
+                item.classList.toggle('active', item.dataset.table === tableName);
+            });
+            
+            // Set default query
+            document.getElementById('queryInput').value = `SELECT * FROM ${tableName} LIMIT 100`;
+            
+            // Load data based on current tab
+            if (currentTab === 'data') {
+                await loadTableData(tableName);
+            } else {
+                await loadTableSchema(tableName);
+            }
+        }
+        
+        async function loadTableData(tableName, offset = 0) {
+            const container = document.getElementById('resultsContainer');
+            const info = document.getElementById('resultsInfo');
+            
+            container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/database/tables/${tableName}/data?limit=${PAGE_SIZE}&offset=${offset}`);
+                const data = await response.json();
+                
+                if (!data.success) {
+                    container.innerHTML = `<div class="error-message">${data.error}</div>`;
+                    return;
+                }
+                
+                if (!data.rows || data.rows.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-title">No Data</div>
+                            <div class="empty-desc">This table is empty</div>
+                        </div>
+                    `;
+                    info.innerHTML = `Table <strong>${tableName}</strong> - 0 rows`;
+                    return;
+                }
+                
+                const start = offset + 1;
+                const end = offset + data.rows.length;
+                info.innerHTML = `Table <strong>${tableName}</strong> - Showing ${start}-${end} of ${data.total.toLocaleString()} rows`;
+                
+                renderTable(data.columns, data.rows, data.total, offset);
+                
+            } catch (e) {
+                container.innerHTML = `<div class="error-message">Failed to load data: ${e.message}</div>`;
+            }
+        }
+        
+        async function loadTableSchema(tableName) {
+            const container = document.getElementById('resultsContainer');
+            const info = document.getElementById('resultsInfo');
+            
+            container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/database/tables/${tableName}/schema`);
+                const data = await response.json();
+                
+                if (!data.success) {
+                    container.innerHTML = `<div class="error-message">${data.error}</div>`;
+                    return;
+                }
+                
+                info.innerHTML = `Schema for <strong>${tableName}</strong> - ${data.columns.length} columns`;
+                
+                container.innerHTML = `
+                    <table class="schema-table">
+                        <thead>
+                            <tr>
+                                <th>Column Name</th>
+                                <th>Type</th>
+                                <th>Nullable</th>
+                                <th>Default</th>
+                                <th>Key</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.columns.map(col => `
+                                <tr>
+                                    <td class="col-name">${col.name}</td>
+                                    <td class="col-type">${col.type || 'TEXT'}</td>
+                                    <td>${col.notnull ? 'No' : 'Yes'}</td>
+                                    <td>${col.default || '-'}</td>
+                                    <td>${col.primary_key ? '<span class="pk-badge">PK</span>' : ''}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+                
+            } catch (e) {
+                container.innerHTML = `<div class="error-message">Failed to load schema: ${e.message}</div>`;
+            }
+        }
+        
+        async function executeQuery() {
+            const query = document.getElementById('queryInput').value.trim();
+            if (!query) return;
+            
+            const container = document.getElementById('resultsContainer');
+            const info = document.getElementById('resultsInfo');
+            
+            container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/database/query`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sql: query, limit: 500 })
+                });
+                
+                const data = await response.json();
+                
+                if (!data.success) {
+                    container.innerHTML = `<div class="error-message">${data.error}</div>`;
+                    info.innerHTML = 'Query failed';
+                    return;
+                }
+                
+                info.innerHTML = `Query result: <strong>${data.row_count}</strong> rows`;
+                
+                if (data.row_count === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-title">No Results</div>
+                            <div class="empty-desc">Query returned no rows</div>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                renderTable(data.columns, data.rows);
+                
+            } catch (e) {
+                container.innerHTML = `<div class="error-message">Query execution failed: ${e.message}</div>`;
+            }
+        }
+        
+        function renderTable(columns, rows, total = null, offset = 0) {
+            const container = document.getElementById('resultsContainer');
+            
+            let html = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            ${columns.map(col => `<th>${col}</th>`).join('')}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rows.map(row => `
+                            <tr>
+                                ${row.map(cell => `
+                                    <td>${cell === null ? '<span class="null-value">NULL</span>' : escapeHtml(String(cell))}</td>
+                                `).join('')}
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+            
+            // Add pagination if browsing a table
+            if (total !== null && currentTable) {
+                const totalPages = Math.ceil(total / PAGE_SIZE);
+                const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
+                
+                html += `
+                    <div class="pagination">
+                        <button class="pagination-btn" onclick="goToPage(${offset - PAGE_SIZE})" ${offset === 0 ? 'disabled' : ''}>
+                            ← Previous
+                        </button>
+                        <span class="pagination-info">Page ${currentPage} of ${totalPages}</span>
+                        <button class="pagination-btn" onclick="goToPage(${offset + PAGE_SIZE})" ${offset + PAGE_SIZE >= total ? 'disabled' : ''}>
+                            Next →
+                        </button>
+                    </div>
+                `;
+            }
+            
+            container.innerHTML = html;
+        }
+        
+        function goToPage(offset) {
+            if (currentTable && offset >= 0) {
+                currentOffset = offset;
+                loadTableData(currentTable, offset);
+            }
+        }
+        
+        function switchTab(tab) {
+            currentTab = tab;
+            
+            document.querySelectorAll('.tab').forEach(t => {
+                t.classList.toggle('active', t.dataset.tab === tab);
+            });
+            
+            if (currentTable) {
+                if (tab === 'data') {
+                    loadTableData(currentTable, currentOffset);
+                } else {
+                    loadTableSchema(currentTable);
+                }
+            }
+        }
+        
+        function clearQuery() {
+            document.getElementById('queryInput').value = '';
+            if (currentTable) {
+                document.getElementById('queryInput').value = `SELECT * FROM ${currentTable} LIMIT 100`;
+            }
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
