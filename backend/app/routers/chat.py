@@ -4,7 +4,7 @@ Chat Router for NOVA Backend
 Handles chat endpoints and conversation management.
 """
 import json
-from typing import Dict, List
+from typing import Dict, List, Any
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException
@@ -21,6 +21,17 @@ router = APIRouter(prefix="/api/chat", tags=["chat"])
 chat_sessions: Dict[str, List[dict]] = {}
 
 
+def _format_bytes(num_bytes: int) -> str:
+    """Format bytes into human readable string"""
+    if num_bytes is None:
+        return "N/A"
+    for unit in ['B', 'KB', 'MB', 'GB', 'TB', 'PB']:
+        if abs(num_bytes) < 1024.0:
+            return f"{num_bytes:.1f} {unit}"
+        num_bytes /= 1024.0
+    return f"{num_bytes:.1f} EB"
+
+
 def get_suggestions(intent: str) -> List[str]:
     """Get contextual suggestions based on intent"""
     suggestions_map = {
@@ -33,6 +44,119 @@ def get_suggestions(intent: str) -> List[str]:
         "fetch_object_store_stats_v4": ["Show another time range", "Compare object stores", "List buckets"]
     }
     return suggestions_map.get(intent, ["List buckets", "Show object stores", "Help"])
+
+
+def format_tool_result(tool_name: str, result: dict) -> str:
+    """Format tool result into a readable message"""
+    if result.get("status") == "error":
+        return f"**Error**: {result.get('error', 'Unknown error occurred')}"
+    
+    # Format based on tool type
+    if tool_name == "list_buckets":
+        buckets = result.get("buckets", [])
+        count = result.get("count", len(buckets))
+        if not buckets:
+            return "No buckets found."
+        lines = [f"**Buckets ({count} found):**\n"]
+        lines.append("| Name | Created |")
+        lines.append("|------|---------|")
+        for b in buckets:
+            name = b.get("name", str(b)) if isinstance(b, dict) else str(b)
+            created = b.get("created", "N/A") if isinstance(b, dict) else "N/A"
+            # Format the datetime if it's an ISO string
+            if created and created != "N/A":
+                try:
+                    created = created.split("T")[0]  # Just show date
+                except:
+                    pass
+            lines.append(f"| {name} | {created} |")
+        return "\n".join(lines)
+    
+    elif tool_name == "get_object_stores":
+        stores = result.get("object_stores", [])
+        if not stores:
+            return "No object stores found."
+        lines = [f"**Object Stores ({len(stores)} found):**\n"]
+        lines.append("| Name | Domain | State | Total Capacity | Used Capacity |")
+        lines.append("|------|--------|-------|----------------|---------------|")
+        for store in stores:
+            name = store.get('name', 'Unknown')
+            domain = store.get('domain', 'N/A')
+            state = store.get('state', 'N/A')
+            total_bytes = store.get('total_capacity_bytes', 0)
+            used_bytes = store.get('used_capacity_bytes', 0)
+            total = _format_bytes(total_bytes) if total_bytes else 'N/A'
+            used = _format_bytes(used_bytes) if used_bytes else 'N/A'
+            lines.append(f"| {name} | {domain} | {state} | {total} | {used} |")
+        return "\n".join(lines)
+    
+    elif tool_name == "list_objects":
+        objects = result.get("objects", [])
+        bucket = result.get("bucket", "")
+        if not objects:
+            return f"No objects found in bucket '{bucket}'."
+        lines = [f"**Objects in '{bucket}':**\n"]
+        lines.append("| Key | Size |")
+        lines.append("|-----|------|")
+        for obj in objects[:50]:  # Limit to 50
+            key = obj.get("key", obj) if isinstance(obj, dict) else obj
+            size = obj.get("size", "N/A") if isinstance(obj, dict) else "N/A"
+            lines.append(f"| {key} | {size} |")
+        if len(objects) > 50:
+            lines.append(f"\n*... and {len(objects) - 50} more objects*")
+        return "\n".join(lines)
+    
+    elif tool_name == "execute_sql":
+        columns = result.get("columns", [])
+        rows = result.get("rows", [])
+        if not rows:
+            return "Query returned no results."
+        lines = ["**Query Results:**\n"]
+        # Create table header
+        lines.append("| " + " | ".join(str(c) for c in columns) + " |")
+        lines.append("|" + "|".join(["---"] * len(columns)) + "|")
+        # Add rows (limit to 20)
+        for row in rows[:20]:
+            lines.append("| " + " | ".join(str(v) for v in row) + " |")
+        if len(rows) > 20:
+            lines.append(f"\n*... and {len(rows) - 20} more rows*")
+        return "\n".join(lines)
+    
+    elif tool_name == "create_bucket":
+        bucket_name = result.get("bucket_name", result.get("bucket", ""))
+        return f"✓ Bucket **{bucket_name}** created successfully."
+    
+    elif tool_name == "put_object":
+        return f"✓ Object uploaded successfully to **{result.get('bucket', '')}**"
+    
+    elif tool_name == "delete_object":
+        return f"✓ Object deleted successfully."
+    
+    elif tool_name == "list_tables":
+        tables = result.get("tables", [])
+        if not tables:
+            return "No tables found in database."
+        return "**Available Tables:**\n" + "\n".join(f"- {t}" for t in tables)
+    
+    elif tool_name == "get_table_schema":
+        table = result.get("table", "")
+        columns = result.get("columns", [])
+        lines = [f"**Schema for '{table}':**\n"]
+        lines.append("| Column | Type | Primary Key |")
+        lines.append("|--------|------|-------------|")
+        for col in columns:
+            pk = "Yes" if col.get("primary_key") else ""
+            lines.append(f"| {col.get('name')} | {col.get('type')} | {pk} |")
+        return "\n".join(lines)
+    
+    elif tool_name == "get_bucket_info":
+        return f"""**Bucket Info:**
+- Name: {result.get('bucket_name', 'N/A')}
+- Objects: {result.get('object_count', 'N/A')}
+- Size: {result.get('total_size', 'N/A')}"""
+    
+    # Default: return JSON formatted
+    return f"**Result:**\n```json\n{json.dumps(result, indent=2)}\n```"
 
 
 @router.post("", response_model=ChatResponse)
@@ -104,19 +228,32 @@ async def chat(request: ChatMessage):
                 })
             
             # Get final response after tool execution
-            final_response = llm_client.chat.completions.create(
-                model=model,
-                messages=chat_sessions[session_id],
-                max_tokens=1024
-            )
-            
-            final_msg = final_response.choices[0].message
-            chat_sessions[session_id].append(final_msg)
+            try:
+                final_response = llm_client.chat.completions.create(
+                    model=model,
+                    messages=chat_sessions[session_id],
+                    max_tokens=2048
+                )
+                final_msg = final_response.choices[0].message
+                final_content = final_msg.content
+            except Exception as e:
+                print(f"Error getting final response: {e}")
+                final_content = None
             
             intent = assistant_msg.tool_calls[0].function.name
             
+            # If LLM didn't provide a good response, format the results ourselves
+            if not final_content or final_content.strip() in ["", "Operation completed.", "Done.", "Completed."]:
+                formatted_results = []
+                for tr in tool_results:
+                    formatted_results.append(format_tool_result(tr["tool"], tr["result"]))
+                final_content = "\n\n".join(formatted_results)
+            
+            # Store the response in session
+            chat_sessions[session_id].append({"role": "assistant", "content": final_content})
+            
             return ChatResponse(
-                message=final_msg.content or "Operation completed.",
+                message=final_content,
                 intent=intent,
                 success=True,
                 data={"tool_results": tool_results},
