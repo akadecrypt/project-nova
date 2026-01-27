@@ -92,8 +92,9 @@ class LearningManager:
         }
         
         # For SQL queries, store the query pattern
-        if tool_name == "execute_sql" and tool_args.get("query"):
-            sql_query = tool_args["query"]
+        # Check both "sql" (actual param) and "query" (legacy) for compatibility
+        sql_query = tool_args.get("sql") or tool_args.get("query")
+        if tool_name == "execute_sql" and sql_query:
             example["sql"] = sql_query
             
             # Store as a query pattern (normalize the user query)

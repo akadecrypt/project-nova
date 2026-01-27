@@ -231,6 +231,136 @@
         "What is the current IOPS?",
         "Show read/write throughput"
       ]
+    },
+    {
+      "name": "search_logs",
+      "description": "Search log events (ERROR, WARN, FATAL) from cluster logs. Filter by severity, pod/component, event type, object store, bucket, and time range.",
+      "category": "log_analysis",
+      "mode": "read",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "severity": {
+            "type": "string",
+            "description": "Filter by severity: ERROR, WARN, FATAL, INFO"
+          },
+          "pod": {
+            "type": "string",
+            "description": "Filter by component: OC (Object Controller), MS (Metadata Service), Atlas, Curator, Stargate"
+          },
+          "event_type": {
+            "type": "string",
+            "description": "Filter by event type: REPLICATION_FAIL, IO_ERROR, AUTH_FAIL, DISK_FULL, OOM, TIMEOUT, CONNECTION_FAIL, CORRUPTION, QUOTA_EXCEEDED, SERVICE_DOWN"
+          },
+          "object_store_name": {
+            "type": "string",
+            "description": "Filter by object store name"
+          },
+          "bucket_name": {
+            "type": "string",
+            "description": "Filter by bucket name"
+          },
+          "hours": {
+            "type": "integer",
+            "description": "Time range in hours (default: 24)"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max results to return (default: 50)"
+          }
+        }
+      },
+      "examples": [
+        "Show me errors from the last 24 hours",
+        "Find FATAL events in OC component",
+        "Search for replication failures",
+        "Show warnings for bucket customer-uploads"
+      ]
+    },
+    {
+      "name": "get_error_summary",
+      "description": "Get a summary of errors and warnings from cluster logs. Returns counts by severity, component (pod), and event type.",
+      "category": "log_analysis",
+      "mode": "read",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "hours": {
+            "type": "integer",
+            "description": "Time range in hours (default: 24)"
+          }
+        }
+      },
+      "examples": [
+        "Summarize errors from the last 24 hours",
+        "What errors occurred today?",
+        "Give me an error breakdown",
+        "How many warnings do we have?"
+      ]
+    },
+    {
+      "name": "get_log_trends",
+      "description": "Get log error/warning trends over time. Shows daily counts for trend analysis.",
+      "category": "log_analysis",
+      "mode": "read",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "integer",
+            "description": "Number of days to analyze (default: 7)"
+          }
+        }
+      },
+      "examples": [
+        "Show error trends for the past week",
+        "Are errors increasing or decreasing?",
+        "Log trends over 14 days"
+      ]
+    },
+    {
+      "name": "get_log_details",
+      "description": "Get detailed information about a specific log event including full message, stack trace, and raw log file location.",
+      "category": "log_analysis",
+      "mode": "read",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "log_id": {
+            "type": "integer",
+            "description": "The log event ID"
+          }
+        },
+        "required": ["log_id"]
+      },
+      "examples": [
+        "Show details for log ID 123",
+        "Get more info about that error"
+      ]
+    },
+    {
+      "name": "get_related_events",
+      "description": "Find log events related to a specific event (same time window, same component, or same event type).",
+      "category": "log_analysis",
+      "mode": "read",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "log_id": {
+            "type": "integer",
+            "description": "Reference log event ID"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max related events to return (default: 10)"
+          }
+        },
+        "required": ["log_id"]
+      },
+      "examples": [
+        "Find events related to log 123",
+        "What else happened around that error?"
+      ]
     }
   ],
   "categories": {
@@ -251,6 +381,12 @@
       "description": "Create, upload, delete operations via S3/Prism API",
       "icon": "edit",
       "mode": "write"
+    },
+    "log_analysis": {
+      "name": "Log Analysis",
+      "description": "Search and analyze cluster log events (ERROR, WARN, FATAL)",
+      "icon": "file-text",
+      "mode": "read"
     }
   },
   "mode_rules": {

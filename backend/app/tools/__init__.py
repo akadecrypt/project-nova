@@ -12,6 +12,10 @@ from .sql_tools import (
     execute_sql, get_table_schema, list_tables, get_database_summary
 )
 from .prism_tools import get_object_stores, fetch_object_store_stats_v4
+from .log_tools import (
+    search_logs, get_error_summary, get_log_trends,
+    get_log_details, get_related_events, get_logs_by_upload
+)
 
 # Tool function registry
 TOOLS_REGISTRY = {
@@ -29,7 +33,14 @@ TOOLS_REGISTRY = {
     "get_database_summary": get_database_summary,
     # Prism Central tools
     "get_object_stores": get_object_stores,
-    "fetch_object_store_stats_v4": fetch_object_store_stats_v4
+    "fetch_object_store_stats_v4": fetch_object_store_stats_v4,
+    # Log Analysis tools
+    "search_logs": search_logs,
+    "get_error_summary": get_error_summary,
+    "get_log_trends": get_log_trends,
+    "get_log_details": get_log_details,
+    "get_related_events": get_related_events,
+    "get_logs_by_upload": get_logs_by_upload
 }
 
 

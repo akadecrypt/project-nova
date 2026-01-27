@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Log Browser - NOVA</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/design-system.css">
+    <style>
+        .app-container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            width: var(--sidebar-width);
+            background: rgba(18, 18, 26, 0.85);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid var(--border-color);
+            padding: 24px;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 32px;
+            text-decoration: none;
+        }
+
+        .logo-icon {
+            width: 44px;
+            height: 44px;
+            background: var(--accent-gradient);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--shadow-glow);
+        }
+
+        .logo-icon svg { width: 24px; height: 24px; fill: white; }
+
+        .logo-text { display: flex; flex-direction: column; }
+
+        .logo-title {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .logo-subtitle {
+            font-size: 10px;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .nav-section { margin-bottom: 24px; }
+        .nav-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 12px;
+            padding-left: 4px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 14px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all var(--transition-normal);
+            margin-bottom: 4px;
+            color: var(--text-secondary);
+            text-decoration: none;
+        }
+
+        .nav-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+        .nav-item.active { background: var(--bg-hover); color: var(--text-primary); border: 1px solid var(--border-color); }
+        .nav-icon { width: 20px; height: 20px; opacity: 0.7; }
+
+        .main-content {
+            flex: 1;
+            margin-left: var(--sidebar-width);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .header {
+            padding: 20px 32px;
+            background: rgba(18, 18, 26, 0.7);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .page-title { font-size: 24px; font-weight: 600; }
+        .page-desc { font-size: 14px; color: var(--text-muted); margin-top: 4px; }
+
+        .content-area {
+            flex: 1;
+            padding: 24px 32px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        /* Filters */
+        .filters-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 20px;
+        }
+
+        .filters-row {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .filter-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .filter-select, .filter-input {
+            padding: 10px 14px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: var(--font-primary);
+            font-size: 14px;
+            min-width: 150px;
+        }
+
+        .filter-select:focus, .filter-input:focus {
+            border-color: var(--accent-primary);
+            outline: none;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all var(--transition-normal);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            border: none;
+        }
+
+        .btn-primary {
+            background: var(--accent-gradient);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-glow);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-hover);
+        }
+
+        /* Stats cards */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .stat-value.error { color: var(--error); }
+        .stat-value.warning { color: var(--warning); }
+        .stat-value.fatal { color: #dc2626; }
+        .stat-value.info { color: var(--accent-primary); }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Logs table */
+        .logs-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            overflow: hidden;
+            flex: 1;
+        }
+
+        .logs-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logs-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .logs-count {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .logs-table-wrapper {
+            overflow-x: auto;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .logs-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .logs-table th {
+            position: sticky;
+            top: 0;
+            background: var(--bg-tertiary);
+            padding: 12px 16px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border-color);
+            white-space: nowrap;
+        }
+
+        .logs-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+            vertical-align: top;
+        }
+
+        .logs-table tr:hover td {
+            background: var(--bg-hover);
+        }
+
+        .severity-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .severity-badge.ERROR {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        .severity-badge.WARN {
+            background: rgba(245, 158, 11, 0.2);
+            color: #f59e0b;
+        }
+
+        .severity-badge.FATAL {
+            background: rgba(220, 38, 38, 0.3);
+            color: #dc2626;
+        }
+
+        .severity-badge.INFO {
+            background: rgba(99, 102, 241, 0.2);
+            color: #6366f1;
+        }
+
+        .pod-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 500;
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+        }
+
+        .event-type {
+            font-family: var(--font-mono);
+            font-size: 12px;
+            color: var(--accent-secondary);
+        }
+
+        .message-cell {
+            max-width: 400px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-family: var(--font-mono);
+            font-size: 12px;
+        }
+
+        .timestamp-cell {
+            font-family: var(--font-mono);
+            font-size: 12px;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+
+        .clickable {
+            cursor: pointer;
+            color: var(--accent-primary);
+        }
+
+        .clickable:hover {
+            text-decoration: underline;
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .modal-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 8px;
+        }
+
+        .modal-close:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            padding: 24px;
+            overflow-y: auto;
+        }
+
+        .detail-row {
+            display: flex;
+            margin-bottom: 16px;
+        }
+
+        .detail-label {
+            width: 140px;
+            font-size: 13px;
+            color: var(--text-muted);
+            flex-shrink: 0;
+        }
+
+        .detail-value {
+            flex: 1;
+            font-size: 14px;
+        }
+
+        .detail-value.mono {
+            font-family: var(--font-mono);
+            font-size: 12px;
+            background: var(--bg-tertiary);
+            padding: 8px 12px;
+            border-radius: 8px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .stack-trace {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            background: var(--bg-tertiary);
+            padding: 12px;
+            border-radius: 8px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar { display: none; }
+            .main-content { margin-left: 0; }
+            .filters-row { flex-direction: column; }
+            .filter-group { width: 100%; }
+            .filter-select, .filter-input { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <a href="index.html" class="logo">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                    </svg>
+                </div>
+                <div class="logo-text">
+                    <span class="logo-title">NOVA</span>
+                    <span class="logo-subtitle">Objects Assistant</span>
+                </div>
+            </a>
+
+            <div class="nav-section">
+                <div class="nav-label">Navigate</div>
+                <a href="index.html" class="nav-item">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    <span>Chat</span>
+                </a>
+                <a href="db-browser.html" class="nav-item">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                        <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+                        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+                    </svg>
+                    <span>Database</span>
+                </a>
+                <a href="log-browser.html" class="nav-item active">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                    </svg>
+                    <span>Logs</span>
+                </a>
+                <a href="settings.html" class="nav-item">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1"></path>
+                    </svg>
+                    <span>Settings</span>
+                </a>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="header">
+                <div>
+                    <h1 class="page-title">Log Browser</h1>
+                    <p class="page-desc">Search and analyze cluster log events</p>
+                </div>
+                <button class="btn btn-primary" onclick="refreshLogs()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 12a9 9 0 1 1-9-9"></path>
+                        <polyline points="21 3 21 9 15 9"></polyline>
+                    </svg>
+                    Refresh
+                </button>
+            </header>
+
+            <div class="content-area">
+                <!-- Stats -->
+                <div class="stats-row" id="statsRow">
+                    <div class="stat-card">
+                        <div class="stat-value error" id="errorCount">-</div>
+                        <div class="stat-label">Errors (24h)</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value warning" id="warnCount">-</div>
+                        <div class="stat-label">Warnings (24h)</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value fatal" id="fatalCount">-</div>
+                        <div class="stat-label">Fatal (24h)</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value info" id="totalCount">-</div>
+                        <div class="stat-label">Total Events</div>
+                    </div>
+                </div>
+
+                <!-- Filters -->
+                <div class="filters-card">
+                    <div class="filters-row">
+                        <div class="filter-group">
+                            <span class="filter-label">Severity</span>
+                            <select class="filter-select" id="severityFilter">
+                                <option value="">All</option>
+                                <option value="FATAL">Fatal</option>
+                                <option value="ERROR">Error</option>
+                                <option value="WARN">Warning</option>
+                                <option value="INFO">Info</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <span class="filter-label">Component</span>
+                            <select class="filter-select" id="podFilter">
+                                <option value="">All</option>
+                                <option value="OC">OC (Object Controller)</option>
+                                <option value="MS">MS (Metadata Service)</option>
+                                <option value="Atlas">Atlas</option>
+                                <option value="Curator">Curator</option>
+                                <option value="Stargate">Stargate</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <span class="filter-label">Event Type</span>
+                            <select class="filter-select" id="eventTypeFilter">
+                                <option value="">All</option>
+                                <option value="REPLICATION_FAIL">Replication Fail</option>
+                                <option value="IO_ERROR">I/O Error</option>
+                                <option value="AUTH_FAIL">Auth Fail</option>
+                                <option value="DISK_FULL">Disk Full</option>
+                                <option value="OOM">Out of Memory</option>
+                                <option value="TIMEOUT">Timeout</option>
+                                <option value="CONNECTION_FAIL">Connection Fail</option>
+                                <option value="CORRUPTION">Corruption</option>
+                                <option value="QUOTA_EXCEEDED">Quota Exceeded</option>
+                                <option value="SERVICE_DOWN">Service Down</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <span class="filter-label">Time Range</span>
+                            <select class="filter-select" id="hoursFilter">
+                                <option value="1">Last 1 hour</option>
+                                <option value="6">Last 6 hours</option>
+                                <option value="24" selected>Last 24 hours</option>
+                                <option value="72">Last 3 days</option>
+                                <option value="168">Last 7 days</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <span class="filter-label">&nbsp;</span>
+                            <button class="btn btn-primary" onclick="applyFilters()">
+                                Search
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Logs Table -->
+                <div class="logs-card">
+                    <div class="logs-header">
+                        <span class="logs-title">Log Events</span>
+                        <span class="logs-count" id="logsCount">Loading...</span>
+                    </div>
+                    <div class="logs-table-wrapper">
+                        <table class="logs-table" id="logsTable">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Severity</th>
+                                    <th>Component</th>
+                                    <th>Event Type</th>
+                                    <th>Message</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="logsBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Detail Modal -->
+    <div class="modal-overlay" id="detailModal">
+        <div class="modal">
+            <div class="modal-header">
+                <span class="modal-title">Log Event Details</span>
+                <button class="modal-close" onclick="closeModal()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body" id="modalBody">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = localStorage.getItem('nova-backend-url') || `http://${window.location.hostname}:9360`;
+        
+        let currentLogs = [];
+
+        // Load saved theme
+        const savedTheme = localStorage.getItem('nova-theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+
+        // Format timestamp
+        function formatTimestamp(epoch) {
+            if (!epoch) return 'N/A';
+            const date = new Date(epoch * 1000);
+            return date.toLocaleString();
+        }
+
+        // Load summary stats
+        async function loadStats() {
+            try {
+                const response = await fetch(`${API_BASE}/api/logs/summary?hours=24`);
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('errorCount').textContent = data.total_errors || 0;
+                    document.getElementById('warnCount').textContent = data.total_warnings || 0;
+                    document.getElementById('fatalCount').textContent = data.total_fatals || 0;
+                    
+                    const total = (data.total_errors || 0) + (data.total_warnings || 0) + (data.total_fatals || 0);
+                    document.getElementById('totalCount').textContent = total;
+                }
+            } catch (e) {
+                console.error('Failed to load stats:', e);
+            }
+        }
+
+        // Load logs
+        async function loadLogs(filters = {}) {
+            const tbody = document.getElementById('logsBody');
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px;">Loading...</td></tr>';
+
+            try {
+                const params = new URLSearchParams();
+                if (filters.severity) params.append('severity', filters.severity);
+                if (filters.pod) params.append('pod', filters.pod);
+                if (filters.event_type) params.append('event_type', filters.event_type);
+                params.append('hours', filters.hours || 24);
+                params.append('limit', 100);
+
+                const response = await fetch(`${API_BASE}/api/logs/search?${params}`);
+                
+                if (!response.ok) {
+                    throw new Error('Failed to load logs');
+                }
+
+                const data = await response.json();
+                currentLogs = data.logs || [];
+                
+                document.getElementById('logsCount').textContent = `${currentLogs.length} events`;
+
+                if (currentLogs.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="6">
+                                <div class="empty-state">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                        <polyline points="14 2 14 8 20 8"></polyline>
+                                    </svg>
+                                    <p>No log events found</p>
+                                    <p style="font-size: 13px;">Try adjusting your filters or time range</p>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                tbody.innerHTML = currentLogs.map(log => `
+                    <tr>
+                        <td class="timestamp-cell">${formatTimestamp(log.timestamp)}</td>
+                        <td><span class="severity-badge ${log.severity}">${log.severity}</span></td>
+                        <td><span class="pod-badge">${log.pod || 'N/A'}</span></td>
+                        <td class="event-type">${log.event_type || '-'}</td>
+                        <td class="message-cell" title="${escapeHtml(log.message || '')}">${escapeHtml(log.message || '')}</td>
+                        <td>
+                            <span class="clickable" onclick="showDetails(${log.log_id})">Details</span>
+                        </td>
+                    </tr>
+                `).join('');
+
+            } catch (e) {
+                console.error('Failed to load logs:', e);
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6">
+                            <div class="empty-state">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                                </svg>
+                                <p>Failed to load logs</p>
+                                <p style="font-size: 13px;">${e.message}</p>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Apply filters
+        function applyFilters() {
+            const filters = {
+                severity: document.getElementById('severityFilter').value,
+                pod: document.getElementById('podFilter').value,
+                event_type: document.getElementById('eventTypeFilter').value,
+                hours: parseInt(document.getElementById('hoursFilter').value)
+            };
+            loadLogs(filters);
+        }
+
+        // Refresh
+        function refreshLogs() {
+            loadStats();
+            applyFilters();
+        }
+
+        // Show log details
+        async function showDetails(logId) {
+            const modal = document.getElementById('detailModal');
+            const modalBody = document.getElementById('modalBody');
+            
+            modalBody.innerHTML = '<p>Loading...</p>';
+            modal.classList.add('visible');
+
+            try {
+                const response = await fetch(`${API_BASE}/api/logs/${logId}`);
+                if (!response.ok) throw new Error('Failed to load details');
+                
+                const data = await response.json();
+                const log = data.log;
+
+                modalBody.innerHTML = `
+                    <div class="detail-row">
+                        <span class="detail-label">Log ID</span>
+                        <span class="detail-value">${log.log_id}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Timestamp</span>
+                        <span class="detail-value">${formatTimestamp(log.timestamp)}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Severity</span>
+                        <span class="detail-value"><span class="severity-badge ${log.severity}">${log.severity}</span></span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Component</span>
+                        <span class="detail-value">${log.pod || 'N/A'}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Node</span>
+                        <span class="detail-value">${log.node_name || 'N/A'}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Event Type</span>
+                        <span class="detail-value">${log.event_type || 'N/A'}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Object Store</span>
+                        <span class="detail-value">${log.object_store_name || 'N/A'}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Bucket</span>
+                        <span class="detail-value">${log.bucket_name || 'N/A'}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Message</span>
+                        <div class="detail-value mono">${escapeHtml(log.message || '')}</div>
+                    </div>
+                    ${log.stack_trace ? `
+                        <div class="detail-row">
+                            <span class="detail-label">Stack Trace</span>
+                            <div class="stack-trace">${escapeHtml(log.stack_trace)}</div>
+                        </div>
+                    ` : ''}
+                    <div class="detail-row">
+                        <span class="detail-label">Raw Log File</span>
+                        <span class="detail-value"><a href="${log.raw_log_file}" target="_blank" class="clickable">${log.raw_log_file || 'N/A'}</a></span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">File Path</span>
+                        <span class="detail-value">${log.raw_file_path || 'N/A'}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Line Number</span>
+                        <span class="detail-value">${log.raw_line_number || 'N/A'}</span>
+                    </div>
+                `;
+            } catch (e) {
+                modalBody.innerHTML = `<p style="color: var(--error);">Failed to load details: ${e.message}</p>`;
+            }
+        }
+
+        // Close modal
+        function closeModal() {
+            document.getElementById('detailModal').classList.remove('visible');
+        }
+
+        // Close modal on overlay click
+        document.getElementById('detailModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeModal();
+            }
+        });
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadStats();
+            loadLogs({ hours: 24 });
+        });
+    </script>
+</body>
+</html>

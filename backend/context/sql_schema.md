@@ -152,6 +152,25 @@ GROUP BY DATE(timestamp)
 ORDER BY date;
 ```
 
+### Daily growth by bucket (IMPORTANT: Use this for "show daily growth")
+```sql
+SELECT 
+    b.bucket_name as Bucket,
+    ROUND(MAX(bs.size_gb) - MIN(bs.size_gb), 2) as "Size Δ (GB)",
+    ROUND((MAX(bs.size_gb) - MIN(bs.size_gb)) / 
+        NULLIF(JULIANDAY(MAX(bs.timestamp)) - JULIANDAY(MIN(bs.timestamp)), 0), 2) as "Avg Δ/day (GB)",
+    MAX(bs.object_count) - MIN(bs.object_count) as "Objects Δ",
+    ROUND((MAX(bs.object_count) - MIN(bs.object_count)) / 
+        NULLIF(JULIANDAY(MAX(bs.timestamp)) - JULIANDAY(MIN(bs.timestamp)), 0), 0) as "Avg Δ/day (objects)",
+    MIN(DATE(bs.timestamp)) as "From",
+    MAX(DATE(bs.timestamp)) as "To"
+FROM bucket b
+JOIN bucket_stats bs ON b.bucket_id = bs.bucket_id
+GROUP BY b.bucket_id, b.bucket_name
+HAVING COUNT(bs.timestamp) > 1
+ORDER BY "Size Δ (GB)" DESC;
+```
+
 ### Top buckets by size
 ```sql
 SELECT 
@@ -187,6 +206,31 @@ SELECT
 FROM object_store os
 JOIN bucket b ON os.object_store_uuid = b.object_store_uuid
 ORDER BY os.store_name, b.bucket_name;
+```
+
+### Bucket trends (Use for "show bucket trends")
+```sql
+SELECT 
+    b.bucket_name,
+    bs.timestamp,
+    bs.size_gb,
+    bs.object_count
+FROM bucket b
+JOIN bucket_stats bs ON b.bucket_id = bs.bucket_id
+ORDER BY b.bucket_name, bs.timestamp;
+```
+
+### List buckets by size (Use for "list buckets by size")
+```sql
+SELECT 
+    b.bucket_name,
+    b.bucket_owner,
+    bs.size_gb,
+    bs.object_count
+FROM bucket b
+JOIN bucket_stats bs ON b.bucket_id = bs.bucket_id
+WHERE bs.timestamp = (SELECT MAX(timestamp) FROM bucket_stats WHERE bucket_id = b.bucket_id)
+ORDER BY bs.size_gb DESC;
 ```
 
 ---
