@@ -69,14 +69,26 @@ def get_table_schema(table_name: str) -> dict:
     
     columns = []
     for row in result.get("rows", []):
-        columns.append({
-            "cid": row[0],
-            "name": row[1],
-            "type": row[2],
-            "notnull": bool(row[3]),
-            "default": row[4],
-            "primary_key": bool(row[5])
-        })
+        # Handle dict rows from SQL agent
+        if isinstance(row, dict):
+            values = list(row.values())
+            columns.append({
+                "cid": values[0] if len(values) > 0 else 0,
+                "name": values[1] if len(values) > 1 else "",
+                "type": values[2] if len(values) > 2 else "TEXT",
+                "notnull": bool(values[3]) if len(values) > 3 else False,
+                "default": values[4] if len(values) > 4 else None,
+                "primary_key": bool(values[5]) if len(values) > 5 else False
+            })
+        else:
+            columns.append({
+                "cid": row[0],
+                "name": row[1],
+                "type": row[2],
+                "notnull": bool(row[3]),
+                "default": row[4],
+                "primary_key": bool(row[5])
+            })
     
     return {
         "status": "success",
@@ -97,7 +109,12 @@ def list_tables() -> dict:
     if result.get("status") == "error":
         return result
     
-    tables = [row[0] for row in result.get("rows", [])]
+    rows = result.get("rows", [])
+    # Handle both dict rows [{"name": "x"}] and array rows [["x"]]
+    if rows and isinstance(rows[0], dict):
+        tables = [list(row.values())[0] for row in rows]
+    else:
+        tables = [row[0] for row in rows]
     
     return {
         "status": "success",
@@ -130,7 +147,11 @@ def get_database_summary() -> dict:
         count_result = execute_sql(f"SELECT COUNT(*) FROM {table_name}")
         row_count = 0
         if count_result.get("status") != "error" and count_result.get("rows"):
-            row_count = count_result["rows"][0][0]
+            first_row = count_result["rows"][0]
+            if isinstance(first_row, dict):
+                row_count = list(first_row.values())[0]
+            else:
+                row_count = first_row[0]
         
         summary["tables"].append({
             "name": table_name,

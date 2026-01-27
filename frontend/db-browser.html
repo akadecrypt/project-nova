@@ -651,7 +651,13 @@
                 const data = await response.json();
                 
                 if (!data.success) {
-                    container.innerHTML = `<div class="error-message">${data.error || 'Failed to load tables'}</div>`;
+                    container.innerHTML = `
+                        <div class="error-message">
+                            <strong>Database Error</strong><br>
+                            ${data.error || 'Failed to load tables'}<br>
+                            <small style="opacity: 0.7;">Check SQL Agent in <a href="settings.html" style="color: var(--accent-primary);">Settings</a></small>
+                        </div>
+                    `;
                     return;
                 }
                 
@@ -681,10 +687,12 @@
                 `).join('');
                 
             } catch (e) {
+                console.error('DB Browser error:', e);
                 container.innerHTML = `
                     <div class="error-message">
-                        <strong>Cannot connect to database</strong><br>
-                        Make sure the SQL Agent is configured in <a href="settings.html" style="color: var(--accent-primary);">Settings</a>
+                        <strong>Cannot connect to backend</strong><br>
+                        ${e.message}<br>
+                        <small style="opacity: 0.7;">Make sure NOVA backend is running on port 9360</small>
                     </div>
                 `;
             }

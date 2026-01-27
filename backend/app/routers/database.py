@@ -18,6 +18,7 @@ def check_sql_configured():
     url = get_sql_agent_url()
     if not url:
         return {"success": False, "error": "SQL Agent not configured. Go to Settings > SQL Agent Configuration."}
+    return None  # Explicitly return None when configured
 
 
 class QueryRequest(BaseModel):
@@ -77,6 +78,20 @@ async def get_schema(table_name: str):
     }
 
 
+def normalize_rows(rows, columns=None):
+    """Convert dict rows to array rows for frontend"""
+    if not rows:
+        return [], columns or []
+    
+    # If rows are dicts, extract columns and convert to arrays
+    if isinstance(rows[0], dict):
+        if not columns:
+            columns = list(rows[0].keys())
+        return [[row.get(col) for col in columns] for row in rows], columns
+    
+    return rows, columns or []
+
+
 @router.get("/tables/{table_name}/data")
 async def get_table_data(table_name: str, limit: int = 100, offset: int = 0):
     """Get data from a table with pagination"""
@@ -88,7 +103,11 @@ async def get_table_data(table_name: str, limit: int = 100, offset: int = 0):
     count_result = execute_sql(f"SELECT COUNT(*) as cnt FROM {table_name}")
     total = 0
     if count_result.get("rows"):
-        total = count_result["rows"][0][0]
+        first_row = count_result["rows"][0]
+        if isinstance(first_row, dict):
+            total = list(first_row.values())[0]
+        else:
+            total = first_row[0]
     
     # Get data
     result = execute_sql(f"SELECT * FROM {table_name} LIMIT {limit} OFFSET {offset}")
@@ -101,11 +120,13 @@ async def get_table_data(table_name: str, limit: int = 100, offset: int = 0):
             "error": result.get("error")
         }
     
+    rows, columns = normalize_rows(result.get("rows", []), result.get("columns"))
+    
     return {
         "success": True,
         "table": table_name,
-        "columns": result.get("columns", []),
-        "rows": result.get("rows", []),
+        "columns": columns,
+        "rows": rows,
         "total": total,
         "limit": limit,
         "offset": offset
@@ -144,10 +165,10 @@ async def run_query(request: QueryRequest):
             "error": result.get("error")
         }
     
-    rows = result.get("rows", [])
+    rows, columns = normalize_rows(result.get("rows", []), result.get("columns"))
     return {
         "success": True,
-        "columns": result.get("columns", []),
+        "columns": columns,
         "rows": rows,
         "row_count": len(rows)
     }
