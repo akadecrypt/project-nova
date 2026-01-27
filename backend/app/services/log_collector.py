@@ -370,7 +370,7 @@ class LogCollector:
             processor = LogProcessor()
             now = int(time.time())
             
-            upload_id = await processor.create_upload_record(
+            upload_id = processor.create_upload_record(
                 s3_key=s3_key,
                 s3_url=s3_url,
                 cluster_name=cluster_name,
