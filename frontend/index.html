@@ -359,10 +359,13 @@
         .chat-area {
             flex: 1;
             overflow-y: auto;
+            overflow-x: hidden;
             padding: 32px;
+            padding-bottom: 160px; /* Space for fixed input */
             display: flex;
             flex-direction: column;
             gap: 24px;
+            scroll-behavior: smooth;
         }
 
         /* Welcome Screen */
@@ -495,7 +498,8 @@
         .message-content {
             padding: 18px 22px;
             border-radius: 18px;
-            max-width: 650px;
+            max-width: min(650px, calc(100vw - 180px));
+            overflow: hidden;
         }
 
         .message.assistant .message-content {
@@ -512,6 +516,31 @@
         .message-text {
             font-size: 15px;
             line-height: 1.7;
+            overflow-x: auto;
+            overflow-y: hidden;
+        }
+        
+        /* Scrollable container for wide content */
+        .message-text .table-wrapper {
+            overflow-x: auto;
+            overflow-y: hidden;
+            margin: 12px -8px;
+            padding: 0 8px;
+            scrollbar-width: thin;
+            scrollbar-color: var(--accent-primary) transparent;
+        }
+        
+        .message-text .table-wrapper::-webkit-scrollbar {
+            height: 6px;
+        }
+        
+        .message-text .table-wrapper::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        
+        .message-text .table-wrapper::-webkit-scrollbar-thumb {
+            background: var(--accent-primary);
+            border-radius: 3px;
         }
 
         .message.assistant .message-text {
@@ -543,6 +572,10 @@
             background: none;
             padding: 0;
         }
+        .message-text pre {
+            overflow-x: auto;
+            max-width: 100%;
+        }
         .message-text ul, .message-text ol {
             margin: 12px 0;
             padding-left: 24px;
@@ -551,26 +584,28 @@
 
         /* Data Tables */
         .data-table {
-            width: 100%;
+            width: max-content;
+            min-width: 100%;
             border-collapse: collapse;
-            margin: 12px 0;
+            margin: 0;
             font-size: 13px;
             background: var(--bg-primary);
             border-radius: 8px;
-            overflow: hidden;
         }
         .data-table th {
             background: var(--bg-tertiary);
-            padding: 10px 12px;
+            padding: 10px 14px;
             text-align: left;
             font-weight: 600;
             color: var(--text-primary);
             border-bottom: 1px solid var(--border-color);
+            white-space: nowrap;
         }
         .data-table td {
-            padding: 8px 12px;
+            padding: 10px 14px;
             border-bottom: 1px solid var(--border-color);
             color: var(--text-secondary);
+            white-space: nowrap;
         }
         .data-table tr:last-child td {
             border-bottom: none;
@@ -606,17 +641,28 @@
             40% { transform: scale(1); }
         }
 
-        /* Input Area */
+        /* Input Area - Fixed at bottom */
         .input-area {
-            padding: 24px 32px 32px;
-            background: linear-gradient(to top, var(--bg-primary) 50%, transparent);
+            position: fixed;
+            bottom: 0;
+            left: var(--sidebar-width);
+            right: 0;
+            padding: 16px 32px 24px;
+            background: linear-gradient(to top, var(--bg-primary) 70%, rgba(18, 18, 26, 0.95) 85%, transparent);
+            z-index: 200;
+            backdrop-filter: blur(10px);
+        }
+        
+        [data-theme="light"] .input-area {
+            background: linear-gradient(to top, var(--bg-primary) 70%, rgba(255, 255, 255, 0.95) 85%, transparent);
         }
 
         .input-container {
             display: flex;
-            gap: 16px;
+            gap: 12px;
             max-width: 900px;
             margin: 0 auto;
+            align-items: flex-end;
         }
 
         .input-wrapper {
@@ -631,10 +677,15 @@
             border-color: var(--accent-primary);
             box-shadow: 0 0 0 3px var(--accent-glow);
         }
+        
+        .input-wrapper.disabled {
+            opacity: 0.6;
+            pointer-events: none;
+        }
 
         .message-input {
             width: 100%;
-            padding: 18px 20px;
+            padding: 16px 20px;
             background: transparent;
             border: none;
             color: var(--text-primary);
@@ -642,19 +693,24 @@
             font-size: 15px;
             resize: none;
             outline: none;
-            max-height: 200px;
+            max-height: 150px;
+            min-height: 52px;
         }
 
         .message-input::placeholder {
             color: var(--text-muted);
         }
+        
+        .message-input:disabled {
+            cursor: not-allowed;
+        }
 
         .send-btn {
-            width: 56px;
-            height: 56px;
+            width: 52px;
+            height: 52px;
             background: var(--accent-gradient);
             border: none;
-            border-radius: 16px;
+            border-radius: 14px;
             cursor: pointer;
             display: flex;
             align-items: center;
@@ -671,28 +727,38 @@
         .send-btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
+            transform: none;
+        }
+        
+        .send-btn.loading {
+            animation: pulse-btn 1.5s ease-in-out infinite;
+        }
+        
+        @keyframes pulse-btn {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 0.8; }
         }
 
         .send-btn svg {
-            width: 24px;
-            height: 24px;
+            width: 22px;
+            height: 22px;
             fill: white;
         }
 
         .input-hint {
             text-align: center;
-            font-size: 12px;
+            font-size: 11px;
             color: var(--text-muted);
-            margin-top: 14px;
+            margin-top: 10px;
         }
 
         .input-hint kbd {
             background: var(--bg-tertiary);
-            padding: 2px 8px;
+            padding: 2px 6px;
             border-radius: 4px;
             border: 1px solid var(--border-color);
             font-family: var(--font-mono);
-            font-size: 11px;
+            font-size: 10px;
         }
 
         /* Mobile */
@@ -714,8 +780,17 @@
             .sidebar.open { transform: translateX(0); }
             .main-content { margin-left: 0; }
             .mobile-menu-btn { display: flex; }
-            .chat-area { padding: 20px; }
-            .input-area { padding: 16px; }
+            .chat-area { 
+                padding: 20px; 
+                padding-bottom: 140px;
+            }
+            .input-area { 
+                left: 0;
+                padding: 12px 16px 20px; 
+            }
+            .message-content {
+                max-width: calc(100vw - 100px);
+            }
             .welcome-title { font-size: 28px; }
             .welcome-subtitle { font-size: 15px; }
         }
@@ -852,6 +927,7 @@
         const API_BASE = localStorage.getItem('nova-backend-url') || `http://${window.location.hostname}:9360`;
         let currentSessionId = `session-${Date.now()}`;
         let chatSessions = JSON.parse(localStorage.getItem('nova-chat-sessions') || '{}');
+        let isProcessing = false; // Track message processing state
 
         // Theme
         const savedTheme = localStorage.getItem('nova-theme') || 'dark';
@@ -966,6 +1042,8 @@
         }
 
         function switchToSession(sessionId) {
+            if (isProcessing) return; // Don't switch while processing
+            
             saveCurrentSession();
             currentSessionId = sessionId;
             
@@ -979,10 +1057,8 @@
                 session.messages.forEach(msg => {
                     addMessage(msg.content, msg.role === 'user', true);
                 });
-                // Scroll to bottom after loading
-                setTimeout(() => {
-                    chatArea.scrollTop = chatArea.scrollHeight;
-                }, 100);
+                // Force scroll to bottom after loading
+                scrollToBottom(true);
             }
             
             loadChatHistory();
@@ -1028,7 +1104,7 @@
             return div.innerHTML;
         }
 
-        // Detect and convert tabular data to HTML table
+        // Detect and convert tabular data to HTML table with scroll wrapper
         function detectAndFormatTable(text) {
             // Check for pipe-separated tables (markdown style)
             if (text.includes('|') && text.split('\n').filter(l => l.includes('|')).length >= 2) {
@@ -1054,7 +1130,8 @@
                 
                 if (tableLines.length >= 2) {
                     let html = beforeTable.join('\n');
-                    html += '\n<table class="data-table"><thead><tr>';
+                    // Wrap table in scrollable container
+                    html += '\n<div class="table-wrapper"><table class="data-table"><thead><tr>';
                     
                     // Header row
                     const headers = tableLines[0].split('|').map(h => h.trim()).filter(h => h);
@@ -1071,7 +1148,7 @@
                         });
                         html += '</tr>';
                     }
-                    html += '</tbody></table>';
+                    html += '</tbody></table></div>';
                     html += afterTable.join('\n');
                     return html;
                 }
@@ -1106,11 +1183,23 @@
                 .replace(/\n/g, '<br>');
         }
 
-        function scrollToBottom() {
+        function scrollToBottom(force = false) {
             const chatArea = document.getElementById('chatArea');
-            setTimeout(() => {
-                chatArea.scrollTop = chatArea.scrollHeight;
-            }, 50);
+            
+            // Use requestAnimationFrame for smoother scrolling
+            const doScroll = () => {
+                chatArea.scrollTo({
+                    top: chatArea.scrollHeight,
+                    behavior: force ? 'auto' : 'smooth'
+                });
+            };
+            
+            // Multiple attempts to ensure scroll happens after DOM updates
+            requestAnimationFrame(() => {
+                doScroll();
+                setTimeout(doScroll, 100);
+                setTimeout(doScroll, 300);
+            });
         }
 
         function addMessage(content, isUser = false, isHtml = false) {
@@ -1164,18 +1253,39 @@
             if (typing) typing.remove();
         }
 
+        // Set processing state (disable/enable input)
+        function setProcessingState(processing) {
+            isProcessing = processing;
+            const input = document.getElementById('messageInput');
+            const sendBtn = document.getElementById('sendBtn');
+            const inputWrapper = input.closest('.input-wrapper');
+            
+            input.disabled = processing;
+            sendBtn.disabled = processing;
+            inputWrapper.classList.toggle('disabled', processing);
+            sendBtn.classList.toggle('loading', processing);
+            
+            if (processing) {
+                input.placeholder = 'NOVA is thinking...';
+            } else {
+                input.placeholder = 'Ask NOVA anything...';
+                input.focus();
+            }
+        }
+
         // Send message
         async function sendMessage() {
             const input = document.getElementById('messageInput');
             const message = input.value.trim();
             
-            if (!message) return;
+            if (!message || isProcessing) return;
             
             input.value = '';
             input.style.height = 'auto';
             
             addMessage(message, true);
             addTypingIndicator();
+            setProcessingState(true);
             
             try {
                 const response = await fetch(`${API_BASE}/api/chat`, {
@@ -1212,6 +1322,7 @@
                 addMessage('Cannot connect to backend. Please check if the server is running.');
             }
             
+            setProcessingState(false);
             saveCurrentSession();
             loadChatHistory();
         }
@@ -1225,7 +1336,7 @@
         const messageInput = document.getElementById('messageInput');
         
         messageInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
+            if (e.key === 'Enter' && !e.shiftKey && !isProcessing) {
                 e.preventDefault();
                 sendMessage();
             }
@@ -1233,7 +1344,7 @@
         
         messageInput.addEventListener('input', () => {
             messageInput.style.height = 'auto';
-            messageInput.style.height = Math.min(messageInput.scrollHeight, 200) + 'px';
+            messageInput.style.height = Math.min(messageInput.scrollHeight, 150) + 'px';
         });
 
         // Initialize
