@@ -1,14 +1,18 @@
 """
 Background Tasks for NOVA Backend
 
-Handles periodic tasks like SQL summary refresh and dynamic schema loading.
+Handles periodic tasks like SQL summary refresh, dynamic schema loading,
+and automated log collection.
 """
 import asyncio
 from datetime import datetime
 
 from .context import get_context_manager
 from .tools.sql_tools import execute_sql, get_database_summary
-from .config import get_background_refresh_interval, is_background_refresh_enabled
+from .config import (
+    get_background_refresh_interval, is_background_refresh_enabled,
+    get_collection_interval_hours, is_auto_collect_enabled, get_initial_delay_minutes
+)
 
 
 def get_row_value(row, index=0):
@@ -210,11 +214,67 @@ async def save_learning_periodically():
             print(f"⚠️ Failed to auto-save learning data: {e}")
 
 
+async def collect_logs_periodically():
+    """
+    Periodically collect logs from all object store clusters.
+    
+    Discovers clusters from Prism Central and runs logbay collection
+    on each cluster, uploading results to S3 for analysis.
+    """
+    from .services.log_collector import get_log_collector, run_log_collection
+    
+    # Check if auto-collection is enabled
+    if not is_auto_collect_enabled():
+        print("📋 Log auto-collection is disabled")
+        return
+    
+    # Initial delay to let other services start
+    initial_delay = get_initial_delay_minutes() * 60
+    print(f"📋 Log collection will start in {get_initial_delay_minutes()} minutes...")
+    await asyncio.sleep(initial_delay)
+    
+    # Get collector and check prerequisites
+    collector = get_log_collector()
+    if not collector.has_sshpass:
+        print("⚠️ sshpass not installed - log collection requires sshpass for SSH access")
+        print("   Install with: brew install hudochenkov/sshpass/sshpass (macOS)")
+        print("   Or: sudo apt-get install sshpass (Ubuntu/Debian)")
+        return
+    
+    # Get collection interval
+    interval_hours = get_collection_interval_hours()
+    interval_seconds = interval_hours * 3600
+    
+    print(f"🔄 Starting automated log collection (every {interval_hours} hour(s))")
+    
+    while True:
+        try:
+            print(f"\n{'='*50}")
+            print(f"📋 Log Collection Cycle - {datetime.now().isoformat()}")
+            print(f"{'='*50}")
+            
+            # Run collection for the past hour
+            results = await run_log_collection(hours=interval_hours)
+            
+            if results.get("clusters_collected", 0) > 0:
+                print(f"✅ Collection complete: {results['clusters_collected']} cluster(s) processed")
+            elif results.get("message"):
+                print(f"⚠️ Collection skipped: {results['message']}")
+            
+        except Exception as e:
+            print(f"❌ Log collection error: {e}")
+        
+        # Wait for next collection cycle
+        print(f"⏰ Next collection in {interval_hours} hour(s)")
+        await asyncio.sleep(interval_seconds)
+
+
 async def start_background_tasks():
     """Start all background tasks"""
     tasks = [
         asyncio.create_task(refresh_sql_summary()),
         asyncio.create_task(save_learning_periodically()),
-        asyncio.create_task(refresh_schema_periodically())
+        asyncio.create_task(refresh_schema_periodically()),
+        asyncio.create_task(collect_logs_periodically())
     ]
     return tasks

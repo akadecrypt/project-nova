@@ -400,6 +400,107 @@ def get_or_create_iam_user(username: str = "nova-service-account") -> dict:
         return {"success": False, "message": str(e)}
 
 
+def get_object_store_clusters() -> dict:
+    """
+    Get Object Store cluster IPs from Prism Central.
+    
+    Queries Prism Central for all object stores and extracts
+    the cluster/node IPs that can be used for SSH-based log collection.
+    
+    Returns:
+        Result dictionary with cluster information for each object store
+    """
+    pc_ip = get_pc_ip()
+    if not pc_ip:
+        return {"success": False, "message": "Prism Central IP not configured"}
+    
+    # First get object stores
+    stores_result = get_object_stores()
+    if stores_result.get("error"):
+        return {"success": False, "message": stores_result.get("error")}
+    
+    clusters = []
+    raw_data = stores_result.get("raw_response", {}).get("data", [])
+    
+    for store in raw_data:
+        store_name = store.get("name")
+        store_id = store.get("extId")
+        domain = store.get("domain")
+        state = store.get("state")
+        
+        # Extract cluster IPs from various possible fields in the API response
+        cluster_ips = []
+        
+        # Try to get from clusterReference
+        cluster_ref = store.get("clusterReference") or store.get("cluster_reference")
+        if cluster_ref:
+            if isinstance(cluster_ref, dict):
+                cluster_ip = cluster_ref.get("ip") or cluster_ref.get("address")
+                if cluster_ip:
+                    cluster_ips.append(cluster_ip)
+        
+        # Try to get from nodes/nodeIpList
+        nodes = store.get("nodes") or store.get("nodeIpList") or store.get("node_ip_list")
+        if nodes:
+            if isinstance(nodes, list):
+                for node in nodes:
+                    if isinstance(node, str):
+                        cluster_ips.append(node)
+                    elif isinstance(node, dict):
+                        ip = node.get("ip") or node.get("address") or node.get("ipAddress")
+                        if ip:
+                            cluster_ips.append(ip)
+        
+        # Try to get from deploymentSpec
+        deployment = store.get("deploymentSpec") or store.get("deployment_spec")
+        if deployment:
+            node_ips = deployment.get("nodeIps") or deployment.get("node_ips")
+            if node_ips and isinstance(node_ips, list):
+                cluster_ips.extend(node_ips)
+        
+        # Try to extract from domain (sometimes domain is the cluster VIP)
+        if not cluster_ips and domain:
+            # Domain might be like "objects.10.36.10.151.nip.io" or direct IP
+            import re
+            ip_match = re.search(r'(\d+\.\d+\.\d+\.\d+)', domain)
+            if ip_match:
+                cluster_ips.append(ip_match.group(1))
+        
+        # Try clientAccessNetwork if available
+        client_network = store.get("clientAccessNetwork") or store.get("client_access_network")
+        if client_network:
+            vip = client_network.get("virtualIp") or client_network.get("virtual_ip")
+            if vip:
+                cluster_ips.append(vip)
+        
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_ips = []
+        for ip in cluster_ips:
+            if ip and ip not in seen:
+                seen.add(ip)
+                unique_ips.append(ip)
+        
+        clusters.append({
+            "object_store_name": store_name,
+            "object_store_id": store_id,
+            "domain": domain,
+            "state": state,
+            "cluster_ips": unique_ips,
+            "primary_ip": unique_ips[0] if unique_ips else None
+        })
+    
+    # Filter to only COMPLETE/active stores
+    active_clusters = [c for c in clusters if c.get("state") == "COMPLETE"]
+    
+    return {
+        "success": True,
+        "count": len(active_clusters),
+        "clusters": active_clusters,
+        "all_clusters": clusters
+    }
+
+
 def auto_configure_s3_from_prism() -> dict:
     """
     Auto-configure S3 settings by fetching endpoint and creating IAM credentials from Prism Central.

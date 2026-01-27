@@ -2,6 +2,7 @@
 
 # NOVA Server Startup Script
 # Starts both backend (FastAPI) and frontend (HTTP server)
+# Includes automated log collection from Prism Central object stores
 
 set -e
 
@@ -10,6 +11,7 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Configuration
@@ -129,6 +131,35 @@ fi
 echo -e "Frontend:  ${GREEN}http://$LOCAL_IP:$FRONTEND_PORT${NC}"
 echo -e "Backend:   ${GREEN}http://$LOCAL_IP:$BACKEND_PORT${NC}"
 echo -e "API Docs:  ${GREEN}http://$LOCAL_IP:$BACKEND_PORT/docs${NC}"
+echo ""
+
+# Check log collection prerequisites
+echo -e "${CYAN}Log Collection Status:${NC}"
+if command -v sshpass &> /dev/null; then
+    echo -e "  sshpass:     ${GREEN}✓ installed${NC}"
+    SSHPASS_OK=true
+else
+    echo -e "  sshpass:     ${YELLOW}✗ not installed (required for auto log collection)${NC}"
+    echo -e "               ${YELLOW}Install: brew install hudochenkov/sshpass/sshpass (macOS)${NC}"
+    SSHPASS_OK=false
+fi
+
+# Check if auto_collect is enabled in config
+if [ -f "$SCRIPT_DIR/backend/config.json" ]; then
+    AUTO_COLLECT=$(grep -o '"auto_collect"[[:space:]]*:[[:space:]]*\(true\|false\)' "$SCRIPT_DIR/backend/config.json" | grep -o '\(true\|false\)' || echo "false")
+    if [ "$AUTO_COLLECT" = "true" ]; then
+        echo -e "  auto_collect: ${GREEN}✓ enabled${NC}"
+        if [ "$SSHPASS_OK" = true ]; then
+            echo -e "  ${GREEN}→ Automated log collection will start after initial delay${NC}"
+        else
+            echo -e "  ${YELLOW}→ Install sshpass to enable automated log collection${NC}"
+        fi
+    else
+        echo -e "  auto_collect: ${YELLOW}✗ disabled${NC}"
+        echo -e "               ${YELLOW}Enable in backend/config.json to auto-collect logs${NC}"
+    fi
+fi
+
 echo ""
 echo -e "${YELLOW}Press Ctrl+C to stop all servers${NC}"
 echo ""

@@ -127,3 +127,39 @@ def get_background_refresh_interval() -> int:
 def is_background_refresh_enabled() -> bool:
     config = load_config()
     return config.get("background", {}).get("enable_background_refresh", True)
+
+
+# Log Analysis configuration getters
+def get_log_analysis_config() -> dict:
+    """Get complete log analysis configuration"""
+    config = load_config()
+    return config.get("log_analysis", {})
+
+def get_logs_bucket() -> str:
+    return get_log_analysis_config().get("logs_bucket", "nova-logs")
+
+def get_log_retention_days() -> int:
+    return get_log_analysis_config().get("retention_days", 30)
+
+def get_collection_interval_hours() -> int:
+    return get_log_analysis_config().get("collection_interval_hours", 1)
+
+def is_auto_collect_enabled() -> bool:
+    return get_log_analysis_config().get("auto_collect", False)
+
+def get_cluster_username() -> str:
+    creds = get_log_analysis_config().get("cluster_credentials", {})
+    return creds.get("username", "nutanix")
+
+def get_cluster_password() -> str:
+    creds = get_log_analysis_config().get("cluster_credentials", {})
+    return creds.get("password", "nutanix/4u")
+
+def get_initial_delay_minutes() -> int:
+    return get_log_analysis_config().get("initial_delay_minutes", 5)
+
+def get_pods_to_scan() -> list:
+    return get_log_analysis_config().get("pods_to_scan", ["OC", "MS", "Atlas", "Curator", "Stargate"])
+
+def get_severity_filter() -> list:
+    return get_log_analysis_config().get("severity_filter", ["ERROR", "WARN", "FATAL"])
