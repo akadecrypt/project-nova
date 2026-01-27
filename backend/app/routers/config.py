@@ -11,7 +11,7 @@ from ..models import (
     FullConfig, ConnectionTestResponse
 )
 from ..config import load_config, save_config
-from ..tools.prism_tools import test_prism_connection
+from ..tools.prism_tools import test_prism_connection, get_s3_endpoint_from_prism, auto_configure_s3_from_prism
 from ..tools.s3_tools import get_s3_client
 
 router = APIRouter(prefix="/api/config", tags=["config"])
@@ -185,6 +185,72 @@ async def test_s3():
         return {"success": False, "message": str(e)}
 
 
+@router.get("/s3/detect")
+async def detect_s3_from_prism():
+    """
+    Auto-detect S3 endpoint from Prism Central Object Stores.
+    Requires Prism Central to be configured first.
+    """
+    result = get_s3_endpoint_from_prism()
+    
+    if result.get("success"):
+        # Optionally auto-save the detected endpoint
+        cfg = load_config()
+        cfg["s3"]["endpoint"] = result.get("endpoint", "")
+        cfg["s3"]["region"] = result.get("region", "us-east-1")
+        save_config(cfg)
+        
+        return {
+            "success": True,
+            "endpoint": result.get("endpoint"),
+            "object_store_name": result.get("object_store_name"),
+            "region": result.get("region"),
+            "message": f"Detected endpoint from Object Store: {result.get('object_store_name')}",
+            "all_stores": result.get("all_stores", [])
+        }
+    else:
+        return {
+            "success": False,
+            "message": result.get("message", "Failed to detect S3 endpoint")
+        }
+
+
+@router.post("/s3/auto-configure")
+async def auto_configure_s3():
+    """
+    Auto-configure S3 completely from Prism Central.
+    - Detects Object Store endpoint
+    - Creates IAM service account
+    - Generates access keys
+    - Saves all configuration
+    """
+    result = auto_configure_s3_from_prism()
+    
+    if result.get("success"):
+        # Save all S3 configuration
+        cfg = load_config()
+        cfg["s3"]["endpoint"] = result.get("endpoint", "")
+        cfg["s3"]["access_key"] = result.get("access_key", "")
+        cfg["s3"]["secret_key"] = result.get("secret_key", "")
+        cfg["s3"]["region"] = result.get("region", "us-east-1")
+        save_config(cfg)
+        
+        return {
+            "success": True,
+            "endpoint": result.get("endpoint"),
+            "access_key": result.get("access_key"),
+            "object_store_name": result.get("object_store_name"),
+            "iam_username": result.get("iam_username"),
+            "message": result.get("message")
+        }
+    else:
+        return {
+            "success": False,
+            "message": result.get("message", "Failed to auto-configure S3"),
+            "endpoint": result.get("endpoint")  # May have endpoint even if IAM failed
+        }
+
+
 # SQL Agent Configuration
 @router.get("/sql")
 async def get_sql_config():
@@ -205,3 +271,20 @@ async def update_sql_config(config: SQLAgentConfig):
     if save_config(cfg):
         return {"success": True, "message": "SQL Agent configuration saved"}
     raise HTTPException(status_code=500, detail="Failed to save configuration")
+
+
+@router.post("/sql/test", response_model=ConnectionTestResponse)
+async def test_sql():
+    """Test SQL Agent connection"""
+    from ..tools.sql_tools import list_tables
+    
+    result = list_tables()
+    
+    if result.get("status") == "error":
+        return {"success": False, "message": result.get("error", "Connection failed")}
+    
+    tables = result.get("tables", [])
+    return {
+        "success": True, 
+        "message": f"Connected! Found {len(tables)} tables"
+    }

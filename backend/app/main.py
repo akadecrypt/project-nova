@@ -114,6 +114,7 @@ async def get_status():
         "llm_provider": "nutanix-ai" if llm_client else "none",
         "s3_configured": bool(get_s3_endpoint()),
         "prism_central_configured": bool(get_pc_ip()),
+        "sql_agent_configured": bool(get_sql_agent_url()),
         "sql_agent_url": get_sql_agent_url(),
         "context_files_loaded": len(context_manager.contexts),
         "tools_loaded": len(tool_manager.get_tools()),

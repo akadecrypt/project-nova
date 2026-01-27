@@ -606,7 +606,7 @@
                         </div>
                         <div>
                             <div class="section-title">S3 / Object Storage</div>
-                            <div class="section-desc">Configure Nutanix Objects S3 endpoint</div>
+                            <div class="section-desc">Auto-configured from Prism Central</div>
                         </div>
                         <span class="status-badge" id="s3Status">
                             <span class="status-dot"></span>
@@ -614,28 +614,76 @@
                         </span>
                     </div>
                     <div class="settings-card">
-                        <div class="form-group">
-                            <label class="form-label">S3 Endpoint URL</label>
-                            <input type="text" class="form-input" id="s3Endpoint" placeholder="http://10.0.0.1:80">
+                        <div style="text-align: center; padding: 16px 0;">
+                            <p style="color: var(--text-muted); margin-bottom: 16px;">
+                                S3 endpoint and credentials are automatically provisioned from Prism Central.<br>
+                                Make sure Prism Central is configured above first.
+                            </p>
+                            <button class="btn btn-primary" onclick="autoConfigureS3()" style="min-width: 200px;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <path d="M21 12a9 9 0 1 1-9-9"></path>
+                                    <polyline points="21 3 21 9 15 9"></polyline>
+                                </svg>
+                                Auto-Configure from Prism
+                            </button>
                         </div>
-                        <div class="form-row">
+                        
+                        <div id="s3ConfigDetails" style="display: none; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-color);">
+                            <div class="form-group">
+                                <label class="form-label">S3 Endpoint</label>
+                                <input type="text" class="form-input" id="s3Endpoint" readonly style="background: var(--bg-secondary);">
+                            </div>
                             <div class="form-group">
                                 <label class="form-label">Access Key</label>
-                                <input type="text" class="form-input" id="s3AccessKey" placeholder="Access key ID">
+                                <input type="text" class="form-input" id="s3AccessKey" readonly style="background: var(--bg-secondary);">
                             </div>
-                            <div class="form-group">
-                                <label class="form-label">Secret Key</label>
-                                <input type="password" class="form-input" id="s3SecretKey" placeholder="••••••••">
+                            <div class="form-actions" style="border-top: none; padding-top: 12px; margin-top: 0;">
+                                <button class="btn btn-secondary" onclick="testS3Connection()">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                                    </svg>
+                                    Test Connection
+                                </button>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- SQL Agent Configuration -->
+                <div class="settings-section">
+                    <div class="section-header">
+                        <div class="section-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 3v18"></path>
+                                <rect x="4" y="8" width="16" height="8" rx="1"></rect>
+                                <path d="M8 8V5a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v3"></path>
+                                <path d="M8 16v3a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-3"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="section-title">SQL Agent</div>
+                            <div class="section-desc">Configure analytics database connection</div>
+                        </div>
+                        <span class="status-badge" id="sqlStatus">
+                            <span class="status-dot"></span>
+                            <span>Checking...</span>
+                        </span>
+                    </div>
+                    <div class="settings-card">
+                        <div class="form-group">
+                            <label class="form-label">SQL Agent URL</label>
+                            <input type="text" class="form-input" id="sqlAgentUrl" placeholder="http://10.0.0.1:9001/execute">
+                            <div class="form-hint">URL of the SQL agent service for analytics queries</div>
+                        </div>
                         <div class="form-actions">
-                            <button class="btn btn-primary" onclick="saveS3Config()">
+                            <button class="btn btn-primary" onclick="saveSQLConfig()">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
                                 </svg>
                                 Save
                             </button>
-                            <button class="btn btn-secondary" onclick="testS3Connection()">
+                            <button class="btn btn-secondary" onclick="testSQLConnection()">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
                                     <polyline points="22 4 12 14.01 9 11.01"></polyline>
@@ -786,6 +834,7 @@
                     updateStatusBadge('llmStatus', data.llm_configured);
                     updateStatusBadge('prismStatus', data.prism_central_configured);
                     updateStatusBadge('s3Status', data.s3_configured);
+                    updateStatusBadge('sqlStatus', data.sql_agent_configured);
                     
                     return true;
                 }
@@ -800,6 +849,7 @@
             updateStatusBadge('llmStatus', false, 'Offline');
             updateStatusBadge('prismStatus', false, 'Offline');
             updateStatusBadge('s3Status', false, 'Offline');
+            updateStatusBadge('sqlStatus', false, 'Offline');
             
             return false;
         }
@@ -830,6 +880,17 @@
                     const s3 = await s3Res.json();
                     document.getElementById('s3Endpoint').value = s3.endpoint || '';
                     document.getElementById('s3AccessKey').value = s3.access_key || '';
+                    // Show details section if S3 is configured
+                    if (s3.endpoint && s3.access_key) {
+                        document.getElementById('s3ConfigDetails').style.display = 'block';
+                    }
+                }
+                
+                // Load SQL Agent config
+                const sqlRes = await fetch(`${API_BASE}/api/config/sql`);
+                if (sqlRes.ok) {
+                    const sql = await sqlRes.json();
+                    document.getElementById('sqlAgentUrl').value = sql.url || '';
                 }
             } catch (e) {
                 console.log('Could not load configurations:', e);
@@ -953,6 +1014,80 @@
                 } else {
                     showToast(data.message || 'Connection failed', 'error');
                     updateStatusBadge('s3Status', false, 'Failed');
+                }
+            } catch (e) {
+                showToast('Backend not available', 'error');
+            }
+        }
+
+        // Auto-configure S3 from Prism Central (endpoint + IAM credentials)
+        async function autoConfigureS3() {
+            try {
+                showToast('Auto-configuring S3 from Prism Central...', 'success');
+                
+                const response = await fetch(`${API_BASE}/api/config/s3/auto-configure`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('s3Endpoint').value = data.endpoint || '';
+                    document.getElementById('s3AccessKey').value = data.access_key || '';
+                    document.getElementById('s3ConfigDetails').style.display = 'block';
+                    showToast(`Configured: ${data.object_store_name}`, 'success');
+                    updateStatusBadge('s3Status', true, 'Configured');
+                } else {
+                    showToast(data.message || 'Auto-configuration failed', 'error');
+                    // If we got endpoint but IAM failed, still show it
+                    if (data.endpoint) {
+                        document.getElementById('s3Endpoint').value = data.endpoint;
+                        document.getElementById('s3ConfigDetails').style.display = 'block';
+                    }
+                }
+            } catch (e) {
+                showToast('Configure Prism Central first', 'error');
+            }
+        }
+
+        // Save SQL Agent config
+        async function saveSQLConfig() {
+            const config = {
+                url: document.getElementById('sqlAgentUrl').value
+            };
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/config/sql`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+                
+                if (response.ok) {
+                    showToast('SQL Agent configuration saved', 'success');
+                    updateStatusBadge('sqlStatus', true);
+                } else {
+                    showToast('Failed to save configuration', 'error');
+                }
+            } catch (e) {
+                showToast('Backend not available', 'error');
+            }
+        }
+
+        // Test SQL Agent connection
+        async function testSQLConnection() {
+            try {
+                const response = await fetch(`${API_BASE}/api/config/sql/test`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showToast('Connected to SQL Agent!', 'success');
+                    updateStatusBadge('sqlStatus', true, 'Connected');
+                } else {
+                    showToast(data.message || 'Connection failed', 'error');
+                    updateStatusBadge('sqlStatus', false, 'Failed');
                 }
             } catch (e) {
                 showToast('Backend not available', 'error');

@@ -232,3 +232,202 @@ def test_prism_connection() -> dict:
         return {"success": False, "message": f"Cannot connect to {pc_ip}"}
     except Exception as e:
         return {"success": False, "message": str(e)}
+
+
+def get_s3_endpoint_from_prism() -> dict:
+    """
+    Get S3 endpoint URL from the first Object Store in Prism Central.
+    
+    Returns:
+        Result dictionary with S3 endpoint info
+    """
+    result = get_object_stores()
+    
+    if result.get("error"):
+        return {"success": False, "message": result.get("error")}
+    
+    stores = result.get("object_stores", [])
+    if not stores:
+        return {"success": False, "message": "No Object Stores found in Prism Central"}
+    
+    # Get the first object store (or one that's in COMPLETE state)
+    selected_store = None
+    for store in stores:
+        if store.get("state") == "COMPLETE":
+            selected_store = store
+            break
+    
+    if not selected_store:
+        selected_store = stores[0]
+    
+    domain = selected_store.get("domain")
+    if not domain:
+        return {"success": False, "message": "Object Store has no domain configured"}
+    
+    # Construct S3 endpoint URL (typically https on port 443 or http on 80)
+    # The domain is usually the S3 endpoint
+    s3_endpoint = f"https://{domain}"
+    
+    return {
+        "success": True,
+        "endpoint": s3_endpoint,
+        "object_store_name": selected_store.get("name"),
+        "object_store_id": selected_store.get("ext_id"),
+        "region": selected_store.get("region") or "us-east-1",
+        "all_stores": [
+            {
+                "name": s.get("name"),
+                "domain": s.get("domain"),
+                "state": s.get("state")
+            }
+            for s in stores
+        ]
+    }
+
+
+def get_or_create_iam_user(username: str = "nova-service-account") -> dict:
+    """
+    Get or create an IAM user and generate access keys using Prism Central v4 API.
+    
+    Args:
+        username: Username for the IAM service account
+        
+    Returns:
+        Result dictionary with access_key and secret_key
+    """
+    pc_ip = get_pc_ip()
+    if not pc_ip:
+        return {"success": False, "message": "Prism Central IP not configured"}
+    
+    base_url = _get_pc_base_url()
+    auth = _get_pc_auth()
+    headers = {"Content-Type": "application/json"}
+    
+    try:
+        # Step 1: List users to check if our user exists
+        list_url = f"{base_url}/api/iam/v4.0.b1/authn/users"
+        response = requests.get(
+            list_url,
+            auth=auth,
+            verify=False,
+            timeout=15
+        )
+        
+        user_ext_id = None
+        if response.status_code == 200:
+            data = response.json()
+            users = data.get("data", [])
+            for user in users:
+                if user.get("username") == username:
+                    user_ext_id = user.get("extId")
+                    break
+        
+        # Step 2: Create user if not exists
+        if not user_ext_id:
+            create_user_url = f"{base_url}/api/iam/v4.0.b1/authn/users"
+            user_payload = {
+                "username": username,
+                "userType": "SERVICE_ACCOUNT",
+                "displayName": "NOVA Service Account"
+            }
+            
+            response = requests.post(
+                create_user_url,
+                auth=auth,
+                json=user_payload,
+                verify=False,
+                timeout=15
+            )
+            
+            if response.status_code in [200, 201, 202]:
+                data = response.json()
+                user_ext_id = data.get("data", {}).get("extId")
+            else:
+                return {
+                    "success": False, 
+                    "message": f"Failed to create user: {response.status_code} - {response.text[:200]}"
+                }
+        
+        if not user_ext_id:
+            return {"success": False, "message": "Could not get or create IAM user"}
+        
+        # Step 3: Create access keys for the user
+        create_key_url = f"{base_url}/api/iam/v4.0.b1/authn/users/{user_ext_id}/keys"
+        key_payload = {
+            "name": f"nova-key-{int(__import__('time').time())}"
+        }
+        
+        response = requests.post(
+            create_key_url,
+            auth=auth,
+            json=key_payload,
+            verify=False,
+            timeout=15
+        )
+        
+        if response.status_code in [200, 201, 202]:
+            data = response.json()
+            key_data = data.get("data", {})
+            access_key = key_data.get("accessKeyId") or key_data.get("keyDetails", {}).get("accessKey")
+            secret_key = key_data.get("secretAccessKey") or key_data.get("keyDetails", {}).get("secretKey")
+            
+            if access_key and secret_key:
+                return {
+                    "success": True,
+                    "access_key": access_key,
+                    "secret_key": secret_key,
+                    "user_id": user_ext_id,
+                    "username": username,
+                    "message": "Successfully created IAM credentials"
+                }
+            else:
+                return {
+                    "success": False,
+                    "message": "Key created but credentials not in response",
+                    "raw_response": data
+                }
+        else:
+            return {
+                "success": False, 
+                "message": f"Failed to create keys: {response.status_code} - {response.text[:200]}"
+            }
+            
+    except requests.exceptions.Timeout:
+        return {"success": False, "message": "Request to Prism Central timed out"}
+    except requests.exceptions.ConnectionError:
+        return {"success": False, "message": f"Cannot connect to Prism Central at {pc_ip}"}
+    except Exception as e:
+        return {"success": False, "message": str(e)}
+
+
+def auto_configure_s3_from_prism() -> dict:
+    """
+    Auto-configure S3 settings by fetching endpoint and creating IAM credentials from Prism Central.
+    
+    Returns:
+        Complete S3 configuration including endpoint, access_key, and secret_key
+    """
+    # Get S3 endpoint from Object Store
+    endpoint_result = get_s3_endpoint_from_prism()
+    if not endpoint_result.get("success"):
+        return endpoint_result
+    
+    # Get or create IAM user and keys
+    iam_result = get_or_create_iam_user()
+    if not iam_result.get("success"):
+        return {
+            "success": False,
+            "message": f"Got endpoint but failed to create credentials: {iam_result.get('message')}",
+            "endpoint": endpoint_result.get("endpoint")
+        }
+    
+    return {
+        "success": True,
+        "endpoint": endpoint_result.get("endpoint"),
+        "access_key": iam_result.get("access_key"),
+        "secret_key": iam_result.get("secret_key"),
+        "region": endpoint_result.get("region", "us-east-1"),
+        "object_store_name": endpoint_result.get("object_store_name"),
+        "iam_username": iam_result.get("username"),
+        "message": "S3 configuration auto-provisioned from Prism Central"
+    }
