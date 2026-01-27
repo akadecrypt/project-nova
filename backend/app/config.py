@@ -41,6 +41,21 @@ def get_default_config() -> dict:
         "background": {
             "sql_refresh_interval_seconds": 300,
             "enable_background_refresh": True
+        },
+        "log_analysis": {
+            "logs_bucket": "nova-logs",
+            "retention_days": 30,
+            "max_message_length": 500,
+            "max_stack_trace_length": 1000,
+            "severity_filter": ["ERROR", "WARN", "FATAL"],
+            "pods_to_scan": ["OC", "MS", "Atlas", "Curator", "Stargate"],
+            "collection_interval_hours": 1,
+            "auto_collect": False,
+            "cluster_credentials": {
+                "username": "nutanix",
+                "password": "nutanix/4u"
+            },
+            "initial_delay_minutes": 5
         }
     }
 
