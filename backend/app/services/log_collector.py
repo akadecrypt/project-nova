@@ -379,8 +379,17 @@ class LogCollector:
             )
             
             if upload_id:
-                # Process in background
-                asyncio.create_task(processor.process_upload(upload_id))
+                # Process in background - process_upload is not async, run in executor
+                import concurrent.futures
+                loop = asyncio.get_event_loop()
+                loop.run_in_executor(
+                    None,
+                    processor.process_upload,
+                    upload_id,
+                    s3_key,
+                    s3_url,
+                    cluster_name
+                )
                 print(f"✅ Processing triggered: upload_id={upload_id}")
                 return upload_id
             else:
