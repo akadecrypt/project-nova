@@ -419,6 +419,24 @@ def get_object_store_clusters() -> dict:
     if stores_result.get("error"):
         return {"success": False, "message": stores_result.get("error")}
     
+    def extract_ip_from_object(ip_obj):
+        """Extract IP address from Prism v4 API IP object format"""
+        if not ip_obj:
+            return None
+        if isinstance(ip_obj, str):
+            return ip_obj
+        if isinstance(ip_obj, dict):
+            # Handle nested structure: ipv4.value or ipv6.value
+            ipv4 = ip_obj.get("ipv4") or ip_obj.get("iPv4")
+            if ipv4 and isinstance(ipv4, dict):
+                return ipv4.get("value")
+            ipv6 = ip_obj.get("ipv6") or ip_obj.get("iPv6")
+            if ipv6 and isinstance(ipv6, dict):
+                return ipv6.get("value")
+            # Direct value field
+            return ip_obj.get("value") or ip_obj.get("ip") or ip_obj.get("address")
+        return None
+    
     clusters = []
     raw_data = stores_result.get("raw_response", {}).get("data", [])
     
@@ -428,50 +446,51 @@ def get_object_store_clusters() -> dict:
         domain = store.get("domain")
         state = store.get("state")
         
-        # Extract cluster IPs from various possible fields in the API response
+        # Extract cluster IPs from various fields in the API response
         cluster_ips = []
+        
+        # Get from publicNetworkIps (list of IP objects)
+        public_ips = store.get("publicNetworkIps") or []
+        for ip_obj in public_ips:
+            ip = extract_ip_from_object(ip_obj)
+            if ip:
+                cluster_ips.append(ip)
+        
+        # Get from storageNetworkVip (single IP object)
+        storage_vip = store.get("storageNetworkVip")
+        if storage_vip:
+            ip = extract_ip_from_object(storage_vip)
+            if ip:
+                cluster_ips.append(ip)
+        
+        # Get from storageNetworkDnsIp
+        storage_dns = store.get("storageNetworkDnsIp")
+        if storage_dns:
+            ip = extract_ip_from_object(storage_dns)
+            if ip:
+                cluster_ips.append(ip)
         
         # Try to get from clusterReference
         cluster_ref = store.get("clusterReference") or store.get("cluster_reference")
         if cluster_ref:
-            if isinstance(cluster_ref, dict):
-                cluster_ip = cluster_ref.get("ip") or cluster_ref.get("address")
-                if cluster_ip:
-                    cluster_ips.append(cluster_ip)
+            ip = extract_ip_from_object(cluster_ref)
+            if ip:
+                cluster_ips.append(ip)
         
         # Try to get from nodes/nodeIpList
         nodes = store.get("nodes") or store.get("nodeIpList") or store.get("node_ip_list")
-        if nodes:
-            if isinstance(nodes, list):
-                for node in nodes:
-                    if isinstance(node, str):
-                        cluster_ips.append(node)
-                    elif isinstance(node, dict):
-                        ip = node.get("ip") or node.get("address") or node.get("ipAddress")
-                        if ip:
-                            cluster_ips.append(ip)
+        if nodes and isinstance(nodes, list):
+            for node in nodes:
+                ip = extract_ip_from_object(node)
+                if ip:
+                    cluster_ips.append(ip)
         
-        # Try to get from deploymentSpec
-        deployment = store.get("deploymentSpec") or store.get("deployment_spec")
-        if deployment:
-            node_ips = deployment.get("nodeIps") or deployment.get("node_ips")
-            if node_ips and isinstance(node_ips, list):
-                cluster_ips.extend(node_ips)
-        
-        # Try to extract from domain (sometimes domain is the cluster VIP)
+        # Try to extract from domain if no IPs found
         if not cluster_ips and domain:
-            # Domain might be like "objects.10.36.10.151.nip.io" or direct IP
             import re
             ip_match = re.search(r'(\d+\.\d+\.\d+\.\d+)', domain)
             if ip_match:
                 cluster_ips.append(ip_match.group(1))
-        
-        # Try clientAccessNetwork if available
-        client_network = store.get("clientAccessNetwork") or store.get("client_access_network")
-        if client_network:
-            vip = client_network.get("virtualIp") or client_network.get("virtual_ip")
-            if vip:
-                cluster_ips.append(vip)
         
         # Remove duplicates while preserving order
         seen = set()
@@ -490,8 +509,9 @@ def get_object_store_clusters() -> dict:
             "primary_ip": unique_ips[0] if unique_ips else None
         })
     
-    # Filter to only COMPLETE/active stores
-    active_clusters = [c for c in clusters if c.get("state") == "COMPLETE"]
+    # Filter to active stores (COMPLETE or OBJECT_STORE_AVAILABLE)
+    active_states = ["COMPLETE", "OBJECT_STORE_AVAILABLE"]
+    active_clusters = [c for c in clusters if c.get("state") in active_states]
     
     return {
         "success": True,
