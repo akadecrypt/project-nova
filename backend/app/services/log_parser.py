@@ -115,6 +115,22 @@ class LogParser:
         'CORRUPTION': [r'checksum\s+mismatch', r'data\s+corruption', r'corrupt'],
         'QUOTA_EXCEEDED': [r'quota\s+exceeded', r'limit\s+reached', r'quota\s+limit'],
         'SERVICE_DOWN': [r'service\s+unavailable', r'failed\s+to\s+start', r'service\s+down'],
+        'OBJECT_ERROR': [
+            r'object\s+lookup.*fail', r'invalid\s*object', r'kInvalidObject',
+            r'object.*not\s+found', r'empty\s+value', r'object\s+error',
+            r'failed.*object', r'object.*empty'
+        ],
+        'METADATA_ERROR': [
+            r'metadata.*error', r'metadata.*fail', r'invalid\s+metadata',
+            r'metadata.*corrupt', r'metadata.*missing'
+        ],
+        'RPC_ERROR': [
+            r'rpc\s+fail', r'rpc\s+error', r'grpc.*error', r'grpc.*fail'
+        ],
+        'VALIDATION_ERROR': [
+            r'validation\s+fail', r'invalid\s+request', r'invalid\s+param',
+            r'validation\s+error', r'malformed'
+        ],
     }
     
     # Timestamp patterns commonly found in Nutanix logs
