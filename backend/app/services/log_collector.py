@@ -33,6 +33,9 @@ from ..config import (
     get_pods_to_scan, get_pc_ip
 )
 from ..tools.prism_tools import get_object_store_clusters
+from ..logging_config import get_collector_logger
+
+logger = get_collector_logger()
 
 
 class LogCollector:

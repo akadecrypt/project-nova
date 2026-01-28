@@ -7,6 +7,9 @@ import requests
 from typing import Optional, List, Dict, Any
 
 from ..config import get_sql_agent_url
+from ..logging_config import get_tools_logger, log_sql_query
+
+logger = get_tools_logger()
 
 
 def execute_sql(sql: str, timeout: int = 10) -> dict:
@@ -26,6 +29,8 @@ def execute_sql(sql: str, timeout: int = 10) -> dict:
         # Normalize SQL: strip whitespace and collapse multiple spaces
         sql = ' '.join(sql.split())
         
+        logger.info(f"SQL: {sql[:150]}{'...' if len(sql) > 150 else ''}")
+        
         response = requests.post(
             url,
             json={"sql": sql},
@@ -33,25 +38,35 @@ def execute_sql(sql: str, timeout: int = 10) -> dict:
         )
         
         if response.status_code != 200:
+            error_msg = f"SQL agent returned status {response.status_code}"
+            logger.error(error_msg)
             return {
                 "status": "error",
-                "error": f"SQL agent returned status {response.status_code}",
+                "error": error_msg,
                 "response": response.text[:500]
             }
         
-        return response.json()
+        result = response.json()
+        row_count = result.get("row_count", len(result.get("rows", [])))
+        logger.info(f"SQL result: {row_count} rows")
+        return result
         
     except requests.exceptions.ConnectionError:
+        error_msg = "Cannot connect to SQL agent"
+        logger.error(error_msg)
         return {
             "status": "error",
             "error": "Cannot connect to SQL agent. Make sure it's running."
         }
     except requests.exceptions.Timeout:
+        error_msg = f"SQL query timed out after {timeout}s"
+        logger.error(error_msg)
         return {
             "status": "error",
             "error": f"SQL query timed out after {timeout} seconds"
         }
     except Exception as e:
+        logger.error(f"SQL error: {str(e)}")
         return {"status": "error", "error": str(e)}
 
 

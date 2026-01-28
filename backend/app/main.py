@@ -4,9 +4,11 @@ NOVA Backend - FastAPI Application Entry Point
 Nutanix Objects Virtual Assistant - AI Agent Backend
 """
 import asyncio
+import logging
+import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import __version__
@@ -17,6 +19,7 @@ from .context import initialize_context_manager, get_context_manager
 from .tools import initialize_tool_manager, get_tool_manager
 from .llm import get_llm_client
 from .background import start_background_tasks, generate_dynamic_schema
+from .logging_config import setup_logging, get_api_logger, log_api_request
 from .routers import (
     chat_router,
     config_router,
@@ -27,40 +30,44 @@ from .routers import (
     logs_router
 )
 
+# Initialize logging
+setup_logging()
+logger = logging.getLogger("nova.main")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application startup and shutdown lifecycle"""
-    print("🚀 Starting NOVA Backend...")
-    print(f"   Version: {__version__}")
+    logger.info("🚀 Starting NOVA Backend...")
+    logger.info(f"   Version: {__version__}")
     
     # Initialize context manager
     context_manager = initialize_context_manager()
-    print(f"📄 Context files loaded: {len(context_manager.contexts)}")
+    logger.info(f"📄 Context files loaded: {len(context_manager.contexts)}")
     
     # Load dynamic SQL schema from database (replaces static sql_schema.md)
     try:
         dynamic_schema = generate_dynamic_schema()
         context_manager.set_context("sql_schema", dynamic_schema)
-        print("📊 Dynamic SQL schema loaded from database")
+        logger.info("📊 Dynamic SQL schema loaded from database")
     except Exception as e:
-        print(f"⚠️ Could not load dynamic schema: {e}")
+        logger.warning(f"⚠️ Could not load dynamic schema: {e}")
     
     # Initialize tool manager
     tool_manager = initialize_tool_manager()
-    print(f"🔧 Tools loaded: {len(tool_manager.get_tools())}")
+    logger.info(f"🔧 Tools loaded: {len(tool_manager.get_tools())}")
     
     # Print configuration status
-    print(f"📡 SQL Agent: {get_sql_agent_url()}")
-    print(f"🪣 S3 Endpoint: {get_s3_endpoint() or 'Not configured'}")
-    print(f"🖥️  Prism Central: {get_pc_ip() or 'Not configured'}")
-    print(f"🤖 LLM: {'Configured' if get_llm_client() else 'Not configured'}")
+    logger.info(f"📡 SQL Agent: {get_sql_agent_url()}")
+    logger.info(f"🪣 S3 Endpoint: {get_s3_endpoint() or 'Not configured'}")
+    logger.info(f"🖥️  Prism Central: {get_pc_ip() or 'Not configured'}")
+    logger.info(f"🤖 LLM: {'Configured' if get_llm_client() else 'Not configured'}")
     
     # Start background tasks
     background_task = await start_background_tasks()
     
-    print("✅ NOVA Backend ready!")
-    print("   API Docs: http://localhost:9360/docs")
+    logger.info("✅ NOVA Backend ready!")
+    logger.info("   API Docs: http://localhost:9360/docs")
     
     yield
     
@@ -80,7 +87,7 @@ async def lifespan(app: FastAPI):
         except asyncio.CancelledError:
             pass
     
-    print("👋 NOVA Backend shutdown complete")
+    logger.info("👋 NOVA Backend shutdown complete")
 
 
 # Create FastAPI app
@@ -99,6 +106,29 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Request logging middleware
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Log all API requests"""
+    start_time = time.time()
+    
+    response = await call_next(request)
+    
+    duration_ms = (time.time() - start_time) * 1000
+    
+    # Skip logging for health checks and static files
+    if request.url.path not in ["/health", "/", "/favicon.ico"]:
+        log_api_request(
+            method=request.method,
+            path=request.url.path,
+            status_code=response.status_code,
+            duration_ms=duration_ms
+        )
+    
+    return response
+
 
 # Register routers
 app.include_router(chat_router)

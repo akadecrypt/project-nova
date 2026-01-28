@@ -16,8 +16,10 @@ from ..tools import get_tool_manager, execute_tool
 from ..llm import get_llm_client
 from ..config import get_llm_model
 from ..learning import get_learning_manager
+from ..logging_config import get_chat_logger, log_chat_message, log_tool_call
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
+logger = get_chat_logger()
 
 # In-memory session storage
 chat_sessions: Dict[str, List[dict]] = {}
@@ -212,6 +214,7 @@ async def chat(request: ChatMessage):
     
     llm_client = get_llm_client()
     if not llm_client:
+        logger.warning("Chat request with unconfigured LLM")
         return ChatResponse(
             message="LLM not configured. Please configure the API key in Settings.",
             intent="error",
@@ -221,6 +224,8 @@ async def chat(request: ChatMessage):
     
     session_id = request.session_id
     user_message = request.message
+    
+    logger.info(f"[{session_id}] User: {user_message[:100]}{'...' if len(user_message) > 100 else ''}")
     
     # Get managers
     context_manager = get_context_manager()
@@ -269,9 +274,18 @@ async def chat(request: ChatMessage):
                 tool_name = tool_call.function.name
                 tool_args = json.loads(tool_call.function.arguments or "{}")
                 
+                logger.info(f"[{session_id}] Calling tool: {tool_name}")
+                log_tool_call(tool_name, tool_args)
+                
                 # Execute the tool
                 result = execute_tool(tool_name, tool_args)
                 tool_results.append({"tool": tool_name, "args": tool_args, "result": result})
+                
+                # Log tool result
+                if result.get("status") == "error":
+                    log_tool_call(tool_name, error=str(result.get("error", "Unknown error")))
+                else:
+                    log_tool_call(tool_name, result=str(result)[:200])
                 
                 # Learn from this interaction
                 was_successful = result.get("status") != "error"
@@ -340,6 +354,8 @@ async def chat(request: ChatMessage):
             # Store the response in session
             chat_sessions[session_id].append({"role": "assistant", "content": final_content})
             
+            logger.info(f"[{session_id}] Response: {intent} - {len(final_content)} chars")
+            
             return ChatResponse(
                 message=final_content,
                 intent=intent,
@@ -349,15 +365,18 @@ async def chat(request: ChatMessage):
             )
         else:
             chat_sessions[session_id].append(assistant_msg)
+            response_content = assistant_msg.content or "I'm not sure how to help with that."
+            logger.info(f"[{session_id}] Response: chat - {len(response_content)} chars")
             
             return ChatResponse(
-                message=assistant_msg.content or "I'm not sure how to help with that.",
+                message=response_content,
                 intent="chat",
                 success=True,
                 suggestions=["List buckets", "Show object stores", "Help"]
             )
             
     except Exception as e:
+        logger.error(f"[{session_id}] Error: {str(e)}")
         return ChatResponse(
             message=f"Error: {str(e)}",
             intent="error",

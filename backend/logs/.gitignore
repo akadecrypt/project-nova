@@ -1,0 +1,7 @@
+# Ignore all log files
+*.log
+*.log.*
+
+# But keep this file
+!.gitignore
+!.gitkeep
