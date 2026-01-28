@@ -131,6 +131,21 @@ class LogParser:
             r'validation\s+fail', r'invalid\s+request', r'invalid\s+param',
             r'validation\s+error', r'malformed'
         ],
+        'SSL_ERROR': [
+            r'ssl_error', r'ssl\s+error', r'tls\s+error', r'certificate\s+error',
+            r'handshake\s+fail'
+        ],
+        'SEND_FAIL': [
+            r'failed\s+to\s+send', r'send.*fail', r'syscall\s+fail',
+            r'internal\s+error.*syscall'
+        ],
+        'SCAN_FAIL': [
+            r'scan\s*fail', r'CuratorScanFailure', r'scan.*error'
+        ],
+        'CLIENT_UNAVAILABLE': [
+            r'client\s+is\s+unavailable', r'client\s+unavailable',
+            r'notification.*unavailable', r'service.*unavailable'
+        ],
     }
     
     # Timestamp patterns commonly found in Nutanix logs
