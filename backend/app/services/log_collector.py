@@ -367,7 +367,9 @@ class LogCollector:
             # Upload
             s3.upload_file(local_path, self.logs_bucket, s3_key)
             
-            s3_url = f"s3://{self.logs_bucket}/{s3_key}"
+            # Construct full HTTP URL with S3 endpoint
+            endpoint = get_s3_endpoint().rstrip('/')
+            s3_url = f"{endpoint}/{self.logs_bucket}/{s3_key}"
             print(f"✅ Uploaded: {s3_url}")
             
             return {
