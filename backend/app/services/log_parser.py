@@ -91,6 +91,8 @@ class LogParser:
     
     # Timestamp patterns commonly found in Nutanix logs
     TIMESTAMP_PATTERNS = [
+        # Google glog format: E20260107 18:56:50.225841Z (yyyymmdd hh:mm:ss)
+        r'[IWEF](\d{8})\s+(\d{2}:\d{2}:\d{2})',
         # ISO format: 2026-01-27T14:30:45.123Z
         r'(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?)',
         # Standard format: 2026-01-27 14:30:45
@@ -290,6 +292,19 @@ class LogParser:
     
     def _detect_severity(self, line: str) -> str:
         """Detect log severity from a line"""
+        # Google glog format: first char is severity (I, W, E, F)
+        if re.match(r'^[IWEF]\d{8}\s', line):
+            first_char = line[0]
+            if first_char == 'F':
+                return 'FATAL'
+            elif first_char == 'E':
+                return 'ERROR'
+            elif first_char == 'W':
+                return 'WARN'
+            else:
+                return 'INFO'
+        
+        # Standard severity patterns
         for severity in ['FATAL', 'ERROR', 'WARN', 'INFO']:
             for pattern in self._severity_compiled[severity]:
                 if pattern.search(line):
@@ -307,6 +322,17 @@ class LogParser:
     
     def _extract_timestamp(self, line: str) -> int:
         """Extract timestamp from a log line, return as epoch seconds"""
+        # Google glog format: E20260107 18:56:50.225841Z
+        glog_match = re.match(r'^[IWEF](\d{4})(\d{2})(\d{2})\s+(\d{2}):(\d{2}):(\d{2})', line)
+        if glog_match:
+            try:
+                year, month, day = glog_match.group(1), glog_match.group(2), glog_match.group(3)
+                hour, minute, second = glog_match.group(4), glog_match.group(5), glog_match.group(6)
+                dt = datetime(int(year), int(month), int(day), int(hour), int(minute), int(second))
+                return int(dt.timestamp())
+            except:
+                pass
+        
         for pattern in self._timestamp_compiled:
             match = pattern.search(line)
             if match:
@@ -340,13 +366,17 @@ class LogParser:
     
     def _is_new_log_entry(self, line: str) -> bool:
         """Check if a line is the start of a new log entry"""
+        # Google glog format: E20260107 18:56:50 (starts with IWEF + 8 digit date)
+        if re.match(r'^[IWEF]\d{8}\s', line):
+            return True
+        
         # Lines starting with timestamp or severity indicator
         for pattern in self._timestamp_compiled:
             if pattern.match(line):
                 return True
         
         # Lines starting with common log prefixes
-        if re.match(r'^[IWEF]\d{4}\s', line):  # Google-style: I0127 14:30:45
+        if re.match(r'^[IWEF]\d{4}\s', line):  # Google-style short: I0127 14:30:45
             return True
         if re.match(r'^\[\d{4}-\d{2}-\d{2}', line):  # [2026-01-27 ...
             return True
@@ -365,13 +395,26 @@ class LogParser:
     
     def _extract_bucket_name(self, line: str) -> Optional[str]:
         """Extract bucket name from log line"""
-        # Pattern: bucket=xxx or bucket: xxx or "bucket_name"
+        # Pattern: bucket=xxx or bucket: xxx or "bucket_name" or bucket_id
         patterns = [
             r'bucket[=:]\s*["\']?([a-zA-Z0-9_-]+)["\']?',
             r'bucket_name[=:]\s*["\']?([a-zA-Z0-9_-]+)["\']?',
+            r'bucket_id[=:]\s*["\']?([a-zA-Z0-9_-]+)["\']?',
+            r'"bucket"\s*:\s*"([^"]+)"',
+            r'Bucket:\s*([a-zA-Z0-9_-]+)',
+            r'bucket\s+([a-zA-Z0-9_-]+)',
         ]
         for pattern in patterns:
             match = re.search(pattern, line, re.IGNORECASE)
             if match:
                 return match.group(1)
+        return None
+    
+    def _extract_object_store_uuid(self, line: str) -> Optional[str]:
+        """Extract object store UUID from log line"""
+        # UUID pattern
+        uuid_pattern = r'object_store[_-]?(?:uuid|id)?[=:]\s*([a-f0-9-]{36})'
+        match = re.search(uuid_pattern, line, re.IGNORECASE)
+        if match:
+            return match.group(1)
         return None
