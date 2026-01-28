@@ -597,6 +597,27 @@
             padding-left: 24px;
         }
         .message-text li { margin-bottom: 6px; }
+        
+        /* Chat images (charts, graphs) */
+        .chat-image {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            margin: 12px 0;
+            background: var(--bg-tertiary);
+            display: block;
+        }
+        .chat-image.chart-error {
+            min-height: 150px;
+            opacity: 0.7;
+        }
+        .message-text a {
+            color: var(--accent-primary);
+            text-decoration: none;
+        }
+        .message-text a:hover {
+            text-decoration: underline;
+        }
 
         /* Data Tables */
         .data-table {
@@ -1227,26 +1248,34 @@
                 const tableFormatted = detectAndFormatTable(section);
                 if (tableFormatted) {
                     formattedSections.push(
-                        tableFormatted
-                            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                            .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                            .replace(/`([^`]+)`/g, '<code>$1</code>')
-                            .replace(/\n/g, '<br>')
+                        applyTextFormatting(tableFormatted)
                     );
                 } else {
                     // Regular text formatting
                     formattedSections.push(
-                        section
-                            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                            .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                            .replace(/`([^`]+)`/g, '<code>$1</code>')
-                            .replace(/\n/g, '<br>')
+                        applyTextFormatting(section)
                     );
                 }
             }
             
             // Join sections with proper spacing
             return formattedSections.join('<div style="margin: 16px 0; border-top: 1px solid var(--border-color); opacity: 0.3;"></div>');
+        }
+        
+        function applyTextFormatting(text) {
+            return text
+                // Markdown images: ![alt](url)
+                .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" class="chat-image" onerror="this.onerror=null;this.src=\'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22200%22><rect fill=%22%23333%22 width=%22100%%22 height=%22100%%22/><text fill=%22%23888%22 x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22>Chart failed to load</text></svg>\';this.classList.add(\'chart-error\');">')
+                // Markdown links: [text](url)
+                .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+                // Bold
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                // Italic
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                // Code
+                .replace(/`([^`]+)`/g, '<code>$1</code>')
+                // Line breaks
+                .replace(/\n/g, '<br>');
         }
 
         function scrollToBottom(force = false) {
