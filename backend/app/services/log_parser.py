@@ -434,6 +434,7 @@ class LogParser:
             r'(object-controller-\d+)',
             r'(poseidon-atlas-\d+)',
             r'(metadata-service-\d+)',
+            r'(ms-server-\d+)',  # MS pods use ms-server-0 naming
             r'(zk-\d+)',
         ]
         for pattern in path_patterns:
@@ -446,6 +447,7 @@ class LogParser:
             r'\b(object-controller-\d+)\b',
             r'\b(poseidon-atlas-\d+)\b',
             r'\b(metadata-service-\d+)\b',
+            r'\b(ms-server-\d+)\b',  # MS pods
             r'\b(zk-\d+)\b',
             r'\b(node-\d+)\b',
             r'\b(atlas-\d+)\b',
