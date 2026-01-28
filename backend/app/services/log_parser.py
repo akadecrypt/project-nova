@@ -146,6 +146,70 @@ class LogParser:
             r'client\s+is\s+unavailable', r'client\s+unavailable',
             r'notification.*unavailable', r'service.*unavailable'
         ],
+        'BUCKET_ERROR': [
+            r'kInvalidBucket', r'invalid\s*bucket', r'bucket.*lookup\s+fail',
+            r'bucket\s+info.*fail', r'bucket.*not\s+found', r'bucket.*error'
+        ],
+        'REGISTRATION_ERROR': [
+            r'registration\s+fail', r'entity\s+registration\s+fail',
+            r'kDBUpdateInProgress', r'db\s+update\s+in\s+progress'
+        ],
+        'IAM_ERROR': [
+            r'could\s+not\s+retrieve.*iam', r'iam.*fail', r'iam.*error',
+            r'could\s+not\s+retrieve.*user\s+info', r'could\s+not\s+retrieve.*keys'
+        ],
+        'CONFIG_NOT_FOUND': [
+            r'config.*not\s+found', r'metadata\s+not\s+found',
+            r'feature\s+config.*not\s+found', r'not\s+found\s+for'
+        ],
+        'S3_OP_ERROR': [
+            r's3_base_op.*:\d+\]', r's3.*op.*error', r'request_id=.*op_id=.*error'
+        ],
+        'NOT_FOUND': [
+            r'non\s*exist', r'non\s*existent', r'no\s+replication\s+configuration',
+            r'no\s+entities\s+found', r'missing\s+uuid', r'website.*non\s*exist',
+            r'cors.*non\s*exist'
+        ],
+        'PARSE_ERROR': [
+            r'parsing.*fail', r'parse\s+error', r'failed\s+to\s+parse'
+        ],
+        'PUBLISH_ERROR': [
+            r'failed\s+to\s+publish', r'publish.*fail', r'publish.*error'
+        ],
+        'USER_ERROR': [
+            r'failed\s+to\s+get\s+user', r'user.*not\s+found', r'missing.*user'
+        ],
+        'PIPE_ERROR': [
+            r'broken\s+pipe', r'error\s+while\s+writing\s+to\s+socket'
+        ],
+        'PROTOCOL_ERROR': [
+            r'only\s+https.*allowed', r'protocol\s+error', r'invalid\s+protocol'
+        ],
+        'NOT_INITIALIZED': [
+            r'not\s+initialized', r'not\s+been\s+populated', r'not\s+handled\s+yet',
+            r'instance.*not\s+initialized'
+        ],
+        'STATE_NOT_FOUND': [
+            r'state\s+not\s+found', r'no.*member\s+state\s+found', r'state.*missing'
+        ],
+        'DNS_ERROR': [
+            r'getaddrinfo\s+fail', r'name.*service.*not\s+known', r'dns.*fail'
+        ],
+        'COMMAND_ERROR': [
+            r'exited\s+with\s+status', r'command.*fail', r'exit\s+code'
+        ],
+        'DISK_ERROR': [
+            r'failed\s+to\s+check\s+disk', r'disk.*error', r'disk.*fail'
+        ],
+        'INVALID_NAME': [
+            r'bucket\s+name\s+can\s+only\s+contain', r'invalid.*name', r'illegal.*name'
+        ],
+        'NOT_READY': [
+            r'not\s+yet.*ready', r'not\s+in\s+a\s+running\s+state', r'not\s+ready'
+        ],
+        'RAFT_ERROR': [
+            r'failed\s+to\s+get\s+raft', r'raft.*error', r'raft.*fail', r'illegal\s+state'
+        ],
     }
     
     # Timestamp patterns commonly found in Nutanix logs
