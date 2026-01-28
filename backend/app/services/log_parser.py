@@ -136,7 +136,7 @@ class LogParser:
             LogEvent objects for matching log lines
         """
         if severity_filter is None:
-            severity_filter = ['ERROR', 'WARN', 'FATAL']
+            severity_filter = ['ERROR', 'FATAL']  # Only errors and fatals, not warnings
         
         severity_filter = [s.upper() for s in severity_filter]
         
@@ -192,35 +192,48 @@ class LogParser:
         filepath_lower = filepath.lower()
         
         # First, check if the file has severity in name (common Nutanix pattern)
-        has_severity = any(sev in filename for sev in ['.error.', '.fatal.', '.warning.', '.warn.'])
+        # Only process ERROR and FATAL files
+        has_error_severity = any(sev in filename for sev in ['.error.', '.fatal.'])
         
-        # Check component patterns
-        for pod, patterns in self.LOG_FILE_PATTERNS.items():
-            for pattern in patterns:
-                pattern_lower = pattern.lower()
-                if pattern_lower in filename or pattern_lower in filepath_lower:
-                    return pod, pattern
+        # FIRST: Identify component from directory path (most reliable)
+        # This prevents misidentification (e.g., poseidon_atlas being tagged as OC)
+        component_from_path = None
+        if '/atlas/' in filepath_lower:
+            component_from_path = 'Atlas'
+        elif '/ms/' in filepath_lower:
+            component_from_path = 'MS'
+        elif '/oc/' in filepath_lower:
+            component_from_path = 'OC'
+        elif '/zookeeper/' in filepath_lower:
+            component_from_path = 'Zookeeper'
+        elif '/bucketstools/' in filepath_lower:
+            component_from_path = 'Buckets'
+        elif '/objectsbrowser/' in filepath_lower:
+            component_from_path = 'ObjectsBrowser'
         
-        # If file has severity pattern but didn't match known pods, still process it
-        if has_severity:
-            # Try to identify from path (e.g., /oc/, /ms/, /atlas/)
-            if '/oc/' in filepath_lower:
-                return 'OC', 'severity_file'
-            elif '/ms/' in filepath_lower:
-                return 'MS', 'severity_file'
-            elif '/atlas/' in filepath_lower:
-                return 'Atlas', 'severity_file'
-            else:
-                return 'Unknown', 'severity_file'
+        # If we identified component from path and file has error severity, return it
+        if component_from_path and has_error_severity:
+            return component_from_path, 'error_file'
         
-        # Also check for any .log file in key directories
-        if filename.endswith('.log') or '.log.' in filename:
-            if '/oc/' in filepath_lower:
-                return 'OC', 'log_file'
-            elif '/ms/' in filepath_lower:
-                return 'MS', 'log_file'
-            elif '/atlas/' in filepath_lower:
-                return 'Atlas', 'log_file'
+        # SECOND: Check filename patterns for .ERROR or .FATAL files
+        if has_error_severity:
+            # Use path-based component if available
+            if component_from_path:
+                return component_from_path, 'error_file'
+            # Otherwise try to identify from filename
+            for pod, patterns in self.LOG_FILE_PATTERNS.items():
+                for pattern in patterns:
+                    if pattern.lower() in filename:
+                        return pod, pattern
+            return 'Unknown', 'error_file'
+        
+        # THIRD: Check for explicit log files (*.log, *.ERROR, *.FATAL)
+        if filename.endswith('.error') or filename.endswith('.fatal'):
+            return component_from_path or 'Unknown', 'severity_file'
+        
+        # FOURTH: Process .out files which often contain important logs
+        if filename.endswith('.out') and component_from_path:
+            return component_from_path, 'out_file'
         
         return None, None
     

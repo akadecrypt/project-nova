@@ -190,7 +190,7 @@ class LogProcessor:
         """
         if severity_filter is None:
             log_config = self.config.get('log_analysis', {})
-            severity_filter = log_config.get('severity_filter', ['ERROR', 'WARN', 'FATAL'])
+            severity_filter = log_config.get('severity_filter', ['ERROR', 'FATAL'])
         
         stats = {
             'total_files': 0,
