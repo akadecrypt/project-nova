@@ -1,93 +1,55 @@
-# Chart Generation Guidelines
+# Data Visualization Guidelines
 
-When users ask for visual representations like charts or graphs, use QuickChart.io to generate them.
+## IMPORTANT: Do NOT Generate Chart URLs
 
-## QuickChart URL Format
+Do NOT attempt to generate QuickChart.io URLs or any image-based charts. They are error-prone and often fail to render.
 
-```
-https://quickchart.io/chart?c={CHART_CONFIG}
-```
+## Instead: Use Well-Formatted Tables
 
-Where `{CHART_CONFIG}` is a **URL-encoded** JSON object.
+When users ask for charts, graphs, or visualizations, provide the data in a **well-formatted markdown table** with a clear summary.
 
-## Important Rules
+### Example Response for "Show me a chart of bucket growth"
 
-1. **Always URL-encode** the entire chart configuration JSON
-2. **Keep charts simple** - avoid complex nested options
-3. **Use short labels** - dates should be "Jan 13" not "2026-01-13"
-4. **Limit data points** - max 10-12 points for readability
-5. **Test the JSON** is valid before encoding
+**api-request-logs** - Growth over the last 2 weeks:
 
-## Simple Line Chart Example
+| Date | Size (GB) | Objects (M) | Daily Growth |
+|------|-----------|-------------|--------------|
+| Jan 13 | 185.2 | 42.5 | - |
+| Jan 15 | 188.5 | 43.2 | +1.8% |
+| Jan 17 | 191.8 | 43.9 | +1.8% |
+| Jan 19 | 195.0 | 44.6 | +1.7% |
+| Jan 21 | 198.2 | 45.3 | +1.6% |
+| Jan 23 | 201.5 | 46.0 | +1.7% |
+| Jan 25 | 204.8 | 46.7 | +1.6% |
+| Jan 27 | 208.0 | 47.4 | +1.6% |
 
-For a line chart showing bucket growth:
+**Summary:** The bucket grew from 185.2 GB to 208.0 GB (+12.3%) over 2 weeks, with ~1.6 GB average daily growth. Object count increased from 42.5M to 47.4M (+11.5%).
 
-```json
-{
-  "type": "line",
-  "data": {
-    "labels": ["Jan 13", "Jan 15", "Jan 17", "Jan 19", "Jan 21", "Jan 23", "Jan 25", "Jan 27"],
-    "datasets": [{
-      "label": "Size (GB)",
-      "data": [185, 189, 192, 195, 198, 202, 205, 208],
-      "borderColor": "#007bff",
-      "fill": false
-    }]
-  }
-}
-```
+## Guidelines
 
-Encoded URL:
-```
-![Chart](https://quickchart.io/chart?c=%7B%22type%22%3A%22line%22%2C%22data%22%3A%7B%22labels%22%3A%5B%22Jan%2013%22%2C%22Jan%2015%22%2C%22Jan%2017%22%2C%22Jan%2019%22%2C%22Jan%2021%22%2C%22Jan%2023%22%2C%22Jan%2025%22%2C%22Jan%2027%22%5D%2C%22datasets%22%3A%5B%7B%22label%22%3A%22Size%20(GB)%22%2C%22data%22%3A%5B185%2C189%2C192%2C195%2C198%2C202%2C205%2C208%5D%2C%22borderColor%22%3A%22%23007bff%22%2C%22fill%22%3Afalse%7D%5D%7D%7D)
-```
+1. **Always use tables** - they render reliably and look good
+2. **Add a text summary** - highlight key insights, trends, percentages
+3. **Include calculated fields** - growth rates, percentages, comparisons
+4. **Keep it readable** - round numbers, use appropriate units (GB, M, K)
+5. **Answer the user's question** - if they want trends, explain the trend
 
-## Simple Bar Chart Example
+## For Comparisons
 
-```json
-{
-  "type": "bar",
-  "data": {
-    "labels": ["bucket-a", "bucket-b", "bucket-c"],
-    "datasets": [{
-      "label": "Objects",
-      "data": [1500, 2300, 800],
-      "backgroundColor": ["#007bff", "#00c851", "#ff9800"]
-    }]
-  }
-}
-```
+Use tables with clear headers:
 
-## Pie Chart Example
+| Object Store | Total Size | Used | Free | Usage % |
+|--------------|------------|------|------|---------|
+| oss1 | 10 TB | 3.2 TB | 6.8 TB | 32% |
+| oss3 | 10 TB | 5.1 TB | 4.9 TB | 51% |
 
-```json
-{
-  "type": "pie",
-  "data": {
-    "labels": ["bucket-a", "bucket-b", "bucket-c"],
-    "datasets": [{
-      "data": [45, 35, 20],
-      "backgroundColor": ["#007bff", "#00c851", "#ff9800"]
-    }]
-  }
-}
-```
+**Insight:** oss3 has 60% more data than oss1 and is approaching 50% capacity.
 
-## When to Use Charts
+## For Distributions
 
-- User explicitly asks for a "chart", "graph", or "visualization"
-- Showing trends over time (line chart)
-- Comparing sizes/counts between items (bar chart)
-- Showing distribution/percentages (pie chart)
+| Bucket | Size | % of Total |
+|--------|------|------------|
+| api-request-logs | 208 GB | 45% |
+| user-uploads | 156 GB | 34% |
+| backups | 95 GB | 21% |
 
-## When NOT to Use Charts
-
-- Simple queries - just return tables or text
-- Single data points - no need for a chart
-- When data is not available - say so instead of making up data
-
-## Alternative: Describe Data
-
-If chart generation is too complex, you can describe the data in text:
-
-"The bucket has grown steadily from 185 GB on Jan 13 to 208 GB on Jan 27, an increase of about 12%."
+The tables will render beautifully in the UI and are much more reliable than charts.
