@@ -46,13 +46,26 @@ class LogParser:
     """
     
     # Log file patterns to scan
+    # Matches actual Nutanix Object Store log file naming conventions
     LOG_FILE_PATTERNS = {
-        'OC': ['oc.log', 'oc.ERROR', 'oc.FATAL', 'oc.WARNING', 'object_controller.log'],
-        'MS': ['ms.log', 'ms.ERROR', 'ms.FATAL', 'metadata_service.log'],
-        'Atlas': ['atlas.log', 'atlas.ERROR', 'atlas.FATAL'],
+        'OC': [
+            'oc.log', 'oc.ERROR', 'oc.FATAL', 'oc.WARNING', 
+            'object_controller.log', 'object_store.', 'object-controller',
+            'poseidon', 'hermes', 'federation_controller',
+        ],
+        'MS': [
+            'ms.log', 'ms.ERROR', 'ms.FATAL', 
+            'metadata_service.log', 'metadata-service', 'ms-',
+        ],
+        'Atlas': ['atlas.log', 'atlas.ERROR', 'atlas.FATAL', 'atlas-'],
         'Curator': ['curator.log', 'curator.ERROR', 'curator.FATAL'],
         'Stargate': ['stargate.log', 'stargate.ERROR', 'stargate.FATAL'],
+        'Zookeeper': ['zookeeper', 'zk-'],
+        'Buckets': ['bucket', 'bucketstools'],
     }
+    
+    # Also match files by severity in filename (common Nutanix pattern)
+    SEVERITY_FILE_PATTERNS = ['.ERROR.', '.FATAL.', '.WARNING.', '.WARN.']
     
     # Severity patterns
     SEVERITY_PATTERNS = {
@@ -174,11 +187,38 @@ class LogParser:
     def _identify_log_file(self, filepath: str) -> Tuple[Optional[str], Optional[str]]:
         """Identify the pod and log type from a file path"""
         filename = os.path.basename(filepath).lower()
+        filepath_lower = filepath.lower()
         
+        # First, check if the file has severity in name (common Nutanix pattern)
+        has_severity = any(sev in filename for sev in ['.error.', '.fatal.', '.warning.', '.warn.'])
+        
+        # Check component patterns
         for pod, patterns in self.LOG_FILE_PATTERNS.items():
             for pattern in patterns:
-                if pattern.lower() in filename:
+                pattern_lower = pattern.lower()
+                if pattern_lower in filename or pattern_lower in filepath_lower:
                     return pod, pattern
+        
+        # If file has severity pattern but didn't match known pods, still process it
+        if has_severity:
+            # Try to identify from path (e.g., /oc/, /ms/, /atlas/)
+            if '/oc/' in filepath_lower:
+                return 'OC', 'severity_file'
+            elif '/ms/' in filepath_lower:
+                return 'MS', 'severity_file'
+            elif '/atlas/' in filepath_lower:
+                return 'Atlas', 'severity_file'
+            else:
+                return 'Unknown', 'severity_file'
+        
+        # Also check for any .log file in key directories
+        if filename.endswith('.log') or '.log.' in filename:
+            if '/oc/' in filepath_lower:
+                return 'OC', 'log_file'
+            elif '/ms/' in filepath_lower:
+                return 'MS', 'log_file'
+            elif '/atlas/' in filepath_lower:
+                return 'Atlas', 'log_file'
         
         return None, None
     

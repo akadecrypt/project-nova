@@ -303,8 +303,38 @@ class LogCollector:
             shutil.rmtree(temp_dir, ignore_errors=True)
             return None
         
+        # Strip mspctl header from the file (it adds "======= IP =======" before content)
+        # The gzip magic bytes are \x1f\x8b
+        self._strip_mspctl_header(local_archive)
+        
         print(f"✅ Collected logs from {object_store_name}: {os.path.getsize(local_archive)} bytes")
         return local_archive
+    
+    def _strip_mspctl_header(self, filepath: str) -> bool:
+        """
+        Strip mspctl SSH header from file if present.
+        mspctl adds '================== IP ==================\n' before command output.
+        """
+        try:
+            with open(filepath, 'rb') as f:
+                data = f.read()
+            
+            # Find gzip magic bytes (\x1f\x8b)
+            gzip_start = data.find(b'\x1f\x8b')
+            
+            if gzip_start == -1:
+                print(f"⚠️ No gzip content found in file")
+                return False
+            
+            if gzip_start > 0:
+                print(f"🔧 Stripping {gzip_start} bytes of mspctl header")
+                with open(filepath, 'wb') as f:
+                    f.write(data[gzip_start:])
+            
+            return True
+        except Exception as e:
+            print(f"⚠️ Error stripping header: {e}")
+            return False
     
     def upload_to_s3(self, local_path: str, object_store_name: str) -> Optional[Dict]:
         """
