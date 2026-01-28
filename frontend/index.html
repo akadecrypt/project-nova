@@ -1117,10 +1117,9 @@
             }
             window.history.replaceState({view: viewName}, '', url);
             
-            // Close mobile sidebar
-            if (window.innerWidth <= 768) {
-                toggleSidebar();
-            }
+            // Close mobile sidebar (explicit close, not toggle)
+            document.getElementById('sidebar')?.classList.remove('open');
+            document.getElementById('sidebarOverlay')?.classList.remove('visible');
         }
 
         // Theme
@@ -1170,9 +1169,28 @@
         function startNewChat() {
             saveCurrentSession();
             currentSessionId = `session-${Date.now()}`;
-            document.getElementById('chatArea').innerHTML = document.getElementById('welcomeScreen').outerHTML;
-            document.getElementById('welcomeScreen').style.display = 'flex';
+            
+            // Recreate welcome screen HTML directly
+            document.getElementById('chatArea').innerHTML = `
+                <div class="welcome-screen" id="welcomeScreen" style="display: flex;">
+                    <div class="welcome-icon">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                        </svg>
+                    </div>
+                    <h1 class="welcome-title">Hello, I'm NOVA</h1>
+                    <p class="welcome-subtitle">Your intelligent assistant for Nutanix Objects. I can help you manage buckets, analyze storage trends, and much more.</p>
+                    <div class="suggestions">
+                        <button class="suggestion-btn" onclick="sendSuggestion('List all buckets')">List all buckets</button>
+                        <button class="suggestion-btn" onclick="sendSuggestion('Create a new bucket')">Create a bucket</button>
+                        <button class="suggestion-btn" onclick="sendSuggestion('Show storage statistics')">Storage stats</button>
+                        <button class="suggestion-btn" onclick="sendSuggestion('Help')">Help</button>
+                    </div>
+                </div>
+            `;
+            
             loadChatHistory();
+            
             // Switch to chat view if not already there
             if (currentView !== 'chat') {
                 switchView('chat');
