@@ -23,6 +23,9 @@ def execute_sql(sql: str, timeout: int = 10) -> dict:
     try:
         url = get_sql_agent_url()
         
+        # Normalize SQL: strip whitespace and collapse multiple spaces
+        sql = ' '.join(sql.split())
+        
         response = requests.post(
             url,
             json={"sql": sql},
