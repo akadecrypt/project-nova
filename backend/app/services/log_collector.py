@@ -499,6 +499,39 @@ class LogCollector:
                 "status": "pending"
             }
             
+            # Check if we've already collected this hour for this cluster
+            current_hour = datetime.now().replace(minute=0, second=0, microsecond=0)
+            current_hour_epoch = int(current_hour.timestamp())
+            
+            # First check in-memory cache
+            last_collection = self._last_collection.get(object_store_name)
+            if last_collection and last_collection >= current_hour:
+                logger.info(f"⏭️ Skipping {object_store_name} - already collected this hour (memory)")
+                print(f"⏭️ Skipping {object_store_name} - already collected at {last_collection.strftime('%H:%M')}")
+                detail["status"] = "skipped"
+                detail["reason"] = "Already collected this hour"
+                results["details"].append(detail)
+                continue
+            
+            # Also check database for persistence across restarts
+            try:
+                from ..tools.sql_tools import execute_sql
+                check_result = execute_sql(
+                    f"SELECT upload_id FROM log_uploads WHERE cluster_name = '{object_store_name}' "
+                    f"AND uploaded_at >= {current_hour_epoch} LIMIT 1"
+                )
+                if check_result.get("rows") and len(check_result["rows"]) > 0:
+                    logger.info(f"⏭️ Skipping {object_store_name} - already collected this hour (DB)")
+                    print(f"⏭️ Skipping {object_store_name} - already collected this hour (found in DB)")
+                    detail["status"] = "skipped"
+                    detail["reason"] = "Already collected this hour (DB check)"
+                    results["details"].append(detail)
+                    # Update memory cache
+                    self._last_collection[object_store_name] = datetime.now()
+                    continue
+            except Exception as e:
+                logger.warning(f"Could not check DB for prior collection: {e}")
+            
             try:
                 # Collect logs via mspctl cls ssh
                 local_archive = self.collect_logs_from_cluster(
