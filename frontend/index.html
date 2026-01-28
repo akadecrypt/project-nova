@@ -1179,7 +1179,12 @@
             document.getElementById('chatArea').innerHTML = document.getElementById('welcomeScreen').outerHTML;
             document.getElementById('welcomeScreen').style.display = 'flex';
             loadChatHistory();
-            toggleSidebar();
+            // Switch to chat view if not already there
+            if (currentView !== 'chat') {
+                switchView('chat');
+            } else if (window.innerWidth <= 768) {
+                toggleSidebar();
+            }
         }
 
         function saveCurrentSession() {
@@ -1262,9 +1267,15 @@
             }
             
             loadChatHistory();
-            // Close sidebar on mobile
-            document.getElementById('sidebar').classList.remove('open');
-            document.getElementById('sidebarOverlay').classList.remove('visible');
+            
+            // Switch to chat view if not already there
+            if (currentView !== 'chat') {
+                switchView('chat');
+            } else {
+                // Close sidebar on mobile
+                document.getElementById('sidebar').classList.remove('open');
+                document.getElementById('sidebarOverlay').classList.remove('visible');
+            }
         }
 
         function deleteSession(sessionId) {
