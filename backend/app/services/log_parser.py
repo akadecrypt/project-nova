@@ -77,13 +77,41 @@ class LogParser:
     
     # Event type patterns (for classification)
     EVENT_TYPE_PATTERNS = {
-        'REPLICATION_FAIL': [r'replication\s+fail', r'sync\s+error', r'replication\s+error'],
-        'IO_ERROR': [r'i/o\s+error', r'disk\s+read\s+fail', r'write\s+error', r'read\s+error'],
-        'AUTH_FAIL': [r'auth.*fail', r'access\s+denied', r'permission\s+denied', r'unauthorized'],
+        'FILE_NOT_FOUND': [
+            r'no\s+such\s+file', r'file.*not\s+exist', r'file\s+not\s+found',
+            r'not\s+a\s+regular\s+file', r'cannot\s+open\s+file'
+        ],
+        'CONNECTION_ERROR': [
+            r'unable\s+to\s+create.*connection', r'connection\s+failed', r'connect\s+error',
+            r'connection\s+refused', r'connection\s+reset', r'failed\s+to\s+connect',
+            r'transport\s+error', r'rpc.*error', r'http\s+connection\s+error'
+        ],
+        'REPLICATION_FAIL': [
+            r'replication\s+fail', r'sync\s+error', r'replication\s+error',
+            r'failed\s+to\s+replicate', r'replication\s+lag'
+        ],
+        'IO_ERROR': [
+            r'i/o\s+error', r'disk\s+read\s+fail', r'write\s+error', r'read\s+error',
+            r'failed\s+to\s+read', r'failed\s+to\s+write'
+        ],
+        'AUTH_FAIL': [
+            r'auth.*fail', r'access\s+denied', r'permission\s+denied', r'unauthorized',
+            r'authentication\s+failed', r'invalid.*credentials'
+        ],
         'DISK_FULL': [r'no\s+space\s+left', r'disk\s+full', r'out\s+of\s+space'],
         'OOM': [r'out\s+of\s+memory', r'oom\s+killer', r'memory\s+allocation\s+fail'],
         'TIMEOUT': [r'timeout', r'timed\s+out', r'deadline\s+exceeded'],
-        'CONNECTION_FAIL': [r'connection\s+refused', r'connection\s+reset', r'connect\s+fail'],
+        'SESSION_ERROR': [
+            r'session.*error', r'failed\s+to\s+read\s+session', r'session\s+expired',
+            r'invalid\s+session'
+        ],
+        'CONFIG_ERROR': [
+            r'configuration\s+error', r'invalid\s+config', r'missing\s+config',
+            r'thread\s+name.*maximum'
+        ],
+        'ZOOKEEPER_ERROR': [
+            r'zookeeper.*error', r'zk.*error', r'znode.*error', r'zeus.*error'
+        ],
         'CORRUPTION': [r'checksum\s+mismatch', r'data\s+corruption', r'corrupt'],
         'QUOTA_EXCEEDED': [r'quota\s+exceeded', r'limit\s+reached', r'quota\s+limit'],
         'SERVICE_DOWN': [r'service\s+unavailable', r'failed\s+to\s+start', r'service\s+down'],
@@ -273,7 +301,7 @@ class LogParser:
                 if severity in severity_filter:
                     timestamp = self._extract_timestamp(line)
                     event_type = self._detect_event_type(line)
-                    node_name = self._extract_node_name(line)
+                    node_name = self._extract_node_name(line, file_path)
                     bucket_name = self._extract_bucket_name(line)
                     
                     current_event = LogEvent(
@@ -398,12 +426,36 @@ class LogParser:
         
         return False
     
-    def _extract_node_name(self, line: str) -> Optional[str]:
-        """Extract node name from log line"""
-        # Pattern: node-01, atlas-7, etc.
-        match = re.search(r'\b(node-\d+|atlas-\d+|ms-\d+|oc-\d+)\b', line, re.IGNORECASE)
-        if match:
-            return match.group(1)
+    def _extract_node_name(self, line: str, file_path: str = "") -> Optional[str]:
+        """Extract node name from log line or file path"""
+        # First try to extract from file path (most reliable)
+        # Pattern: object-controller-0, poseidon-atlas-0, zk-1, metadata-service-0
+        path_patterns = [
+            r'(object-controller-\d+)',
+            r'(poseidon-atlas-\d+)',
+            r'(metadata-service-\d+)',
+            r'(zk-\d+)',
+        ]
+        for pattern in path_patterns:
+            match = re.search(pattern, file_path, re.IGNORECASE)
+            if match:
+                return match.group(1)
+        
+        # Then try from line content
+        line_patterns = [
+            r'\b(object-controller-\d+)\b',
+            r'\b(poseidon-atlas-\d+)\b',
+            r'\b(metadata-service-\d+)\b',
+            r'\b(zk-\d+)\b',
+            r'\b(node-\d+)\b',
+            r'\b(atlas-\d+)\b',
+            r'\b(ms-\d+)\b',
+            r'\b(oc-\d+)\b',
+        ]
+        for pattern in line_patterns:
+            match = re.search(pattern, line, re.IGNORECASE)
+            if match:
+                return match.group(1)
         return None
     
     def _extract_bucket_name(self, line: str) -> Optional[str]:
