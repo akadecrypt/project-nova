@@ -541,7 +541,16 @@
             color: var(--text-muted);
             margin: 0 12px;
         }
+        
+        /* Iframe mode - hide header when embedded */
+        .iframe-mode .header { display: none !important; }
+        .iframe-mode .main-content { margin-top: 0 !important; }
     </style>
+    <script>
+        if (window.self !== window.top) {
+            document.documentElement.classList.add('iframe-mode');
+        }
+    </script>
 </head>
 <body>
     <div class="app-container">

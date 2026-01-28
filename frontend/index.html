@@ -244,6 +244,15 @@
             padding-top: 16px;
             border-top: 1px solid var(--border-color);
         }
+        
+        .nav-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 12px;
+            padding-left: 4px;
+        }
 
         .nav-item {
             display: flex;
@@ -261,6 +270,27 @@
         .nav-item:hover {
             background: var(--bg-hover);
             color: var(--text-primary);
+        }
+        
+        .nav-item.active {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+        
+        /* View containers */
+        .view-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .view-container iframe {
+            flex: 1;
+            width: 100%;
+            border: none;
+            background: var(--bg-primary);
         }
 
         .nav-icon {
@@ -898,7 +928,14 @@
             </div>
 
             <div class="nav-section">
-                <a href="db-browser.html" class="nav-item">
+                <div class="nav-label">Tools</div>
+                <a href="#" class="nav-item active" data-view="chat" onclick="switchView('chat'); return false;">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    <span>Chat</span>
+                </a>
+                <a href="#" class="nav-item" data-view="database" onclick="switchView('database'); return false;">
                     <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
                         <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
@@ -906,7 +943,7 @@
                     </svg>
                     <span>Database</span>
                 </a>
-                <a href="log-browser.html" class="nav-item">
+                <a href="#" class="nav-item" data-view="logs" onclick="switchView('logs'); return false;">
                     <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                         <polyline points="14 2 14 8 20 8"></polyline>
@@ -915,7 +952,7 @@
                     </svg>
                     <span>Logs</span>
                 </a>
-                <a href="settings.html" class="nav-item">
+                <a href="#" class="nav-item" data-view="settings" onclick="switchView('settings'); return false;">
                     <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="3"></circle>
                         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
@@ -960,36 +997,54 @@
                 </div>
             </header>
 
-            <div class="chat-area" id="chatArea">
-                <div class="welcome-screen" id="welcomeScreen">
-                    <div class="welcome-icon">
-                        <svg viewBox="0 0 24 24">
-                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-                        </svg>
+            <!-- Chat View -->
+            <div class="view-container" id="chatView" style="display: flex; flex-direction: column; flex: 1;">
+                <div class="chat-area" id="chatArea">
+                    <div class="welcome-screen" id="welcomeScreen">
+                        <div class="welcome-icon">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                            </svg>
+                        </div>
+                        <h1 class="welcome-title">Hello, I'm NOVA</h1>
+                        <p class="welcome-subtitle">Your intelligent assistant for Nutanix Objects. I can help you manage buckets, analyze storage trends, and much more.</p>
+                        <div class="suggestions">
+                            <button class="suggestion-btn" onclick="sendSuggestion('List all buckets')">List all buckets</button>
+                            <button class="suggestion-btn" onclick="sendSuggestion('Create a new bucket')">Create a bucket</button>
+                            <button class="suggestion-btn" onclick="sendSuggestion('Show storage statistics')">Storage stats</button>
+                            <button class="suggestion-btn" onclick="sendSuggestion('Help')">Help</button>
+                        </div>
                     </div>
-                    <h1 class="welcome-title">Hello, I'm NOVA</h1>
-                    <p class="welcome-subtitle">Your intelligent assistant for Nutanix Objects. I can help you manage buckets, analyze storage trends, and much more.</p>
-                    <div class="suggestions">
-                        <button class="suggestion-btn" onclick="sendSuggestion('List all buckets')">List all buckets</button>
-                        <button class="suggestion-btn" onclick="sendSuggestion('Create a new bucket')">Create a bucket</button>
-                        <button class="suggestion-btn" onclick="sendSuggestion('Show storage statistics')">Storage stats</button>
-                        <button class="suggestion-btn" onclick="sendSuggestion('Help')">Help</button>
+                </div>
+
+                <div class="input-area">
+                    <div class="input-container">
+                        <div class="input-wrapper">
+                            <textarea class="message-input" id="messageInput" placeholder="Ask NOVA anything..." rows="1"></textarea>
+                        </div>
+                        <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                            </svg>
+                        </button>
                     </div>
+                    <div class="input-hint">Press <kbd>Enter</kbd> to send · <kbd>Shift + Enter</kbd> for new line</div>
                 </div>
             </div>
-
-            <div class="input-area">
-                <div class="input-container">
-                    <div class="input-wrapper">
-                        <textarea class="message-input" id="messageInput" placeholder="Ask NOVA anything..." rows="1"></textarea>
-                    </div>
-                    <button class="send-btn" id="sendBtn" onclick="sendMessage()">
-                        <svg viewBox="0 0 24 24">
-                            <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
-                        </svg>
-                    </button>
-                </div>
-                <div class="input-hint">Press <kbd>Enter</kbd> to send · <kbd>Shift + Enter</kbd> for new line</div>
+            
+            <!-- Database View -->
+            <div class="view-container" id="databaseView" style="display: none; flex: 1;">
+                <iframe src="db-browser.html" style="width: 100%; height: 100%; border: none;"></iframe>
+            </div>
+            
+            <!-- Logs View -->
+            <div class="view-container" id="logsView" style="display: none; flex: 1;">
+                <iframe src="log-browser.html" style="width: 100%; height: 100%; border: none;"></iframe>
+            </div>
+            
+            <!-- Settings View -->
+            <div class="view-container" id="settingsView" style="display: none; flex: 1;">
+                <iframe src="settings.html" style="width: 100%; height: 100%; border: none;"></iframe>
             </div>
         </main>
     </div>
@@ -1000,6 +1055,46 @@
         let currentSessionId = `session-${Date.now()}`;
         let chatSessions = JSON.parse(localStorage.getItem('nova-chat-sessions') || '{}');
         let isProcessing = false; // Track message processing state
+        let currentView = 'chat';
+
+        // View Switching
+        function switchView(viewName) {
+            currentView = viewName;
+            
+            // Hide all views
+            document.querySelectorAll('.view-container').forEach(v => v.style.display = 'none');
+            
+            // Show selected view
+            const viewMap = {
+                'chat': 'chatView',
+                'database': 'databaseView',
+                'logs': 'logsView',
+                'settings': 'settingsView'
+            };
+            const viewEl = document.getElementById(viewMap[viewName]);
+            if (viewEl) {
+                viewEl.style.display = viewName === 'chat' ? 'flex' : 'block';
+            }
+            
+            // Update nav active state
+            document.querySelectorAll('.nav-item[data-view]').forEach(item => {
+                item.classList.toggle('active', item.dataset.view === viewName);
+            });
+            
+            // Update page title
+            const titles = {
+                'chat': 'Chat',
+                'database': 'Database Browser',
+                'logs': 'Log Browser',
+                'settings': 'Settings'
+            };
+            document.title = `NOVA - ${titles[viewName] || 'Nutanix Objects Virtual Assistant'}`;
+            
+            // Close mobile sidebar
+            if (window.innerWidth <= 768) {
+                toggleSidebar();
+            }
+        }
 
         // Theme
         const savedTheme = localStorage.getItem('nova-theme') || 'dark';

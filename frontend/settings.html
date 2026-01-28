@@ -434,7 +434,17 @@
             .form-row { grid-template-columns: 1fr; }
             .theme-selector { flex-wrap: wrap; }
         }
+        /* Iframe mode - hide sidebar when embedded */
+        .iframe-mode .sidebar,
+        .iframe-mode .bg-animation { display: none !important; }
+        .iframe-mode .main-content { margin-left: 0 !important; }
     </style>
+    <script>
+        // Detect if loaded in iframe and add iframe-mode class
+        if (window.self !== window.top) {
+            document.documentElement.classList.add('iframe-mode');
+        }
+    </script>
 </head>
 <body>
     <div class="bg-animation"></div>

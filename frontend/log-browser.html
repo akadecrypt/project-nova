@@ -490,7 +490,16 @@
             .filter-group { width: 100%; }
             .filter-select, .filter-input { width: 100%; }
         }
+        
+        /* Iframe mode - hide sidebar when embedded */
+        .iframe-mode .sidebar { display: none !important; }
+        .iframe-mode .main-content { margin-left: 0 !important; }
     </style>
+    <script>
+        if (window.self !== window.top) {
+            document.documentElement.classList.add('iframe-mode');
+        }
+    </script>
 </head>
 <body>
     <div class="app-container">
