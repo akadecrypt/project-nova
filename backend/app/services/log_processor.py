@@ -202,6 +202,32 @@ class LogProcessor:
         }
         
         try:
+            # Check if already processed - avoid duplicate processing
+            status_check = execute_sql(
+                f"SELECT status FROM log_uploads WHERE upload_id={upload_id}"
+            )
+            if status_check.get('rows'):
+                current_status = status_check['rows'][0]
+                if isinstance(current_status, dict):
+                    current_status = current_status.get('status', '')
+                else:
+                    current_status = current_status[0] if current_status else ''
+                
+                if current_status == 'COMPLETED':
+                    print(f"⏭️ Upload {upload_id} already processed, skipping")
+                    return {'skipped': True, 'reason': 'Already processed'}
+            
+            # Clear any existing logs for this upload_id (handles re-processing)
+            existing_check = execute_sql(
+                f"SELECT COUNT(*) as cnt FROM logs WHERE upload_id={upload_id}"
+            )
+            if existing_check.get('rows'):
+                row = existing_check['rows'][0]
+                count = row.get('cnt', 0) if isinstance(row, dict) else row[0]
+                if count > 0:
+                    print(f"🗑️ Clearing {count} existing logs for upload_id {upload_id}")
+                    execute_sql(f"DELETE FROM logs WHERE upload_id={upload_id}")
+            
             # Update status to PROCESSING
             self.update_upload_status(upload_id, 'PROCESSING')
             
