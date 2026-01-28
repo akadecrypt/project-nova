@@ -117,6 +117,18 @@ class LogProcessor:
         raw_file_path = event.raw_file_path.replace("'", "''") if event.raw_file_path else ""
         raw_log_file = event.raw_log_file.replace("'", "''") if event.raw_log_file else ""
         
+        # Check for duplicate based on timestamp + message (first 100 chars) + node_name
+        message_check = message[:100].replace("'", "''") if message else ""
+        node_check = event.node_name or ''
+        dup_check = execute_sql(
+            f"SELECT 1 FROM logs WHERE timestamp={event.timestamp} "
+            f"AND message LIKE '{message_check}%' "
+            f"AND (node_name='{node_check}' OR (node_name IS NULL AND '{node_check}'='')) "
+            f"LIMIT 1"
+        )
+        if dup_check.get('rows'):
+            return False  # Duplicate found, skip
+        
         now = int(time.time())
         
         # Build INSERT statement
