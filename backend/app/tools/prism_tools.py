@@ -99,6 +99,22 @@ def get_object_stores(verify_ssl: bool = False) -> dict:
         return {"error": str(e)}
 
 
+def _normalize_timestamp(ts: str) -> str:
+    """
+    Normalize timestamp to RFC 3339 format expected by Nutanix API.
+    Converts 'Z' suffix to '+00:00' and ensures proper format.
+    """
+    if not ts:
+        return ts
+    # Replace Z with +00:00 for RFC 3339 compliance
+    if ts.endswith('Z'):
+        ts = ts[:-1] + '+00:00'
+    # Ensure the timestamp has timezone info
+    if '+' not in ts and '-' not in ts[-6:]:
+        ts = ts + '+00:00'
+    return ts
+
+
 def fetch_object_store_stats_v4(
     object_store_ext_id: str,
     start_time: str,
@@ -113,8 +129,8 @@ def fetch_object_store_stats_v4(
     
     Args:
         object_store_ext_id: External ID (UUID) of the object store
-        start_time: Start time in ISO 8601 format
-        end_time: End time in ISO 8601 format
+        start_time: Start time in RFC 3339 format (e.g., 2026-01-28T07:55:00+00:00)
+        end_time: End time in RFC 3339 format
         select_stats: List of statistics to retrieve
         sampling_interval: Sampling interval in seconds
         stat_type: Type of statistics
@@ -128,6 +144,10 @@ def fetch_object_store_stats_v4(
         return {"error": "Prism Central IP not configured"}
     
     url = f"{_get_pc_base_url()}/api/objects/v4.0/stats/object-stores/{object_store_ext_id}"
+    
+    # Normalize timestamps to RFC 3339 format
+    start_time = _normalize_timestamp(start_time)
+    end_time = _normalize_timestamp(end_time)
     
     params = {
         "$startTime": start_time,
