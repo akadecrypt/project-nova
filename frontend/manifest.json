@@ -1,0 +1,45 @@
+{
+  "name": "NOVA - Nutanix Objects Virtual Assistant",
+  "short_name": "NOVA",
+  "description": "AI-powered assistant for managing Nutanix Objects storage",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#0a0a0f",
+  "theme_color": "#6366f1",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["productivity", "utilities"],
+  "shortcuts": [
+    {
+      "name": "New Chat",
+      "short_name": "Chat",
+      "description": "Start a new conversation",
+      "url": "/index.html?view=chat"
+    },
+    {
+      "name": "Database",
+      "short_name": "Database",
+      "description": "Browse database",
+      "url": "/index.html?view=database"
+    },
+    {
+      "name": "Settings",
+      "short_name": "Settings",
+      "description": "Configure NOVA",
+      "url": "/index.html?view=settings"
+    }
+  ]
+}
