@@ -6,6 +6,7 @@
     "sql_schema",
     "api_reference",
     "troubleshooting",
-    "best_practices"
+    "best_practices",
+    "chart_generation"
   ]
 }
