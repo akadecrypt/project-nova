@@ -152,23 +152,43 @@ def format_tool_result(tool_name: str, result: dict) -> str:
         lines = []
         row_count = len(rows)
         
-        # Generate appropriate title based on columns
-        if any('error' in str(c).lower() or 'severity' in str(c).lower() for c in columns):
+        # Determine data type and generate appropriate title
+        is_error_data = any('error' in str(c).lower() or 'severity' in str(c).lower() or 'fatal' in str(c).lower() for c in columns)
+        is_bucket_data = any('bucket' in str(c).lower() for c in columns)
+        is_storage_data = any('size' in str(c).lower() or 'storage' in str(c).lower() or 'gb' in str(c).lower() for c in columns)
+        is_alert_data = any('alert' in str(c).lower() for c in columns)
+        is_store_data = any('store' in str(c).lower() for c in columns)
+        
+        if is_error_data:
             title = "Error Analysis"
-        elif any('bucket' in str(c).lower() for c in columns):
+        elif is_bucket_data:
             title = "Bucket Information" 
-        elif any('size' in str(c).lower() or 'storage' in str(c).lower() or 'gb' in str(c).lower() for c in columns):
+        elif is_storage_data:
             title = "Storage Statistics"
-        elif any('alert' in str(c).lower() for c in columns):
+        elif is_alert_data:
             title = "System Alerts"
-        elif any('store' in str(c).lower() for c in columns):
+        elif is_store_data:
             title = "Object Store Information"
         else:
             title = "Query Results"
         
         lines.append(f"### {title}\n")
         
-        # Single row - show as key-value pairs for better readability
+        # Generate summary sentence
+        if row_count == 1:
+            row = rows[0]
+            row_values = row if isinstance(row, (list, tuple)) else list(row.values()) if isinstance(row, dict) else [row]
+            summary_parts = []
+            for i, col in enumerate(columns):
+                val = row_values[i] if i < len(row_values) else None
+                if val and isinstance(val, (int, float)):
+                    summary_parts.append(f"**{format_value(val, col)}** {str(col).replace('_', ' ')}")
+            if summary_parts:
+                lines.append(f"Summary: {', '.join(summary_parts[:3])}.\n")
+        else:
+            lines.append(f"Found **{row_count:,}** records.\n")
+        
+        # Data table
         if row_count == 1:
             row = rows[0]
             row_values = row if isinstance(row, (list, tuple)) else list(row.values()) if isinstance(row, dict) else [row]
@@ -180,24 +200,8 @@ def format_tool_result(tool_name: str, result: dict) -> str:
                 formatted_val = format_value(val, col)
                 col_display = str(col).replace("_", " ").title()
                 lines.append(f"| {col_display} | **{formatted_val}** |")
-            
-            # Add insights for single-row results
-            lines.append("\n**Key Takeaways:**")
-            for i, col in enumerate(columns):
-                val = row_values[i] if i < len(row_values) else None
-                col_lower = str(col).lower()
-                if val and isinstance(val, (int, float)):
-                    if 'size' in col_lower or 'gb' in col_lower:
-                        lines.append(f"- Total storage: {format_value(val, col)}")
-                    elif 'count' in col_lower or 'objects' in col_lower:
-                        lines.append(f"- Total objects: {format_value(val, col)}")
-                    elif 'error' in col_lower or 'fatal' in col_lower:
-                        if val > 0:
-                            lines.append(f"- ⚠️ {int(val)} issues detected - review recommended")
-                        else:
-                            lines.append(f"- ✅ No critical issues")
         else:
-            # Multiple rows - show as table
+            # Multiple rows table
             lines.append("| " + " | ".join(str(c).replace("_", " ").title() for c in columns) + " |")
             lines.append("|" + "|".join(["---"] * len(columns)) + "|")
             
@@ -211,9 +215,94 @@ def format_tool_result(tool_name: str, result: dict) -> str:
             
             if row_count > 25:
                 lines.append(f"\n*Showing 25 of {row_count} results*")
+        
+        # Generate chart if we have numeric data for comparison
+        chart_data = None
+        if row_count > 1 and row_count <= 15:
+            # Find label column and value column
+            label_col_idx = None
+            value_col_idx = None
             
-            # Add summary
-            lines.append(f"\n**Summary:** Found {row_count:,} records")
+            for i, col in enumerate(columns):
+                col_lower = str(col).lower()
+                if 'name' in col_lower or 'type' in col_lower or 'bucket' in col_lower or 'severity' in col_lower or 'node' in col_lower or 'pod' in col_lower:
+                    label_col_idx = i
+                elif 'count' in col_lower or 'total' in col_lower or 'size' in col_lower or 'errors' in col_lower or col_lower == 'count':
+                    value_col_idx = i
+            
+            # Default to first text and first number column
+            if label_col_idx is None:
+                for i, col in enumerate(columns):
+                    row_val = rows[0][i] if isinstance(rows[0], (list, tuple)) else rows[0].get(col)
+                    if isinstance(row_val, str):
+                        label_col_idx = i
+                        break
+            if value_col_idx is None:
+                for i, col in enumerate(columns):
+                    row_val = rows[0][i] if isinstance(rows[0], (list, tuple)) else rows[0].get(col)
+                    if isinstance(row_val, (int, float)) and i != label_col_idx:
+                        value_col_idx = i
+                        break
+            
+            if label_col_idx is not None and value_col_idx is not None:
+                labels = []
+                values = []
+                for row in rows[:10]:
+                    row_values = row if isinstance(row, (list, tuple)) else list(row.values()) if isinstance(row, dict) else [row]
+                    if label_col_idx < len(row_values) and value_col_idx < len(row_values):
+                        label = str(row_values[label_col_idx])[:20]  # Truncate long labels
+                        val = row_values[value_col_idx]
+                        if isinstance(val, (int, float)):
+                            labels.append(label)
+                            values.append(val)
+                
+                if labels and values:
+                    value_col_name = str(columns[value_col_idx]).replace("_", " ").title()
+                    chart_type = "pie" if is_storage_data and row_count <= 6 else "bar"
+                    chart_data = {
+                        "type": chart_type,
+                        "title": f"{title}",
+                        "labels": labels,
+                        "datasets": [{"label": value_col_name, "data": values}]
+                    }
+        
+        # Add chart
+        if chart_data:
+            lines.append("\n```chart")
+            lines.append(json.dumps(chart_data))
+            lines.append("```\n")
+        
+        # Add insights section
+        lines.append("\n**Key Insights:**")
+        
+        if is_error_data:
+            # Error-specific insights
+            total_errors = sum(r[value_col_idx] if isinstance(r, (list, tuple)) else list(r.values())[value_col_idx] 
+                              for r in rows if isinstance(r[value_col_idx] if isinstance(r, (list, tuple)) else list(r.values())[value_col_idx], (int, float)))
+            lines.append(f"- Total issues: **{total_errors:,}**")
+            if any('fatal' in str(r).lower() for r in rows):
+                lines.append("- ⚠️ FATAL errors present - investigate immediately")
+            lines.append("- Review error patterns and address root causes")
+        elif is_storage_data:
+            lines.append("- Monitor storage growth trends")
+            lines.append("- Consider lifecycle policies for older data")
+            lines.append("- Enable tiering to optimize costs")
+        elif is_bucket_data:
+            lines.append(f"- Managing **{row_count}** buckets")
+            lines.append("- Review access patterns and permissions")
+        else:
+            lines.append(f"- **{row_count:,}** records in result set")
+            lines.append("- Data retrieved successfully")
+        
+        lines.append("\n**Recommendations:**")
+        if is_error_data:
+            lines.append("1. Investigate FATAL/critical errors first")
+            lines.append("2. Set up alerting for error thresholds")
+            lines.append("3. Review logs for recurring patterns")
+        else:
+            lines.append("1. Schedule regular reviews of this data")
+            lines.append("2. Set up monitoring dashboards")
+            lines.append("3. Configure alerts for anomalies")
         
         return "\n".join(lines)
     
@@ -408,21 +497,34 @@ async def chat(request: ChatMessage):
                 needs_formatting = True
             else:
                 content_lower = final_content.strip().lower()
+                content_len = len(final_content.strip())
+                
                 # Check for generic completion messages
                 generic_patterns = [
                     "operation completed", "done", "completed", "finished",
                     "executed successfully", "query executed", "has been executed",
                     "here is the", "here are the", "i have",
-                    "the results", "the data"
+                    "the results", "the data", "query results"
                 ]
+                
                 # If response is short and generic, format it ourselves
-                if len(final_content.strip()) < 100:
+                if content_len < 150:
                     for pattern in generic_patterns:
                         if pattern in content_lower:
                             needs_formatting = True
                             break
-                # Also check if response contains SQL query instead of results
+                
+                # Check if response contains SQL query instead of results
                 if "SELECT" in final_content.upper() and "|" not in final_content:
+                    needs_formatting = True
+                
+                # Check if response is missing key sections (insights, chart)
+                has_insights = "insight" in content_lower or "key" in content_lower or "recommend" in content_lower or "finding" in content_lower
+                has_chart = "```chart" in final_content
+                has_summary = "**" in final_content  # Bold text for emphasis
+                
+                # If we have data but missing insights/chart, enhance the response
+                if "|" in final_content and content_len < 500 and not (has_insights or has_chart):
                     needs_formatting = True
             
             if needs_formatting:
