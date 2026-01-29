@@ -811,10 +811,6 @@
                         <div class="stat-label">Errors (24h)</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-value warning" id="warnCount">-</div>
-                        <div class="stat-label">Warnings (24h)</div>
-                    </div>
-                    <div class="stat-card">
                         <div class="stat-value fatal" id="fatalCount">-</div>
                         <div class="stat-label">Fatal (24h)</div>
                     </div>
@@ -999,10 +995,9 @@
                 if (response.ok) {
                     const data = await response.json();
                     document.getElementById('errorCount').textContent = data.total_errors || 0;
-                    document.getElementById('warnCount').textContent = data.total_warnings || 0;
                     document.getElementById('fatalCount').textContent = data.total_fatals || 0;
                     
-                    const total = (data.total_errors || 0) + (data.total_warnings || 0) + (data.total_fatals || 0);
+                    const total = (data.total_errors || 0) + (data.total_fatals || 0);
                     document.getElementById('totalCount').textContent = total;
                 }
             } catch (e) {
@@ -1439,7 +1434,7 @@
                                 COUNT(*) as cnt 
                             FROM logs 
                             WHERE timestamp > ${dayAgo} 
-                              AND severity IN ('ERROR', 'WARN', 'FATAL')
+                              AND severity IN ('ERROR', 'FATAL')
                             GROUP BY hour_bucket, severity
                             ORDER BY hour_bucket
                         `,
@@ -1456,7 +1451,7 @@
                 loadingEl.style.display = 'none';
                 
                 if (!data.success || !data.rows || data.rows.length === 0) {
-                    renderTrendChart([], [], [], []);
+                    renderTrendChart([], [], []);
                     statsEl.innerHTML = '<span class="trend-stat-label">No data available</span>';
                     return;
                 }
@@ -1464,10 +1459,9 @@
                 // Process into 24 hour buckets
                 const hours = Array.from({length: 24}, (_, i) => i);
                 const errorData = new Array(24).fill(0);
-                const warnData = new Array(24).fill(0);
                 const fatalData = new Array(24).fill(0);
                 
-                let totalErrors = 0, totalWarns = 0, totalFatals = 0;
+                let totalErrors = 0, totalFatals = 0;
                 
                 data.rows.forEach(row => {
                     const bucket = Math.min(23, Math.max(0, row[0]));
@@ -1477,9 +1471,6 @@
                     if (severity === 'ERROR') {
                         errorData[bucket] += count;
                         totalErrors += count;
-                    } else if (severity === 'WARN') {
-                        warnData[bucket] += count;
-                        totalWarns += count;
                     } else if (severity === 'FATAL') {
                         fatalData[bucket] += count;
                         totalFatals += count;
@@ -1503,18 +1494,13 @@
                         <span class="trend-stat-value">${totalErrors.toLocaleString()}</span>
                     </div>
                     <div class="trend-stat">
-                        <div class="trend-stat-dot" style="background: #f59e0b;"></div>
-                        <span class="trend-stat-label">Warnings</span>
-                        <span class="trend-stat-value">${totalWarns.toLocaleString()}</span>
-                    </div>
-                    <div class="trend-stat">
                         <div class="trend-stat-dot" style="background: #dc2626;"></div>
                         <span class="trend-stat-label">Fatal</span>
                         <span class="trend-stat-value">${totalFatals.toLocaleString()}</span>
                     </div>
                 `;
 
-                renderTrendChart(labels, errorData, warnData, fatalData);
+                renderTrendChart(labels, errorData, fatalData);
 
             } catch (e) {
                 console.error('Failed to load trend:', e);
@@ -1523,7 +1509,7 @@
         }
 
         // Render beautiful trend chart
-        function renderTrendChart(labels, errorData, warnData, fatalData) {
+        function renderTrendChart(labels, errorData, fatalData) {
             const canvas = document.getElementById('trendChart');
             const ctx = canvas.getContext('2d');
             const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
@@ -1538,12 +1524,8 @@
             errorGradient.addColorStop(0, 'rgba(239, 68, 68, 0.3)');
             errorGradient.addColorStop(1, 'rgba(239, 68, 68, 0)');
             
-            const warnGradient = ctx.createLinearGradient(0, 0, 0, 150);
-            warnGradient.addColorStop(0, 'rgba(245, 158, 11, 0.3)');
-            warnGradient.addColorStop(1, 'rgba(245, 158, 11, 0)');
-            
             const fatalGradient = ctx.createLinearGradient(0, 0, 0, 150);
-            fatalGradient.addColorStop(0, 'rgba(220, 38, 38, 0.3)');
+            fatalGradient.addColorStop(0, 'rgba(220, 38, 38, 0.5)');
             fatalGradient.addColorStop(1, 'rgba(220, 38, 38, 0)');
 
             trendChart = new Chart(ctx, {
@@ -1562,18 +1544,6 @@
                             pointRadius: 0,
                             pointHoverRadius: 4,
                             pointHoverBackgroundColor: '#ef4444'
-                        },
-                        {
-                            label: 'Warnings',
-                            data: warnData,
-                            borderColor: '#f59e0b',
-                            backgroundColor: warnGradient,
-                            borderWidth: 2,
-                            fill: true,
-                            tension: 0.4,
-                            pointRadius: 0,
-                            pointHoverRadius: 4,
-                            pointHoverBackgroundColor: '#f59e0b'
                         },
                         {
                             label: 'Fatal',
