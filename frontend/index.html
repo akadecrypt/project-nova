@@ -1748,7 +1748,8 @@
             // But preserve chart containers as single units
             const chartPlaceholder = '___CHART_PLACEHOLDER___';
             const charts = [];
-            text = text.replace(/<div class="chart-container">[\s\S]*?<\/div>\s*<\/div>/g, function(match) {
+            // Match chart containers - they have chart-container class and end with </div>
+            text = text.replace(/<div class="chart-container"[^>]*>[\s\S]*?<\/div>/g, function(match) {
                 charts.push(match);
                 return chartPlaceholder + (charts.length - 1);
             });
