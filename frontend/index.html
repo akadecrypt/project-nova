@@ -1669,18 +1669,51 @@
         }
         
         function detectAndRenderChart(text) {
-            // Look for chart JSON blocks: ```chart {...} ```
-            const chartRegex = /```chart\s*([\s\S]*?)```/g;
-            let match;
+            // Look for chart JSON blocks with multiple patterns
+            // Pattern 1: ```chart\n{...}\n```
+            // Pattern 2: ```chart{...}```
+            // Pattern 3: Handle with or without newlines
+            
             let result = text;
             
-            while ((match = chartRegex.exec(text)) !== null) {
+            // Try multiple regex patterns to catch different formats
+            const patterns = [
+                /```chart\s*\n?\s*(\{[\s\S]*?\})\s*\n?```/g,
+                /```chart\s*(\{[\s\S]*?\})\s*```/g,
+                /`{3}chart\s*([\s\S]*?)`{3}/g
+            ];
+            
+            for (const chartRegex of patterns) {
+                let match;
+                while ((match = chartRegex.exec(result)) !== null) {
+                    try {
+                        // Clean up the JSON string
+                        let jsonStr = match[1].trim();
+                        // Handle potential issues with the JSON
+                        const chartData = JSON.parse(jsonStr);
+                        const chartHtml = renderChart(chartData);
+                        result = result.replace(match[0], chartHtml);
+                        // Reset regex lastIndex since we modified the string
+                        chartRegex.lastIndex = 0;
+                    } catch (e) {
+                        console.error('Failed to parse chart data:', e, match[1]);
+                    }
+                }
+            }
+            
+            // Also try to find chart JSON without backticks (in case markdown didn't wrap it)
+            const rawJsonPattern = /\{"type"\s*:\s*"(bar|line|pie|doughnut)"[\s\S]*?"datasets"\s*:\s*\[[\s\S]*?\]\s*\}/g;
+            let jsonMatch;
+            while ((jsonMatch = rawJsonPattern.exec(result)) !== null) {
                 try {
-                    const chartData = JSON.parse(match[1]);
-                    const chartHtml = renderChart(chartData);
-                    result = result.replace(match[0], chartHtml);
+                    const chartData = JSON.parse(jsonMatch[0]);
+                    if (chartData.type && chartData.datasets) {
+                        const chartHtml = renderChart(chartData);
+                        result = result.replace(jsonMatch[0], chartHtml);
+                        rawJsonPattern.lastIndex = 0;
+                    }
                 } catch (e) {
-                    console.error('Failed to parse chart data:', e);
+                    // Not valid chart JSON, skip
                 }
             }
             
@@ -1688,26 +1721,60 @@
         }
 
         function formatMessage(text) {
-            // First, detect and render any charts
+            // First, detect and render any charts - this is critical to run before anything else
             text = detectAndRenderChart(text);
+            
+            // If there are still unprocessed chart blocks (fallback), remove them to avoid showing raw JSON
+            // This handles edge cases where the JSON is malformed
+            text = text.replace(/```chart[\s\S]*?```/g, function(match) {
+                console.warn('Unprocessed chart block found:', match.substring(0, 100));
+                // Try one more time to parse it
+                try {
+                    const jsonMatch = match.match(/\{[\s\S]*\}/);
+                    if (jsonMatch) {
+                        const chartData = JSON.parse(jsonMatch[0]);
+                        if (chartData.type && chartData.datasets) {
+                            return renderChart(chartData);
+                        }
+                    }
+                } catch(e) {
+                    console.error('Chart parse error:', e);
+                }
+                // Return a placeholder if we can't render it
+                return '<div class="chart-container" style="background: #1a1a2e; padding: 20px; border-radius: 8px; text-align: center; color: #888;">📊 Chart data could not be rendered</div>';
+            });
+            
             // Split by double newlines to handle multiple sections/tables
+            // But preserve chart containers as single units
+            const chartPlaceholder = '___CHART_PLACEHOLDER___';
+            const charts = [];
+            text = text.replace(/<div class="chart-container">[\s\S]*?<\/div>\s*<\/div>/g, function(match) {
+                charts.push(match);
+                return chartPlaceholder + (charts.length - 1);
+            });
+            
             const sections = text.split(/\n\n+/);
             let formattedSections = [];
             
             for (const section of sections) {
                 if (!section.trim()) continue;
                 
-                // Try to detect and format tables
-                const tableFormatted = detectAndFormatTable(section);
-                if (tableFormatted) {
-                    formattedSections.push(
-                        applyTextFormatting(tableFormatted)
-                    );
+                // Check if this section has a chart placeholder
+                if (section.includes(chartPlaceholder)) {
+                    // Restore charts and add the section
+                    let restored = section;
+                    for (let i = 0; i < charts.length; i++) {
+                        restored = restored.replace(chartPlaceholder + i, charts[i]);
+                    }
+                    formattedSections.push(applyTextFormatting(restored));
                 } else {
-                    // Regular text formatting
-                    formattedSections.push(
-                        applyTextFormatting(section)
-                    );
+                    // Try to detect and format tables
+                    const tableFormatted = detectAndFormatTable(section);
+                    if (tableFormatted) {
+                        formattedSections.push(applyTextFormatting(tableFormatted));
+                    } else {
+                        formattedSections.push(applyTextFormatting(section));
+                    }
                 }
             }
             
@@ -1716,6 +1783,11 @@
         }
         
         function applyTextFormatting(text) {
+            // Skip if it contains chart container (already rendered)
+            if (text.includes('chart-container')) {
+                return text;
+            }
+            
             return text
                 // Markdown images: ![alt](url)
                 .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" class="chat-image" onerror="this.onerror=null;this.src=\'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22200%22><rect fill=%22%23333%22 width=%22100%%22 height=%22100%%22/><text fill=%22%23888%22 x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22>Chart failed to load</text></svg>\';this.classList.add(\'chart-error\');">')
@@ -1736,17 +1808,17 @@
                 .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
                 // Italic
                 .replace(/\*(.+?)\*/g, '<em>$1</em>')
-                // Inline code
-                .replace(/`([^`]+)`/g, '<code class="msg-code">$1</code>')
-                // Code blocks
-                .replace(/```(\w*)\n?([\s\S]*?)```/g, '<pre class="msg-pre"><code>$2</code></pre>')
+                // Inline code (single backticks, not triple)
+                .replace(/`([^`\n]+)`/g, '<code class="msg-code">$1</code>')
+                // Code blocks - but NOT chart blocks (they should already be processed)
+                .replace(/```(?!chart)([\w]*)\n?([\s\S]*?)```/g, '<pre class="msg-pre"><code>$2</code></pre>')
                 // Blockquotes
                 .replace(/^>\s+(.+)$/gm, '<blockquote class="msg-quote">$1</blockquote>')
                 // Wrap consecutive li items in ul/ol
                 .replace(/(<li class="msg-li">[\s\S]*?<\/li>)(?:\s*<br>)*/g, '$1')
                 .replace(/(<li class="msg-li-num">[\s\S]*?<\/li>)(?:\s*<br>)*/g, '$1')
                 // Line breaks (but not after block elements)
-                .replace(/\n(?!<\/?(h[1-4]|li|ul|ol|hr|pre|blockquote))/g, '<br>')
+                .replace(/\n(?!<\/?(h[1-4]|li|ul|ol|hr|pre|blockquote|div))/g, '<br>')
                 // Status indicators
                 .replace(/✅|✔️|\[OK\]|\[SUCCESS\]/g, '<span class="status-icon ok">✓</span>')
                 .replace(/❌|✖️|\[ERROR\]|\[FAIL\]/g, '<span class="status-icon error">✗</span>')
