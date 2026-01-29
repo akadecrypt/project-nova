@@ -4,6 +4,7 @@
     "system_prompt",
     "product_knowledge",
     "sql_schema",
+    "sql_queries",
     "api_reference",
     "troubleshooting",
     "best_practices",
