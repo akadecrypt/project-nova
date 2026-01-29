@@ -1,55 +1,229 @@
 # Data Visualization Guidelines
 
-## IMPORTANT: Do NOT Generate Chart URLs
+## Chart Generation
 
-Do NOT attempt to generate QuickChart.io URLs or any image-based charts. They are error-prone and often fail to render.
+When users ask for charts, graphs, or visualizations, you can generate interactive charts using the following format:
 
-## Instead: Use Well-Formatted Tables
+### Chart JSON Format
 
-When users ask for charts, graphs, or visualizations, provide the data in a **well-formatted markdown table** with a clear summary.
+Wrap chart data in a code block with the `chart` language identifier:
 
-### Example Response for "Show me a chart of bucket growth"
+````
+```chart
+{
+  "type": "bar",
+  "title": "Chart Title",
+  "labels": ["Label1", "Label2", "Label3"],
+  "datasets": [
+    {
+      "label": "Dataset Name",
+      "data": [10, 20, 30]
+    }
+  ]
+}
+```
+````
 
-**api-request-logs** - Growth over the last 2 weeks:
+### Supported Chart Types
 
-| Date | Size (GB) | Objects (M) | Daily Growth |
-|------|-----------|-------------|--------------|
-| Jan 13 | 185.2 | 42.5 | - |
-| Jan 15 | 188.5 | 43.2 | +1.8% |
-| Jan 17 | 191.8 | 43.9 | +1.8% |
-| Jan 19 | 195.0 | 44.6 | +1.7% |
-| Jan 21 | 198.2 | 45.3 | +1.6% |
-| Jan 23 | 201.5 | 46.0 | +1.7% |
-| Jan 25 | 204.8 | 46.7 | +1.6% |
-| Jan 27 | 208.0 | 47.4 | +1.6% |
+1. **bar** - Bar chart (default)
+2. **line** - Line chart
+3. **pie** - Pie chart
+4. **doughnut** - Doughnut chart
 
-**Summary:** The bucket grew from 185.2 GB to 208.0 GB (+12.3%) over 2 weeks, with ~1.6 GB average daily growth. Object count increased from 42.5M to 47.4M (+11.5%).
+### Chart Data Structure
 
-## Guidelines
+```json
+{
+  "type": "bar|line|pie|doughnut",
+  "title": "Optional chart title",
+  "labels": ["Category1", "Category2", ...],
+  "datasets": [
+    {
+      "label": "Dataset name",
+      "data": [value1, value2, ...]
+    }
+  ]
+}
+```
 
-1. **Always use tables** - they render reliably and look good
-2. **Add a text summary** - highlight key insights, trends, percentages
-3. **Include calculated fields** - growth rates, percentages, comparisons
-4. **Keep it readable** - round numbers, use appropriate units (GB, M, K)
-5. **Answer the user's question** - if they want trends, explain the trend
+---
 
-## For Comparisons
+## Example Charts
 
-Use tables with clear headers:
+### Bar Chart - Error Count by Severity
+```chart
+{
+  "type": "bar",
+  "title": "Errors by Severity (Last 24h)",
+  "labels": ["FATAL", "ERROR", "WARN"],
+  "datasets": [
+    {
+      "label": "Count",
+      "data": [5, 150, 320]
+    }
+  ]
+}
+```
 
-| Object Store | Total Size | Used | Free | Usage % |
-|--------------|------------|------|------|---------|
-| oss1 | 10 TB | 3.2 TB | 6.8 TB | 32% |
-| oss3 | 10 TB | 5.1 TB | 4.9 TB | 51% |
+### Line Chart - Error Trend
+```chart
+{
+  "type": "line",
+  "title": "Error Trend (Hourly)",
+  "labels": ["00:00", "04:00", "08:00", "12:00", "16:00", "20:00"],
+  "datasets": [
+    {
+      "label": "Errors",
+      "data": [12, 8, 25, 18, 42, 15]
+    }
+  ]
+}
+```
 
-**Insight:** oss3 has 60% more data than oss1 and is approaching 50% capacity.
+### Pie Chart - Storage Distribution
+```chart
+{
+  "type": "pie",
+  "title": "Storage by Bucket",
+  "labels": ["api-logs", "backups", "archives", "temp"],
+  "datasets": [
+    {
+      "label": "Size (GB)",
+      "data": [245, 180, 120, 55]
+    }
+  ]
+}
+```
 
-## For Distributions
+### Multiple Datasets (Line)
+```chart
+{
+  "type": "line",
+  "title": "Errors vs Warnings",
+  "labels": ["Mon", "Tue", "Wed", "Thu", "Fri"],
+  "datasets": [
+    {
+      "label": "Errors",
+      "data": [45, 32, 55, 28, 41]
+    },
+    {
+      "label": "Warnings",
+      "data": [120, 95, 140, 88, 110]
+    }
+  ]
+}
+```
 
-| Bucket | Size | % of Total |
-|--------|------|------------|
-| api-request-logs | 208 GB | 45% |
-| user-uploads | 156 GB | 34% |
-| backups | 95 GB | 21% |
+---
 
-The tables will render beautifully in the UI and are much more reliable than charts.
+## When to Use Charts
+
+Generate charts when users ask for:
+- "Show me a chart of..."
+- "Graph the..."
+- "Visualize..."
+- "Plot..."
+- "Show trend..."
+- "Compare X and Y visually"
+
+### Good Chart Use Cases:
+1. **Error trends over time** - Line chart
+2. **Error distribution by severity/type** - Bar or pie chart
+3. **Storage usage by bucket** - Pie or bar chart
+4. **Comparison between object stores** - Bar chart
+5. **Node error counts** - Bar chart
+6. **Alert distribution** - Pie chart
+
+---
+
+## Chart + Table Combination
+
+For comprehensive answers, provide BOTH a chart AND a summary table:
+
+**Example Response:**
+
+Here's the error distribution for the last 24 hours:
+
+```chart
+{
+  "type": "bar",
+  "title": "Errors by Component",
+  "labels": ["OC", "MS", "Atlas", "Curator"],
+  "datasets": [{"label": "Errors", "data": [89, 45, 23, 12]}]
+}
+```
+
+| Component | Error Count | % of Total |
+|-----------|-------------|------------|
+| OC | 89 | 52.7% |
+| MS | 45 | 26.6% |
+| Atlas | 23 | 13.6% |
+| Curator | 12 | 7.1% |
+
+**Summary:** Object Controller (OC) has the most errors at 52.7%, followed by Metadata Service at 26.6%.
+
+---
+
+## Query Data for Charts
+
+To generate charts, first query the data:
+
+### Error by Severity
+```sql
+SELECT severity, COUNT(*) as count 
+FROM logs 
+WHERE timestamp > strftime('%s','now') - 86400 
+GROUP BY severity 
+ORDER BY count DESC
+```
+
+### Error by Component
+```sql
+SELECT pod, COUNT(*) as count 
+FROM logs 
+WHERE severity IN ('ERROR','FATAL') 
+GROUP BY pod 
+ORDER BY count DESC
+```
+
+### Hourly Error Trend
+```sql
+SELECT 
+    strftime('%H:00', timestamp, 'unixepoch') as hour,
+    COUNT(*) as errors
+FROM logs 
+WHERE severity IN ('ERROR','FATAL') 
+AND timestamp > strftime('%s','now') - 86400
+GROUP BY hour
+ORDER BY hour
+```
+
+### Storage by Bucket
+```sql
+SELECT b.bucket_name, bs.size_gb 
+FROM bucket_stats bs 
+JOIN bucket b ON bs.bucket_id = b.bucket_id 
+ORDER BY bs.size_gb DESC 
+LIMIT 10
+```
+
+### Errors by Object Store
+```sql
+SELECT object_store_name, COUNT(*) as errors 
+FROM logs 
+WHERE severity IN ('ERROR','FATAL') 
+AND object_store_name IS NOT NULL
+GROUP BY object_store_name
+```
+
+---
+
+## Important Guidelines
+
+1. **Always query data first** - Use execute_sql to get real data before generating charts
+2. **Use appropriate chart types** - Bar for comparisons, line for trends, pie for proportions
+3. **Keep it simple** - Don't show more than 10 categories in a chart
+4. **Include a summary** - Always explain what the chart shows
+5. **Combine with tables** - Tables provide exact numbers, charts show patterns
+6. **Title your charts** - Always include a descriptive title
