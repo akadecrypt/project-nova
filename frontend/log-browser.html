@@ -577,6 +577,22 @@
             border: 1px solid var(--border-color);
             border-radius: 12px;
             padding: 16px;
+            height: 180px;
+            position: relative;
+        }
+        
+        .trend-card canvas {
+            max-height: 120px !important;
+            height: 120px !important;
+        }
+        
+        .trend-loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: var(--text-muted);
+            font-size: 13px;
         }
 
         .trend-header {
@@ -1334,90 +1350,83 @@
 
         // Load error trend data
         async function loadErrorTrend() {
+            const canvas = document.getElementById('trendChart');
+            const container = canvas.parentElement;
+            
+            // Show loading
+            let loadingEl = container.querySelector('.trend-loading');
+            if (!loadingEl) {
+                loadingEl = document.createElement('div');
+                loadingEl.className = 'trend-loading';
+                loadingEl.textContent = 'Loading chart...';
+                container.appendChild(loadingEl);
+            }
+            loadingEl.style.display = 'block';
+            
             try {
+                // Use a simpler, faster query with LIMIT
+                const now = Math.floor(Date.now() / 1000);
+                const dayAgo = now - 86400;
+                
                 const response = await fetch(`${API_BASE}/api/database/query`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        sql: `
-                            SELECT 
-                                strftime('%H:00', datetime(timestamp, 'unixepoch')) as hour,
-                                severity,
-                                COUNT(*) as count
-                            FROM logs 
-                            WHERE timestamp > strftime('%s', 'now', '-24 hours')
-                            GROUP BY hour, severity
-                            ORDER BY hour
-                        `
+                        sql: `SELECT severity, COUNT(*) as cnt FROM logs WHERE timestamp > ${dayAgo} AND severity IN ('ERROR', 'WARN', 'FATAL') GROUP BY severity`,
+                        limit: 10
                     })
                 });
                 
-                if (!response.ok) return;
+                if (!response.ok) {
+                    loadingEl.textContent = 'Failed to load';
+                    return;
+                }
                 
                 const data = await response.json();
-                if (!data.success || !data.rows) return;
+                loadingEl.style.display = 'none';
+                
+                if (!data.success || !data.rows || data.rows.length === 0) {
+                    // Show empty state
+                    renderTrendChart(['No Data'], [0], [0], [0]);
+                    return;
+                }
 
-                // Process data for chart
-                const hours = [...new Set(data.rows.map(r => r[0]))].slice(-12);
-                const errorData = hours.map(h => {
-                    const row = data.rows.find(r => r[0] === h && r[1] === 'ERROR');
-                    return row ? row[2] : 0;
-                });
-                const warnData = hours.map(h => {
-                    const row = data.rows.find(r => r[0] === h && r[1] === 'WARN');
-                    return row ? row[2] : 0;
-                });
-                const fatalData = hours.map(h => {
-                    const row = data.rows.find(r => r[0] === h && r[1] === 'FATAL');
-                    return row ? row[2] : 0;
-                });
+                // Simple bar chart with totals by severity
+                const labels = ['Errors', 'Warnings', 'Fatal'];
+                const errorCount = data.rows.find(r => r[0] === 'ERROR')?.[1] || 0;
+                const warnCount = data.rows.find(r => r[0] === 'WARN')?.[1] || 0;
+                const fatalCount = data.rows.find(r => r[0] === 'FATAL')?.[1] || 0;
 
-                renderTrendChart(hours, errorData, warnData, fatalData);
+                renderTrendChart(labels, [errorCount], [warnCount], [fatalCount]);
 
             } catch (e) {
                 console.error('Failed to load trend:', e);
+                loadingEl.textContent = 'Error loading chart';
             }
         }
 
         // Render trend chart
         function renderTrendChart(labels, errorData, warnData, fatalData) {
-            const ctx = document.getElementById('trendChart').getContext('2d');
+            const canvas = document.getElementById('trendChart');
+            const ctx = canvas.getContext('2d');
             const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
 
             if (trendChart) {
                 trendChart.destroy();
+                trendChart = null;
             }
 
+            // Use bar chart for simple severity breakdown
             trendChart = new Chart(ctx, {
-                type: 'line',
+                type: 'bar',
                 data: {
-                    labels: labels,
-                    datasets: [
-                        {
-                            label: 'Errors',
-                            data: errorData,
-                            borderColor: '#ef4444',
-                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                            fill: true,
-                            tension: 0.4
-                        },
-                        {
-                            label: 'Warnings',
-                            data: warnData,
-                            borderColor: '#f59e0b',
-                            backgroundColor: 'rgba(245, 158, 11, 0.1)',
-                            fill: true,
-                            tension: 0.4
-                        },
-                        {
-                            label: 'Fatal',
-                            data: fatalData,
-                            borderColor: '#dc2626',
-                            backgroundColor: 'rgba(220, 38, 38, 0.1)',
-                            fill: true,
-                            tension: 0.4
-                        }
-                    ]
+                    labels: ['Errors', 'Warnings', 'Fatal'],
+                    datasets: [{
+                        data: [errorData[0] || 0, warnData[0] || 0, fatalData[0] || 0],
+                        backgroundColor: ['#ef4444', '#f59e0b', '#dc2626'],
+                        borderRadius: 4,
+                        barThickness: 40
+                    }]
                 },
                 options: {
                     responsive: true,
@@ -1428,7 +1437,7 @@
                     scales: {
                         x: {
                             ticks: { color: isDark ? '#a3a3a3' : '#666' },
-                            grid: { color: isDark ? '#333' : '#ddd' }
+                            grid: { display: false }
                         },
                         y: {
                             ticks: { color: isDark ? '#a3a3a3' : '#666' },
