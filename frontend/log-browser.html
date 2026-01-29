@@ -577,13 +577,13 @@
             border: 1px solid var(--border-color);
             border-radius: 12px;
             padding: 16px;
-            height: 180px;
+            height: 280px;
             position: relative;
         }
         
         .trend-card canvas {
-            max-height: 120px !important;
-            height: 120px !important;
+            max-height: 230px !important;
+            height: 230px !important;
         }
         
         .trend-loading {
@@ -607,29 +607,6 @@
             font-weight: 600;
             color: var(--text-primary);
         }
-
-        .trend-legend {
-            display: flex;
-            gap: 16px;
-        }
-
-        .legend-item {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 12px;
-            color: var(--text-muted);
-        }
-
-        .legend-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-        }
-
-        .legend-dot.error { background: var(--error); }
-        .legend-dot.warning { background: var(--warning); }
-        .legend-dot.fatal { background: #dc2626; }
 
         /* Export Dropdown */
         .export-dropdown {
@@ -833,40 +810,19 @@
                         <div class="filter-group">
                             <span class="filter-label">Severity</span>
                             <select class="filter-select" id="severityFilter">
-                                <option value="">All</option>
-                                <option value="FATAL">Fatal</option>
-                                <option value="ERROR">Error</option>
-                                <option value="WARN">Warning</option>
-                                <option value="INFO">Info</option>
+                                <option value="">All Severities</option>
                             </select>
                         </div>
                         <div class="filter-group">
                             <span class="filter-label">Component</span>
                             <select class="filter-select" id="podFilter">
-                                <option value="">All</option>
-                                <option value="OC">OC (Object Controller)</option>
-                                <option value="MS">MS (Metadata Service)</option>
-                                <option value="Atlas">Atlas</option>
-                                <option value="Zookeeper">Zookeeper</option>
-                                <option value="Buckets">Buckets Tools</option>
-                                <option value="Curator">Curator</option>
-                                <option value="Stargate">Stargate</option>
+                                <option value="">All Components</option>
                             </select>
                         </div>
                         <div class="filter-group">
                             <span class="filter-label">Event Type</span>
                             <select class="filter-select" id="eventTypeFilter">
-                                <option value="">All</option>
-                                <option value="REPLICATION_FAIL">Replication Fail</option>
-                                <option value="IO_ERROR">I/O Error</option>
-                                <option value="AUTH_FAIL">Auth Fail</option>
-                                <option value="DISK_FULL">Disk Full</option>
-                                <option value="OOM">Out of Memory</option>
-                                <option value="TIMEOUT">Timeout</option>
-                                <option value="CONNECTION_FAIL">Connection Fail</option>
-                                <option value="CORRUPTION">Corruption</option>
-                                <option value="QUOTA_EXCEEDED">Quota Exceeded</option>
-                                <option value="SERVICE_DOWN">Service Down</option>
+                                <option value="">All Event Types</option>
                             </select>
                         </div>
                         <div class="filter-group">
@@ -924,17 +880,12 @@
                     </div>
                 </div>
 
-                <!-- Error Trend Chart -->
+                <!-- Event Types Chart -->
                 <div class="trend-card" id="trendCard">
                     <div class="trend-header">
-                        <span class="trend-title">Error Trend (Last 24 Hours)</span>
-                        <div class="trend-legend">
-                            <span class="legend-item"><span class="legend-dot error"></span> Error</span>
-                            <span class="legend-item"><span class="legend-dot warning"></span> Warning</span>
-                            <span class="legend-item"><span class="legend-dot fatal"></span> Fatal</span>
-                        </div>
+                        <span class="trend-title">Top Event Types (Last 24 Hours)</span>
                     </div>
-                    <canvas id="trendChart" height="80"></canvas>
+                    <canvas id="trendChart"></canvas>
                 </div>
 
                 <!-- Logs Table -->
@@ -1323,32 +1274,99 @@
             return escaped.replace(regex, '<span class="highlight">$1</span>');
         }
 
-        // Load object stores for filter
-        async function loadObjectStores() {
+        // Load all filter dropdowns from database
+        async function loadFilterOptions() {
             try {
-                const response = await fetch(`${API_BASE}/api/database/query`, {
+                // Load severities
+                const sevResponse = await fetch(`${API_BASE}/api/database/query`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ sql: 'SELECT DISTINCT name FROM object_store ORDER BY name' })
+                    body: JSON.stringify({ sql: 'SELECT DISTINCT severity, COUNT(*) as cnt FROM logs WHERE severity IS NOT NULL GROUP BY severity ORDER BY cnt DESC' })
                 });
-                if (response.ok) {
-                    const data = await response.json();
+                if (sevResponse.ok) {
+                    const data = await sevResponse.json();
                     if (data.success && data.rows) {
-                        const select = document.getElementById('storeFilter');
+                        const select = document.getElementById('severityFilter');
                         data.rows.forEach(row => {
-                            const option = document.createElement('option');
-                            option.value = row[0];
-                            option.textContent = row[0];
-                            select.appendChild(option);
+                            if (row[0]) {
+                                const option = document.createElement('option');
+                                option.value = row[0];
+                                option.textContent = `${row[0]} (${row[1].toLocaleString()})`;
+                                select.appendChild(option);
+                            }
                         });
                     }
                 }
+
+                // Load components (pods)
+                const podResponse = await fetch(`${API_BASE}/api/database/query`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sql: 'SELECT DISTINCT pod, COUNT(*) as cnt FROM logs WHERE pod IS NOT NULL AND pod != \'\' GROUP BY pod ORDER BY cnt DESC LIMIT 20' })
+                });
+                if (podResponse.ok) {
+                    const data = await podResponse.json();
+                    if (data.success && data.rows) {
+                        const select = document.getElementById('podFilter');
+                        data.rows.forEach(row => {
+                            if (row[0]) {
+                                const option = document.createElement('option');
+                                option.value = row[0];
+                                option.textContent = `${row[0]} (${row[1].toLocaleString()})`;
+                                select.appendChild(option);
+                            }
+                        });
+                    }
+                }
+
+                // Load event types
+                const eventResponse = await fetch(`${API_BASE}/api/database/query`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sql: 'SELECT DISTINCT event_type, COUNT(*) as cnt FROM logs WHERE event_type IS NOT NULL AND event_type != \'\' GROUP BY event_type ORDER BY cnt DESC LIMIT 20' })
+                });
+                if (eventResponse.ok) {
+                    const data = await eventResponse.json();
+                    if (data.success && data.rows) {
+                        const select = document.getElementById('eventTypeFilter');
+                        data.rows.forEach(row => {
+                            if (row[0]) {
+                                const option = document.createElement('option');
+                                option.value = row[0];
+                                option.textContent = `${row[0]} (${row[1].toLocaleString()})`;
+                                select.appendChild(option);
+                            }
+                        });
+                    }
+                }
+
+                // Load object stores
+                const storeResponse = await fetch(`${API_BASE}/api/database/query`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sql: 'SELECT DISTINCT object_store_name, COUNT(*) as cnt FROM logs WHERE object_store_name IS NOT NULL AND object_store_name != \'\' GROUP BY object_store_name ORDER BY cnt DESC' })
+                });
+                if (storeResponse.ok) {
+                    const data = await storeResponse.json();
+                    if (data.success && data.rows) {
+                        const select = document.getElementById('storeFilter');
+                        data.rows.forEach(row => {
+                            if (row[0]) {
+                                const option = document.createElement('option');
+                                option.value = row[0];
+                                option.textContent = `${row[0]} (${row[1].toLocaleString()})`;
+                                select.appendChild(option);
+                            }
+                        });
+                    }
+                }
+
             } catch (e) {
-                console.error('Failed to load object stores:', e);
+                console.error('Failed to load filter options:', e);
             }
         }
 
-        // Load error trend data
+        // Load error trend data - shows event types breakdown
         async function loadErrorTrend() {
             const canvas = document.getElementById('trendChart');
             const container = canvas.parentElement;
@@ -1364,15 +1382,15 @@
             loadingEl.style.display = 'block';
             
             try {
-                // Use a simpler, faster query with LIMIT
                 const now = Math.floor(Date.now() / 1000);
                 const dayAgo = now - 86400;
                 
+                // Get event types breakdown
                 const response = await fetch(`${API_BASE}/api/database/query`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        sql: `SELECT severity, COUNT(*) as cnt FROM logs WHERE timestamp > ${dayAgo} AND severity IN ('ERROR', 'WARN', 'FATAL') GROUP BY severity`,
+                        sql: `SELECT event_type, COUNT(*) as cnt FROM logs WHERE timestamp > ${dayAgo} AND event_type IS NOT NULL AND event_type != '' GROUP BY event_type ORDER BY cnt DESC LIMIT 10`,
                         limit: 10
                     })
                 });
@@ -1386,18 +1404,14 @@
                 loadingEl.style.display = 'none';
                 
                 if (!data.success || !data.rows || data.rows.length === 0) {
-                    // Show empty state
-                    renderTrendChart(['No Data'], [0], [0], [0]);
+                    renderEventTypesChart(['No Data'], [0]);
                     return;
                 }
 
-                // Simple bar chart with totals by severity
-                const labels = ['Errors', 'Warnings', 'Fatal'];
-                const errorCount = data.rows.find(r => r[0] === 'ERROR')?.[1] || 0;
-                const warnCount = data.rows.find(r => r[0] === 'WARN')?.[1] || 0;
-                const fatalCount = data.rows.find(r => r[0] === 'FATAL')?.[1] || 0;
+                const labels = data.rows.map(r => r[0] || 'Unknown');
+                const counts = data.rows.map(r => r[1] || 0);
 
-                renderTrendChart(labels, [errorCount], [warnCount], [fatalCount]);
+                renderEventTypesChart(labels, counts);
 
             } catch (e) {
                 console.error('Failed to load trend:', e);
@@ -1405,8 +1419,8 @@
             }
         }
 
-        // Render trend chart
-        function renderTrendChart(labels, errorData, warnData, fatalData) {
+        // Render event types chart
+        function renderEventTypesChart(labels, counts) {
             const canvas = document.getElementById('trendChart');
             const ctx = canvas.getContext('2d');
             const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
@@ -1416,19 +1430,25 @@
                 trendChart = null;
             }
 
-            // Use bar chart for simple severity breakdown
+            // Color palette for bars
+            const colors = [
+                '#ef4444', '#f59e0b', '#10b981', '#6366f1', '#8b5cf6',
+                '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#14b8a6'
+            ];
+
             trendChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: ['Errors', 'Warnings', 'Fatal'],
+                    labels: labels,
                     datasets: [{
-                        data: [errorData[0] || 0, warnData[0] || 0, fatalData[0] || 0],
-                        backgroundColor: ['#ef4444', '#f59e0b', '#dc2626'],
+                        data: counts,
+                        backgroundColor: labels.map((_, i) => colors[i % colors.length]),
                         borderRadius: 4,
-                        barThickness: 40
+                        barThickness: 30
                     }]
                 },
                 options: {
+                    indexAxis: 'y',
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
@@ -1437,12 +1457,15 @@
                     scales: {
                         x: {
                             ticks: { color: isDark ? '#a3a3a3' : '#666' },
-                            grid: { display: false }
-                        },
-                        y: {
-                            ticks: { color: isDark ? '#a3a3a3' : '#666' },
                             grid: { color: isDark ? '#333' : '#ddd' },
                             beginAtZero: true
+                        },
+                        y: {
+                            ticks: { 
+                                color: isDark ? '#a3a3a3' : '#666',
+                                font: { size: 10 }
+                            },
+                            grid: { display: false }
                         }
                     }
                 }
@@ -1549,7 +1572,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             loadStats();
             loadLogs({ hours: 24 });
-            loadObjectStores();
+            loadFilterOptions();
             loadErrorTrend();
         });
     </script>
