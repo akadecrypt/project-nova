@@ -888,6 +888,436 @@ FROM object_store os
 | "Versioned buckets" | `SELECT bucket_name, bucket_owner FROM bucket WHERE versioning = 1` |
 | "Largest bucket" | `SELECT b.bucket_name, bs.size_gb FROM bucket_stats bs JOIN bucket b ON bs.bucket_id = b.bucket_id ORDER BY bs.size_gb DESC LIMIT 1` |
 | "Bucket with most objects" | `SELECT b.bucket_name, bs.object_count FROM bucket_stats bs JOIN bucket b ON bs.bucket_id = b.bucket_id ORDER BY bs.object_count DESC LIMIT 1` |
+| "System health" | `SELECT (SELECT COUNT(*) FROM logs WHERE severity = 'FATAL' AND timestamp > strftime('%s','now') - 86400) as fatals_24h, (SELECT COUNT(*) FROM logs WHERE severity = 'ERROR' AND timestamp > strftime('%s','now') - 86400) as errors_24h, (SELECT COUNT(*) FROM alerts WHERE is_active = 1) as active_alerts` |
+| "Is everything OK?" | `SELECT CASE WHEN (SELECT COUNT(*) FROM logs WHERE severity = 'FATAL' AND timestamp > strftime('%s','now') - 3600) > 0 THEN 'CRITICAL - Fatal errors detected' WHEN (SELECT COUNT(*) FROM alerts WHERE severity = 'CRITICAL' AND is_active = 1) > 0 THEN 'WARNING - Critical alerts active' ELSE 'OK - No critical issues' END as status` |
+| "Recent activity" | `SELECT timestamp, pod, node_name, severity, SUBSTR(message, 1, 80) as message FROM logs ORDER BY timestamp DESC LIMIT 20` |
+| "Node status" | `SELECT node_name, COUNT(*) as total_logs, SUM(CASE WHEN severity='FATAL' THEN 1 ELSE 0 END) as fatals, SUM(CASE WHEN severity='ERROR' THEN 1 ELSE 0 END) as errors FROM logs WHERE timestamp > strftime('%s','now') - 86400 GROUP BY node_name` |
+| "Storage overview" | `SELECT COUNT(DISTINCT b.bucket_id) as buckets, ROUND(SUM(bs.size_gb),2) as total_gb, SUM(bs.object_count) as objects FROM bucket b JOIN bucket_stats bs ON b.bucket_id = bs.bucket_id` |
+
+---
+
+## MORE SPECIFIC ERROR QUERIES
+
+### File not found errors
+```sql
+SELECT log_id, timestamp, pod, node_name, message
+FROM logs 
+WHERE event_type = 'FILE_NOT_FOUND' 
+   OR message LIKE '%not found%'
+   OR message LIKE '%does not exist%'
+   OR message LIKE '%no such file%'
+ORDER BY timestamp DESC
+LIMIT 30
+```
+
+### Object errors
+```sql
+SELECT log_id, timestamp, pod, node_name, bucket_name, message
+FROM logs 
+WHERE event_type = 'OBJECT_ERROR'
+   OR message LIKE '%object%error%'
+   OR message LIKE '%object%fail%'
+   OR message LIKE '%InvalidObject%'
+ORDER BY timestamp DESC
+LIMIT 30
+```
+
+### Metadata errors
+```sql
+SELECT log_id, timestamp, pod, node_name, message
+FROM logs 
+WHERE event_type = 'METADATA_ERROR'
+   OR message LIKE '%metadata%error%'
+   OR message LIKE '%metadata%fail%'
+ORDER BY timestamp DESC
+LIMIT 30
+```
+
+### RPC/gRPC errors
+```sql
+SELECT log_id, timestamp, pod, node_name, message
+FROM logs 
+WHERE event_type = 'RPC_ERROR'
+   OR message LIKE '%rpc%error%'
+   OR message LIKE '%grpc%fail%'
+   OR message LIKE '%transport error%'
+ORDER BY timestamp DESC
+LIMIT 30
+```
+
+### Scan failures
+```sql
+SELECT log_id, timestamp, pod, node_name, message
+FROM logs 
+WHERE event_type = 'SCAN_FAIL'
+   OR message LIKE '%scan%fail%'
+   OR message LIKE '%CuratorScanFailure%'
+ORDER BY timestamp DESC
+LIMIT 30
+```
+
+### Registration errors
+```sql
+SELECT log_id, timestamp, pod, node_name, message
+FROM logs 
+WHERE event_type = 'REGISTRATION_ERROR'
+   OR message LIKE '%registration%fail%'
+   OR message LIKE '%failed to register%'
+ORDER BY timestamp DESC
+LIMIT 30
+```
+
+### Parse errors
+```sql
+SELECT log_id, timestamp, pod, node_name, message
+FROM logs 
+WHERE event_type = 'PARSE_ERROR'
+   OR message LIKE '%parse%error%'
+   OR message LIKE '%parsing%fail%'
+   OR message LIKE '%invalid format%'
+ORDER BY timestamp DESC
+LIMIT 30
+```
+
+### Protocol errors
+```sql
+SELECT log_id, timestamp, pod, node_name, message
+FROM logs 
+WHERE event_type = 'PROTOCOL_ERROR'
+   OR message LIKE '%protocol%error%'
+   OR message LIKE '%unexpected response%'
+ORDER BY timestamp DESC
+LIMIT 30
+```
+
+### DNS errors
+```sql
+SELECT log_id, timestamp, pod, node_name, message
+FROM logs 
+WHERE event_type = 'DNS_ERROR'
+   OR message LIKE '%dns%fail%'
+   OR message LIKE '%name resolution%'
+   OR message LIKE '%could not resolve%'
+ORDER BY timestamp DESC
+LIMIT 30
+```
+
+### Bucket errors
+```sql
+SELECT log_id, timestamp, pod, node_name, bucket_name, message
+FROM logs 
+WHERE event_type = 'BUCKET_ERROR'
+   OR message LIKE '%bucket%error%'
+   OR message LIKE '%bucket%not%found%'
+ORDER BY timestamp DESC
+LIMIT 30
+```
+
+### Validation errors
+```sql
+SELECT log_id, timestamp, pod, node_name, message
+FROM logs 
+WHERE event_type = 'VALIDATION_ERROR'
+   OR message LIKE '%validation%fail%'
+   OR message LIKE '%invalid%input%'
+   OR message LIKE '%invalid%request%'
+ORDER BY timestamp DESC
+LIMIT 30
+```
+
+### Configuration errors
+```sql
+SELECT log_id, timestamp, pod, node_name, message
+FROM logs 
+WHERE event_type = 'CONFIG_NOT_FOUND'
+   OR message LIKE '%config%not found%'
+   OR message LIKE '%configuration%error%'
+   OR message LIKE '%missing config%'
+ORDER BY timestamp DESC
+LIMIT 30
+```
+
+---
+
+## STATISTICS AND AGGREGATION QUERIES
+
+### Total log counts by all dimensions
+```sql
+SELECT 
+    COUNT(*) as total_logs,
+    COUNT(DISTINCT object_store_name) as stores,
+    COUNT(DISTINCT node_name) as nodes,
+    COUNT(DISTINCT bucket_name) as buckets,
+    COUNT(DISTINCT pod) as components,
+    COUNT(DISTINCT event_type) as event_types
+FROM logs
+```
+
+### Error rate by component
+```sql
+SELECT 
+    pod,
+    COUNT(*) as total,
+    SUM(CASE WHEN severity = 'ERROR' THEN 1 ELSE 0 END) as errors,
+    SUM(CASE WHEN severity = 'FATAL' THEN 1 ELSE 0 END) as fatals,
+    ROUND(100.0 * SUM(CASE WHEN severity IN ('ERROR','FATAL') THEN 1 ELSE 0 END) / COUNT(*), 2) as error_rate_pct
+FROM logs
+GROUP BY pod
+ORDER BY error_rate_pct DESC
+```
+
+### Top 10 error messages
+```sql
+SELECT 
+    SUBSTR(message, 1, 100) as error_message,
+    COUNT(*) as occurrences
+FROM logs
+WHERE severity IN ('ERROR', 'FATAL')
+GROUP BY SUBSTR(message, 1, 100)
+ORDER BY occurrences DESC
+LIMIT 10
+```
+
+### Error distribution by hour of day
+```sql
+SELECT 
+    CAST(strftime('%H', timestamp, 'unixepoch') AS INTEGER) as hour,
+    COUNT(*) as error_count
+FROM logs
+WHERE severity IN ('ERROR', 'FATAL')
+GROUP BY hour
+ORDER BY hour
+```
+
+### Logs per object store
+```sql
+SELECT 
+    object_store_name,
+    COUNT(*) as total_logs,
+    SUM(CASE WHEN severity = 'FATAL' THEN 1 ELSE 0 END) as fatals,
+    SUM(CASE WHEN severity = 'ERROR' THEN 1 ELSE 0 END) as errors,
+    SUM(CASE WHEN severity = 'WARN' THEN 1 ELSE 0 END) as warnings
+FROM logs
+WHERE object_store_name IS NOT NULL
+GROUP BY object_store_name
+```
+
+### Event type breakdown
+```sql
+SELECT 
+    event_type,
+    COUNT(*) as count,
+    COUNT(DISTINCT node_name) as affected_nodes,
+    MIN(timestamp) as first_seen,
+    MAX(timestamp) as last_seen
+FROM logs
+WHERE event_type IS NOT NULL
+GROUP BY event_type
+ORDER BY count DESC
+```
+
+### Bucket error analysis
+```sql
+SELECT 
+    bucket_name,
+    COUNT(*) as error_count,
+    COUNT(DISTINCT event_type) as error_types,
+    COUNT(DISTINCT node_name) as affected_nodes
+FROM logs
+WHERE bucket_name IS NOT NULL
+AND severity IN ('ERROR', 'FATAL')
+GROUP BY bucket_name
+ORDER BY error_count DESC
+LIMIT 15
+```
+
+---
+
+## HEALTH CHECK QUERIES
+
+### Quick health check
+```sql
+SELECT 
+    'Fatals (1h)' as metric, COUNT(*) as value FROM logs WHERE severity = 'FATAL' AND timestamp > strftime('%s','now') - 3600
+UNION ALL
+SELECT 'Errors (1h)', COUNT(*) FROM logs WHERE severity = 'ERROR' AND timestamp > strftime('%s','now') - 3600
+UNION ALL
+SELECT 'Active Alerts', COUNT(*) FROM alerts WHERE is_active = 1
+UNION ALL
+SELECT 'Critical Alerts', COUNT(*) FROM alerts WHERE severity = 'CRITICAL' AND is_active = 1
+```
+
+### Comprehensive system status
+```sql
+SELECT 
+    (SELECT COUNT(*) FROM object_store WHERE state = 'ACTIVE') as active_stores,
+    (SELECT COUNT(*) FROM bucket) as total_buckets,
+    (SELECT ROUND(SUM(size_gb), 2) FROM bucket_stats) as total_storage_gb,
+    (SELECT COUNT(*) FROM logs WHERE severity = 'FATAL' AND timestamp > strftime('%s','now') - 86400) as fatals_24h,
+    (SELECT COUNT(*) FROM logs WHERE severity = 'ERROR' AND timestamp > strftime('%s','now') - 86400) as errors_24h,
+    (SELECT COUNT(*) FROM alerts WHERE is_active = 1) as active_alerts
+```
+
+### Node health matrix
+```sql
+SELECT 
+    node_name,
+    MAX(timestamp) as last_activity,
+    SUM(CASE WHEN severity = 'FATAL' AND timestamp > strftime('%s','now') - 3600 THEN 1 ELSE 0 END) as fatals_1h,
+    SUM(CASE WHEN severity = 'ERROR' AND timestamp > strftime('%s','now') - 3600 THEN 1 ELSE 0 END) as errors_1h,
+    SUM(CASE WHEN severity = 'FATAL' AND timestamp > strftime('%s','now') - 86400 THEN 1 ELSE 0 END) as fatals_24h,
+    SUM(CASE WHEN severity = 'ERROR' AND timestamp > strftime('%s','now') - 86400 THEN 1 ELSE 0 END) as errors_24h
+FROM logs
+WHERE node_name IS NOT NULL
+GROUP BY node_name
+ORDER BY fatals_1h DESC, errors_1h DESC
+```
+
+### Component health
+```sql
+SELECT 
+    pod as component,
+    COUNT(DISTINCT node_name) as nodes,
+    SUM(CASE WHEN severity = 'FATAL' THEN 1 ELSE 0 END) as total_fatals,
+    SUM(CASE WHEN severity = 'ERROR' THEN 1 ELSE 0 END) as total_errors,
+    MAX(timestamp) as last_log
+FROM logs
+GROUP BY pod
+ORDER BY total_fatals DESC, total_errors DESC
+```
+
+---
+
+## TREND AND COMPARISON QUERIES
+
+### Compare errors between stores
+```sql
+SELECT 
+    object_store_name,
+    SUM(CASE WHEN timestamp > strftime('%s','now') - 3600 THEN 1 ELSE 0 END) as last_hour,
+    SUM(CASE WHEN timestamp > strftime('%s','now') - 21600 THEN 1 ELSE 0 END) as last_6h,
+    SUM(CASE WHEN timestamp > strftime('%s','now') - 86400 THEN 1 ELSE 0 END) as last_24h
+FROM logs
+WHERE severity IN ('ERROR', 'FATAL')
+AND object_store_name IS NOT NULL
+GROUP BY object_store_name
+```
+
+### Error trend (hourly buckets)
+```sql
+SELECT 
+    datetime(timestamp - (timestamp % 3600), 'unixepoch') as hour,
+    COUNT(*) as errors,
+    COUNT(DISTINCT node_name) as nodes_affected
+FROM logs
+WHERE severity IN ('ERROR', 'FATAL')
+AND timestamp > strftime('%s','now') - 86400
+GROUP BY (timestamp - (timestamp % 3600))
+ORDER BY hour DESC
+LIMIT 24
+```
+
+### New vs recurring errors
+```sql
+SELECT 
+    CASE 
+        WHEN first_seen = last_seen THEN 'New (single occurrence)'
+        WHEN last_seen - first_seen < 3600 THEN 'Recent (within 1 hour)'
+        ELSE 'Recurring'
+    END as error_category,
+    COUNT(*) as count
+FROM (
+    SELECT SUBSTR(message, 1, 80) as msg, MIN(timestamp) as first_seen, MAX(timestamp) as last_seen
+    FROM logs
+    WHERE severity IN ('ERROR', 'FATAL')
+    GROUP BY SUBSTR(message, 1, 80)
+)
+GROUP BY error_category
+```
+
+---
+
+## DETAILED LOG INSPECTION QUERIES
+
+### Get full log details by ID
+```sql
+SELECT * FROM logs WHERE log_id = 1111865
+```
+
+### Get logs around a specific timestamp (context)
+```sql
+SELECT log_id, timestamp, pod, node_name, severity, message
+FROM logs
+WHERE timestamp BETWEEN 1769590000 AND 1769595000
+ORDER BY timestamp
+```
+
+### Get logs from same node as a crash
+```sql
+SELECT log_id, timestamp, severity, event_type, message
+FROM logs
+WHERE node_name = 'object-controller-0'
+AND timestamp > strftime('%s','now') - 3600
+ORDER BY timestamp DESC
+LIMIT 50
+```
+
+### Search logs by keyword
+```sql
+SELECT log_id, timestamp, pod, node_name, severity, message
+FROM logs
+WHERE message LIKE '%keyword%'
+ORDER BY timestamp DESC
+LIMIT 30
+```
+
+### Get logs with stack traces
+```sql
+SELECT log_id, timestamp, pod, node_name, event_type, message, stack_trace
+FROM logs
+WHERE stack_trace IS NOT NULL AND stack_trace != ''
+ORDER BY timestamp DESC
+LIMIT 20
+```
+
+---
+
+## EVEN MORE USER QUESTION MAPPINGS
+
+| Question | Query |
+|----------|-------|
+| "Give me a summary" | `SELECT severity, COUNT(*) as count FROM logs WHERE timestamp > strftime('%s','now') - 86400 GROUP BY severity ORDER BY count DESC` |
+| "What happened?" | `SELECT timestamp, pod, node_name, severity, event_type, SUBSTR(message,1,80) as message FROM logs WHERE severity IN ('ERROR','FATAL') ORDER BY timestamp DESC LIMIT 20` |
+| "Any issues?" | `SELECT COUNT(*) as issues FROM logs WHERE severity IN ('ERROR', 'FATAL') AND timestamp > strftime('%s','now') - 3600` |
+| "Show all logs" | `SELECT log_id, timestamp, pod, node_name, severity, event_type, SUBSTR(message,1,60) as message FROM logs ORDER BY timestamp DESC LIMIT 50` |
+| "Show warnings" | `SELECT timestamp, pod, node_name, message FROM logs WHERE severity = 'WARN' ORDER BY timestamp DESC LIMIT 30` |
+| "Recent crashes" | `SELECT timestamp, node_name, object_store_name, message FROM logs WHERE event_type = 'CRASH' AND timestamp > strftime('%s','now') - 86400 ORDER BY timestamp DESC` |
+| "Bucket info" | `SELECT bucket_name, bucket_owner, versioning, worm, replication_status, tiering_status FROM bucket ORDER BY bucket_name` |
+| "Bucket details for X" | `SELECT * FROM bucket WHERE bucket_name LIKE '%X%'` |
+| "Storage stats" | `SELECT b.bucket_name, bs.size_gb, bs.object_count, bs.timestamp FROM bucket_stats bs JOIN bucket b ON bs.bucket_id = b.bucket_id ORDER BY bs.size_gb DESC` |
+| "How much data?" | `SELECT ROUND(SUM(size_gb),2) as total_gb FROM bucket_stats` |
+| "How many objects?" | `SELECT SUM(object_count) as total_objects FROM bucket_stats` |
+| "List object stores" | `SELECT store_name, state, node_count, os_version, location FROM object_store` |
+| "Store details" | `SELECT * FROM object_store` |
+| "Active stores" | `SELECT store_name, node_count, os_version FROM object_store WHERE state = 'ACTIVE'` |
+| "Alert count" | `SELECT COUNT(*) as alerts FROM alerts WHERE is_active = 1` |
+| "Warning alerts" | `SELECT entity_id, message, first_detected_at FROM alerts WHERE severity = 'WARNING' AND is_active = 1` |
+| "Resolved alerts" | `SELECT entity_id, message, resolved_at FROM alerts WHERE resolved_at IS NOT NULL ORDER BY resolved_at DESC LIMIT 20` |
+| "Replication lag" | `SELECT b.bucket_name, br.pending_objects, br.pending_size_gb, br.last_sync_time FROM bucket_replication br JOIN bucket b ON br.source_bucket_id = b.bucket_id WHERE br.pending_objects > 0` |
+| "Failed replications" | `SELECT b.bucket_name, br.last_error, br.last_sync_time FROM bucket_replication br JOIN bucket b ON br.source_bucket_id = b.bucket_id WHERE br.last_error IS NOT NULL` |
+| "Upload history" | `SELECT cluster_name, s3_key, status, errors_found, uploaded_at FROM log_uploads ORDER BY uploaded_at DESC LIMIT 20` |
+| "Failed uploads" | `SELECT cluster_name, s3_key, error_message, uploaded_at FROM log_uploads WHERE status = 'FAILED'` |
+| "Errors by bucket" | `SELECT bucket_name, COUNT(*) as errors FROM logs WHERE bucket_name IS NOT NULL AND severity IN ('ERROR','FATAL') GROUP BY bucket_name ORDER BY errors DESC` |
+| "Errors by store" | `SELECT object_store_name, COUNT(*) as errors FROM logs WHERE object_store_name IS NOT NULL AND severity IN ('ERROR','FATAL') GROUP BY object_store_name ORDER BY errors DESC` |
+| "Errors by component" | `SELECT pod, COUNT(*) as errors FROM logs WHERE severity IN ('ERROR','FATAL') GROUP BY pod ORDER BY errors DESC` |
+| "Errors by node" | `SELECT node_name, COUNT(*) as errors FROM logs WHERE severity IN ('ERROR','FATAL') GROUP BY node_name ORDER BY errors DESC LIMIT 15` |
+| "Errors by type" | `SELECT event_type, COUNT(*) as count FROM logs WHERE severity IN ('ERROR','FATAL') AND event_type IS NOT NULL GROUP BY event_type ORDER BY count DESC` |
+| "When was last error?" | `SELECT MAX(timestamp) as last_error_time FROM logs WHERE severity IN ('ERROR', 'FATAL')` |
+| "When was last fatal?" | `SELECT MAX(timestamp) as last_fatal_time FROM logs WHERE severity = 'FATAL'` |
+| "Oldest bucket" | `SELECT bucket_name, created_at FROM bucket ORDER BY created_at ASC LIMIT 1` |
+| "Newest bucket" | `SELECT bucket_name, created_at FROM bucket ORDER BY created_at DESC LIMIT 1` |
+| "Buckets by owner" | `SELECT bucket_owner, COUNT(*) as buckets FROM bucket GROUP BY bucket_owner ORDER BY buckets DESC` |
+| "Search X" | `SELECT timestamp, pod, node_name, severity, message FROM logs WHERE message LIKE '%X%' ORDER BY timestamp DESC LIMIT 30` |
 
 ---
 
