@@ -123,18 +123,98 @@ def format_tool_result(tool_name: str, result: dict) -> str:
             rows = [[r.get(c) for c in columns] for r in rows]
         
         if not rows:
-            return "Query returned no results."
+            return "### No Results\n\nThe query returned no data. This could mean:\n- No matching records exist\n- The filters are too restrictive\n\nTry a different query or time range."
         
-        lines = [f"**Query Results ({len(rows)} rows):**\n"]
-        # Create table header
-        lines.append("| " + " | ".join(str(c) for c in columns) + " |")
-        lines.append("|" + "|".join(["---"] * len(columns)) + "|")
-        # Add rows (limit to 30)
-        for row in rows[:30]:
-            row_values = row if isinstance(row, (list, tuple)) else [row]
-            lines.append("| " + " | ".join(str(v) if v is not None else "NULL" for v in row_values) + " |")
-        if len(rows) > 30:
-            lines.append(f"\n*... and {len(rows) - 30} more rows*")
+        # Format values nicely
+        def format_value(val, col_name=""):
+            if val is None:
+                return "-"
+            col_lower = col_name.lower() if col_name else ""
+            
+            # Format large numbers for storage
+            if isinstance(val, (int, float)):
+                if 'size' in col_lower or 'gb' in col_lower or 'capacity' in col_lower:
+                    if val > 1000:
+                        return f"{val/1000:.1f} TB"
+                    return f"{val:.1f} GB"
+                elif 'count' in col_lower or 'objects' in col_lower or 'total' in col_lower:
+                    if val > 1000000:
+                        return f"{val/1000000:.1f}M"
+                    elif val > 1000:
+                        return f"{val/1000:.1f}K"
+                    return f"{int(val):,}"
+                elif isinstance(val, float):
+                    return f"{val:,.2f}"
+                else:
+                    return f"{val:,}"
+            return str(val)
+        
+        lines = []
+        row_count = len(rows)
+        
+        # Generate appropriate title based on columns
+        if any('error' in str(c).lower() or 'severity' in str(c).lower() for c in columns):
+            title = "Error Analysis"
+        elif any('bucket' in str(c).lower() for c in columns):
+            title = "Bucket Information" 
+        elif any('size' in str(c).lower() or 'storage' in str(c).lower() or 'gb' in str(c).lower() for c in columns):
+            title = "Storage Statistics"
+        elif any('alert' in str(c).lower() for c in columns):
+            title = "System Alerts"
+        elif any('store' in str(c).lower() for c in columns):
+            title = "Object Store Information"
+        else:
+            title = "Query Results"
+        
+        lines.append(f"### {title}\n")
+        
+        # Single row - show as key-value pairs for better readability
+        if row_count == 1:
+            row = rows[0]
+            row_values = row if isinstance(row, (list, tuple)) else list(row.values()) if isinstance(row, dict) else [row]
+            
+            lines.append("| Metric | Value |")
+            lines.append("|--------|-------|")
+            for i, col in enumerate(columns):
+                val = row_values[i] if i < len(row_values) else "-"
+                formatted_val = format_value(val, col)
+                col_display = str(col).replace("_", " ").title()
+                lines.append(f"| {col_display} | **{formatted_val}** |")
+            
+            # Add insights for single-row results
+            lines.append("\n**Key Takeaways:**")
+            for i, col in enumerate(columns):
+                val = row_values[i] if i < len(row_values) else None
+                col_lower = str(col).lower()
+                if val and isinstance(val, (int, float)):
+                    if 'size' in col_lower or 'gb' in col_lower:
+                        lines.append(f"- Total storage: {format_value(val, col)}")
+                    elif 'count' in col_lower or 'objects' in col_lower:
+                        lines.append(f"- Total objects: {format_value(val, col)}")
+                    elif 'error' in col_lower or 'fatal' in col_lower:
+                        if val > 0:
+                            lines.append(f"- ⚠️ {int(val)} issues detected - review recommended")
+                        else:
+                            lines.append(f"- ✅ No critical issues")
+        else:
+            # Multiple rows - show as table
+            lines.append("| " + " | ".join(str(c).replace("_", " ").title() for c in columns) + " |")
+            lines.append("|" + "|".join(["---"] * len(columns)) + "|")
+            
+            for row in rows[:25]:
+                row_values = row if isinstance(row, (list, tuple)) else list(row.values()) if isinstance(row, dict) else [row]
+                formatted_row = []
+                for i, v in enumerate(row_values):
+                    col_name = columns[i] if i < len(columns) else ""
+                    formatted_row.append(format_value(v, col_name))
+                lines.append("| " + " | ".join(formatted_row) + " |")
+            
+            if row_count > 25:
+                lines.append(f"\n*Showing 25 of {row_count} results*")
+            
+            # Add summary
+            lines.append(f"\n**Summary:** Found {row_count:,} records")
+        
         return "\n".join(lines)
     
     elif tool_name == "create_bucket":
