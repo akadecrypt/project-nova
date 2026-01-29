@@ -684,6 +684,187 @@
         .message-text a:hover {
             text-decoration: underline;
         }
+        
+        /* Message formatting styles */
+        .msg-h1 {
+            font-size: 1.5em;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin: 16px 0 12px 0;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--accent-primary);
+        }
+        .msg-h2 {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 14px 0 10px 0;
+            padding-bottom: 6px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .msg-h3 {
+            font-size: 1.15em;
+            font-weight: 600;
+            color: var(--accent-primary);
+            margin: 12px 0 8px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .msg-h3::before {
+            content: '▸';
+            color: var(--accent-secondary);
+        }
+        .msg-h4 {
+            font-size: 1em;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin: 10px 0 6px 0;
+        }
+        .msg-hr {
+            border: none;
+            height: 1px;
+            background: linear-gradient(to right, transparent, var(--border-color), transparent);
+            margin: 16px 0;
+        }
+        .msg-li {
+            display: block;
+            padding: 4px 0 4px 20px;
+            position: relative;
+        }
+        .msg-li::before {
+            content: '•';
+            color: var(--accent-primary);
+            font-weight: bold;
+            position: absolute;
+            left: 4px;
+        }
+        .msg-li-num {
+            display: block;
+            padding: 4px 0 4px 24px;
+            position: relative;
+            counter-increment: list-counter;
+        }
+        .msg-li-num::before {
+            content: counter(list-counter) ".";
+            color: var(--accent-primary);
+            font-weight: 600;
+            position: absolute;
+            left: 0;
+        }
+        .message-text { counter-reset: list-counter; }
+        .msg-code {
+            background: var(--bg-tertiary);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: var(--font-mono);
+            font-size: 0.9em;
+            color: var(--accent-secondary);
+        }
+        .msg-pre {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+            margin: 12px 0;
+            overflow-x: auto;
+        }
+        .msg-pre code {
+            font-family: var(--font-mono);
+            font-size: 0.85em;
+            color: var(--text-secondary);
+            background: none;
+            padding: 0;
+        }
+        .msg-quote {
+            border-left: 3px solid var(--accent-primary);
+            padding-left: 12px;
+            margin: 10px 0;
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+        
+        /* Status badges in messages */
+        .status-ok { color: #10b981; font-weight: 600; }
+        .status-warn { color: #f59e0b; font-weight: 600; }
+        .status-error { color: #ef4444; font-weight: 600; }
+        .status-info { color: #6366f1; font-weight: 600; }
+        
+        /* Section divider */
+        .section-divider {
+            height: 1px;
+            background: linear-gradient(to right, transparent, var(--border-color) 20%, var(--border-color) 80%, transparent);
+            margin: 20px 0;
+        }
+        
+        /* Summary box */
+        .msg-summary {
+            background: var(--bg-tertiary);
+            border-left: 4px solid var(--accent-primary);
+            padding: 12px 16px;
+            border-radius: 0 8px 8px 0;
+            margin: 12px 0;
+        }
+        
+        /* Highlight box for important info */
+        .msg-highlight {
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin: 12px 0;
+        }
+        
+        /* Key-value pairs styling */
+        .msg-kv {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px dashed var(--border-color);
+        }
+        .msg-kv:last-child { border-bottom: none; }
+        .msg-key { color: var(--text-muted); }
+        .msg-value { color: var(--text-primary); font-weight: 500; }
+        
+        /* Status icons */
+        .status-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            font-size: 12px;
+            font-weight: bold;
+            margin-right: 4px;
+        }
+        .status-icon.ok {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+        }
+        .status-icon.error {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+        .status-icon.warn {
+            background: rgba(245, 158, 11, 0.2);
+            color: #f59e0b;
+        }
+        .status-icon.info {
+            background: rgba(99, 102, 241, 0.2);
+            color: #6366f1;
+        }
+        
+        /* Highlighted numbers */
+        .highlight-num {
+            font-weight: 600;
+            color: var(--accent-primary);
+        }
+        .highlight-unit {
+            font-size: 0.85em;
+            color: var(--text-muted);
+            text-transform: lowercase;
+        }
 
         /* Data Tables */
         .data-table {
@@ -1531,7 +1712,7 @@
             }
             
             // Join sections with proper spacing
-            return formattedSections.join('<div style="margin: 16px 0; border-top: 1px solid var(--border-color); opacity: 0.3;"></div>');
+            return formattedSections.join('<div class="section-divider"></div>');
         }
         
         function applyTextFormatting(text) {
@@ -1540,14 +1721,40 @@
                 .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" class="chat-image" onerror="this.onerror=null;this.src=\'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22200%22><rect fill=%22%23333%22 width=%22100%%22 height=%22100%%22/><text fill=%22%23888%22 x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22>Chart failed to load</text></svg>\';this.classList.add(\'chart-error\');">')
                 // Markdown links: [text](url)
                 .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+                // Headers (process before other formatting)
+                .replace(/^####\s+(.+)$/gm, '<h4 class="msg-h4">$1</h4>')
+                .replace(/^###\s+(.+)$/gm, '<h3 class="msg-h3">$1</h3>')
+                .replace(/^##\s+(.+)$/gm, '<h2 class="msg-h2">$1</h2>')
+                .replace(/^#\s+(.+)$/gm, '<h1 class="msg-h1">$1</h1>')
+                // Horizontal rule
+                .replace(/^---+$/gm, '<hr class="msg-hr">')
+                // Bullet lists
+                .replace(/^[-*]\s+(.+)$/gm, '<li class="msg-li">$1</li>')
+                // Numbered lists
+                .replace(/^\d+\.\s+(.+)$/gm, '<li class="msg-li-num">$1</li>')
                 // Bold
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
                 // Italic
-                .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                // Code
-                .replace(/`([^`]+)`/g, '<code>$1</code>')
-                // Line breaks
-                .replace(/\n/g, '<br>');
+                .replace(/\*(.+?)\*/g, '<em>$1</em>')
+                // Inline code
+                .replace(/`([^`]+)`/g, '<code class="msg-code">$1</code>')
+                // Code blocks
+                .replace(/```(\w*)\n?([\s\S]*?)```/g, '<pre class="msg-pre"><code>$2</code></pre>')
+                // Blockquotes
+                .replace(/^>\s+(.+)$/gm, '<blockquote class="msg-quote">$1</blockquote>')
+                // Wrap consecutive li items in ul/ol
+                .replace(/(<li class="msg-li">[\s\S]*?<\/li>)(?:\s*<br>)*/g, '$1')
+                .replace(/(<li class="msg-li-num">[\s\S]*?<\/li>)(?:\s*<br>)*/g, '$1')
+                // Line breaks (but not after block elements)
+                .replace(/\n(?!<\/?(h[1-4]|li|ul|ol|hr|pre|blockquote))/g, '<br>')
+                // Status indicators
+                .replace(/✅|✔️|\[OK\]|\[SUCCESS\]/g, '<span class="status-icon ok">✓</span>')
+                .replace(/❌|✖️|\[ERROR\]|\[FAIL\]/g, '<span class="status-icon error">✗</span>')
+                .replace(/⚠️|\[WARNING\]|\[WARN\]/g, '<span class="status-icon warn">⚠</span>')
+                .replace(/ℹ️|\[INFO\]/g, '<span class="status-icon info">ℹ</span>')
+                // Highlight important numbers
+                .replace(/\b(\d+(?:,\d{3})*(?:\.\d+)?)\s*(GB|MB|KB|TB|errors?|warnings?|fatals?|alerts?)\b/gi, 
+                    '<span class="highlight-num">$1</span> <span class="highlight-unit">$2</span>');
         }
 
         function scrollToBottom(force = false) {
