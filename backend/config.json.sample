@@ -18,10 +18,18 @@
     "region": "us-east-1"
   },
   "sql_agent": {
-    "url": "http://10.x.x.x:9001/execute"
+    "url": "http://localhost:9001/execute",
+    "db_path": "~/nova.db"
   },
   "background": {
     "sql_refresh_interval_seconds": 300,
     "enable_background_refresh": true
+  },
+  "log_analysis": {
+    "logs_bucket": "nova-logs",
+    "retention_days": 30,
+    "collection_interval_hours": 1,
+    "auto_collect": false,
+    "initial_delay_minutes": 5
   }
 }
