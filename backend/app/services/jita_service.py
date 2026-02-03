@@ -30,8 +30,13 @@ class JitaService:
     JITA_BASE_URL = "https://jita.eng.nutanix.com/api/v2"
     AUTH = ("agave_bot", "admin")
     
-    # Direct log server URL (contains actual log files)
-    LOG_SERVER_URL = "http://10.46.1.200/logs"
+    # Log server mapping by lab/infra (can be extended)
+    # Format: {lab}_{infra} -> server URL
+    LOG_SERVERS = {
+        'phx1_systest': 'http://10.46.1.200',
+        'phx1-services_systest': 'http://10.46.1.200',
+        'default': 'http://10.46.1.200',  # Fallback
+    }
     
     # Key log files to analyze (in priority order)
     KEY_LOG_FILES = [
@@ -416,7 +421,70 @@ class JitaService:
         """
         Build direct log server URL from test result metadata.
         
-        URL structure: http://10.46.1.200/logs/{task_id}/{run_id}/{test_result_id}/{test_path}/
+        Extracts the log path from JITA API URL and determines the correct log server.
+        """
+        try:
+            # First, try to get log path from test_log_url (JITA API URL)
+            test_log_url = result.get('test_log_url', '')
+            
+            if test_log_url:
+                # Parse JITA API URL to extract log path and server info
+                # Example: https://jita.eng.nutanix.com/api/v2/log?log_type=test_log&url=/logs/697a.../697a.../697a...&lab=phx1&infra=systest
+                url_info = self._parse_jita_log_url(test_log_url)
+                if url_info:
+                    return url_info
+            
+            # Fallback: Construct URL from test result metadata
+            return self._construct_log_url_from_metadata(result_id, result)
+            
+        except Exception as e:
+            logger.warning(f"Error building direct log URL: {e}")
+            return None
+    
+    def _parse_jita_log_url(self, jita_url: str) -> Optional[str]:
+        """
+        Parse JITA API log URL to extract direct log server URL.
+        
+        Input: https://jita.eng.nutanix.com/api/v2/log?log_type=test_log&url=/logs/...&lab=phx1&infra=systest
+        Output: http://10.46.1.200/logs/.../
+        """
+        try:
+            from urllib.parse import urlparse, parse_qs
+            
+            parsed = urlparse(jita_url)
+            params = parse_qs(parsed.query)
+            
+            # Extract path from 'url' parameter
+            log_path = params.get('url', [''])[0]
+            if not log_path:
+                return None
+            
+            # Extract lab and infra for server lookup
+            lab = params.get('lab', [''])[0]
+            infra = params.get('infra', [''])[0]
+            
+            # Determine log server
+            server_key = f"{lab}_{infra}" if lab and infra else 'default'
+            log_server = self.LOG_SERVERS.get(server_key, self.LOG_SERVERS['default'])
+            
+            # Build full URL - log_path already includes /logs/
+            # Add trailing slash if path is a directory
+            full_url = f"{log_server}{log_path}"
+            if not full_url.endswith('/') and not full_url.endswith('.log'):
+                full_url += '/'
+            
+            logger.info(f"Parsed log URL: {full_url} (lab={lab}, infra={infra})")
+            return full_url
+            
+        except Exception as e:
+            logger.warning(f"Error parsing JITA log URL: {e}")
+            return None
+    
+    def _construct_log_url_from_metadata(self, result_id: str, result: Dict) -> Optional[str]:
+        """
+        Construct log URL from test result metadata (fallback method).
+        
+        URL structure: {server}/logs/{task_id}/{run_id}/{test_result_id}/{test_path}/
         """
         try:
             # Get task_id from agave_task_id
@@ -453,14 +521,17 @@ class JitaService:
             # Convert module path to directory path
             module_path = '/'.join(module_parts)
             
-            # Build URL
-            url = f"{self.LOG_SERVER_URL}/{task_id}/{run_id}/{result_id}/{module_path}/{test_class}/{test_method}/"
+            # Use default server (can be improved by checking allocated resources for lab info)
+            log_server = self.LOG_SERVERS['default']
             
-            logger.info(f"Built direct log URL: {url}")
+            # Build URL
+            url = f"{log_server}/logs/{task_id}/{run_id}/{result_id}/{module_path}/{test_class}/{test_method}/"
+            
+            logger.info(f"Constructed log URL from metadata: {url}")
             return url
             
         except Exception as e:
-            logger.warning(f"Error building direct log URL: {e}")
+            logger.warning(f"Error constructing log URL: {e}")
             return None
     
     def _fetch_logs_from_server(
