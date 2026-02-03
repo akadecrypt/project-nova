@@ -177,20 +177,178 @@ async def run_query(request: QueryRequest):
 @router.get("/summary")
 async def get_summary():
     """Get database summary with all tables and their info"""
-    config_check = check_sql_configured()
-    if config_check:
-        return config_check
+    all_tables = []
     
-    result = get_database_summary()
+    # Get tables from SQL agent (nova.db)
+    config_check = check_sql_configured()
+    if not config_check:
+        result = get_database_summary()
+        if result.get("status") != "error":
+            for table in result.get("tables", []):
+                table["source"] = "nova"
+                all_tables.append(table)
+    
+    # Also get tables from JITA database
+    jita_tables = get_jita_database_summary()
+    all_tables.extend(jita_tables)
+    
+    if not all_tables:
+        return {
+            "success": False,
+            "tables": [],
+            "error": "No database tables found"
+        }
+    
+    return {
+        "success": True,
+        "tables": all_tables
+    }
+
+
+# ============= JITA Database Functions =============
+import os
+import sqlite3
+
+JITA_DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "jita_data.db")
+
+
+def get_jita_database_summary():
+    """Get summary of JITA database tables"""
+    tables = []
+    
+    if not os.path.exists(JITA_DB_PATH):
+        return tables
+    
+    try:
+        conn = sqlite3.connect(JITA_DB_PATH)
+        cursor = conn.cursor()
+        
+        # Get all tables
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+        table_names = [row[0] for row in cursor.fetchall()]
+        
+        for table_name in table_names:
+            # Get row count
+            cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
+            row_count = cursor.fetchone()[0]
+            
+            # Get schema
+            cursor.execute(f"PRAGMA table_info({table_name})")
+            columns = []
+            for col in cursor.fetchall():
+                columns.append({
+                    "name": col[1],
+                    "type": col[2],
+                    "nullable": not col[3],
+                    "primary_key": bool(col[5])
+                })
+            
+            tables.append({
+                "name": table_name,
+                "row_count": row_count,
+                "columns": columns,
+                "source": "jita"
+            })
+        
+        conn.close()
+    except Exception as e:
+        print(f"Error reading JITA database: {e}")
+    
+    return tables
+
+
+def execute_jita_sql(sql: str, limit: int = 100):
+    """Execute SQL on JITA database"""
+    if not os.path.exists(JITA_DB_PATH):
+        return {"status": "error", "error": "JITA database not found"}
+    
+    try:
+        conn = sqlite3.connect(JITA_DB_PATH)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute(sql)
+        rows = cursor.fetchall()
+        
+        if rows:
+            columns = list(rows[0].keys())
+            result_rows = [list(row) for row in rows]
+        else:
+            columns = []
+            result_rows = []
+        
+        conn.close()
+        
+        return {
+            "status": "success",
+            "columns": columns,
+            "rows": result_rows
+        }
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+
+@router.get("/jita/tables")
+async def get_jita_tables():
+    """List all tables in the JITA database"""
+    tables = get_jita_database_summary()
+    return {
+        "success": True,
+        "tables": [t["name"] for t in tables],
+        "count": len(tables)
+    }
+
+
+@router.get("/jita/tables/{table_name}/data")
+async def get_jita_table_data(table_name: str, limit: int = 100, offset: int = 0):
+    """Get data from a JITA table with pagination"""
+    # Sanitize table name
+    if not table_name.replace("_", "").isalnum():
+        return {"success": False, "error": "Invalid table name"}
+    
+    # Get total count
+    count_result = execute_jita_sql(f"SELECT COUNT(*) as cnt FROM {table_name}")
+    total = 0
+    if count_result.get("status") == "success" and count_result.get("rows"):
+        total = count_result["rows"][0][0]
+    
+    # Get data
+    result = execute_jita_sql(f"SELECT * FROM {table_name} LIMIT {limit} OFFSET {offset}")
     
     if result.get("status") == "error":
         return {
             "success": False,
-            "tables": [],
+            "columns": [],
+            "rows": [],
             "error": result.get("error")
         }
     
     return {
         "success": True,
-        "tables": result.get("tables", [])
+        "table": table_name,
+        "columns": result.get("columns", []),
+        "rows": result.get("rows", []),
+        "total": total,
+        "limit": limit,
+        "offset": offset
+    }
+
+
+@router.get("/jita/tables/{table_name}/schema")
+async def get_jita_table_schema(table_name: str):
+    """Get schema for a JITA table"""
+    tables = get_jita_database_summary()
+    
+    for table in tables:
+        if table["name"] == table_name:
+            return {
+                "success": True,
+                "table": table_name,
+                "columns": table["columns"]
+            }
+    
+    return {
+        "success": False,
+        "columns": [],
+        "error": f"Table {table_name} not found"
     }

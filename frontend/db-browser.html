@@ -871,6 +871,7 @@
         const API_BASE = localStorage.getItem('nova-backend-url') || `http://${window.location.hostname}:9360`;
         
         let currentTable = null;
+        let currentSource = 'nova';  // 'nova' or 'jita'
         let currentTab = 'data';
         let currentOffset = 0;
         let currentResults = { columns: [], rows: [] };
@@ -980,8 +981,8 @@ ORDER BY status, source_bucket`
                 }
                 
                 container.innerHTML = data.tables.map(table => `
-                    <div class="table-item" onclick="selectTable('${table.name}')" data-table="${table.name}">
-                        <div class="table-icon">
+                    <div class="table-item" onclick="selectTable('${table.name}', '${table.source || 'nova'}')" data-table="${table.name}" data-source="${table.source || 'nova'}">
+                        <div class="table-icon" style="${table.source === 'jita' ? 'color: #f59e0b;' : ''}">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                                 <line x1="3" y1="9" x2="21" y2="9"></line>
@@ -990,7 +991,7 @@ ORDER BY status, source_bucket`
                         </div>
                         <div class="table-info">
                             <div class="table-name">${table.name}</div>
-                            <div class="table-rows">${table.row_count.toLocaleString()} rows</div>
+                            <div class="table-rows">${table.row_count.toLocaleString()} rows ${table.source === 'jita' ? '<span style="color: #f59e0b; font-size: 10px;">(JITA)</span>' : ''}</div>
                         </div>
                     </div>
                 `).join('');
@@ -1007,8 +1008,9 @@ ORDER BY status, source_bucket`
             }
         }
         
-        async function selectTable(tableName) {
+        async function selectTable(tableName, source = 'nova') {
             currentTable = tableName;
+            currentSource = source;
             currentOffset = 0;
             
             // Update active state
@@ -1021,20 +1023,25 @@ ORDER BY status, source_bucket`
             
             // Load data based on current tab
             if (currentTab === 'data') {
-                await loadTableData(tableName);
+                await loadTableData(tableName, 0, source);
             } else {
-                await loadTableSchema(tableName);
+                await loadTableSchema(tableName, source);
             }
         }
         
-        async function loadTableData(tableName, offset = 0) {
+        async function loadTableData(tableName, offset = 0, source = null) {
             const container = document.getElementById('resultsContainer');
             const info = document.getElementById('resultsInfo');
             
+            source = source || currentSource;
             container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
             
             try {
-                const response = await fetch(`${API_BASE}/api/database/tables/${tableName}/data?limit=${PAGE_SIZE}&offset=${offset}`);
+                // Use different endpoint for JITA tables
+                const apiPath = source === 'jita' 
+                    ? `${API_BASE}/api/database/jita/tables/${tableName}/data?limit=${PAGE_SIZE}&offset=${offset}`
+                    : `${API_BASE}/api/database/tables/${tableName}/data?limit=${PAGE_SIZE}&offset=${offset}`;
+                const response = await fetch(apiPath);
                 const data = await response.json();
                 
                 if (!data.success) {
@@ -1064,14 +1071,19 @@ ORDER BY status, source_bucket`
             }
         }
         
-        async function loadTableSchema(tableName) {
+        async function loadTableSchema(tableName, source = null) {
             const container = document.getElementById('resultsContainer');
             const info = document.getElementById('resultsInfo');
             
+            source = source || currentSource;
             container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
             
             try {
-                const response = await fetch(`${API_BASE}/api/database/tables/${tableName}/schema`);
+                // Use different endpoint for JITA tables
+                const apiPath = source === 'jita'
+                    ? `${API_BASE}/api/database/jita/tables/${tableName}/schema`
+                    : `${API_BASE}/api/database/tables/${tableName}/schema`;
+                const response = await fetch(apiPath);
                 const data = await response.json();
                 
                 if (!data.success) {
@@ -1200,7 +1212,7 @@ ORDER BY status, source_bucket`
         function goToPage(offset) {
             if (currentTable && offset >= 0) {
                 currentOffset = offset;
-                loadTableData(currentTable, offset);
+                loadTableData(currentTable, offset, currentSource);
             }
         }
         
@@ -1213,9 +1225,9 @@ ORDER BY status, source_bucket`
             
             if (currentTable) {
                 if (tab === 'data') {
-                    loadTableData(currentTable, currentOffset);
+                    loadTableData(currentTable, currentOffset, currentSource);
                 } else {
-                    loadTableSchema(currentTable);
+                    loadTableSchema(currentTable, currentSource);
                 }
             }
         }
