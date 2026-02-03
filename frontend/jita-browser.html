@@ -25,6 +25,14 @@
             overflow-y: auto;
         }
 
+        /* Hide sidebar when in iframe */
+        .in-iframe .sidebar {
+            display: none;
+        }
+        .in-iframe .main-content {
+            margin-left: 0;
+        }
+
         .logo {
             display: flex;
             align-items: center;
@@ -697,6 +705,11 @@
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
+            // Detect if loaded in iframe and hide sidebar
+            if (window.self !== window.top) {
+                document.documentElement.classList.add('in-iframe');
+            }
+            
             loadPreviousRuns();
             
             // Check URL params
