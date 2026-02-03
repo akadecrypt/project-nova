@@ -6,12 +6,35 @@
     <title>Test Timeline - NOVA</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
+        /* Theme Variables */
+        :root, [data-theme="dark"] {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #111116;
+            --bg-tertiary: #18181b;
+            --border-color: #27272a;
+            --border-hover: #3f3f46;
+            --text-primary: #e4e4e7;
+            --text-secondary: #a1a1aa;
+            --text-muted: #71717a;
+        }
+        
+        [data-theme="light"] {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f4f4f5;
+            --bg-tertiary: #e4e4e7;
+            --border-color: #d4d4d8;
+            --border-hover: #a1a1aa;
+            --text-primary: #18181b;
+            --text-secondary: #3f3f46;
+            --text-muted: #71717a;
+        }
+        
         * { box-sizing: border-box; margin: 0; padding: 0; }
         
         body {
             font-family: 'Inter', sans-serif;
-            background: #0a0a0f;
-            color: #e4e4e7;
+            background: var(--bg-primary);
+            color: var(--text-primary);
             min-height: 100vh;
             padding: 24px;
         }
@@ -25,11 +48,11 @@
             align-items: flex-start;
             margin-bottom: 24px;
             padding-bottom: 20px;
-            border-bottom: 1px solid #27272a;
+            border-bottom: 1px solid var(--border-color);
         }
 
         .header h1 { font-size: 20px; font-weight: 600; margin-bottom: 6px; }
-        .header-meta { font-size: 13px; color: #71717a; }
+        .header-meta { font-size: 13px; color: var(--text-muted); }
         
         .header-actions { display: flex; gap: 10px; }
 
@@ -48,8 +71,8 @@
         }
         .btn-primary { background: #6366f1; color: white; }
         .btn-primary:hover { background: #4f46e5; }
-        .btn-secondary { background: #27272a; color: #e4e4e7; }
-        .btn-secondary:hover { background: #3f3f46; }
+        .btn-secondary { background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-color); }
+        .btn-secondary:hover { background: var(--border-hover); }
 
         /* Timeline */
         .timeline {
@@ -64,7 +87,7 @@
             top: 0;
             bottom: 0;
             width: 2px;
-            background: linear-gradient(to bottom, #6366f1, #27272a);
+            background: linear-gradient(to bottom, #6366f1, var(--border-color));
         }
 
         .phase {
@@ -78,8 +101,8 @@
             width: 32px;
             height: 32px;
             border-radius: 50%;
-            background: #111116;
-            border: 2px solid #27272a;
+            background: var(--bg-secondary);
+            border: 2px solid var(--border-color);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -97,8 +120,8 @@
         }
 
         .phase-content {
-            background: #111116;
-            border: 1px solid #27272a;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
             border-radius: 10px;
             overflow: hidden;
         }
@@ -115,7 +138,7 @@
             transition: background 0.15s;
         }
 
-        .phase-header:hover { background: #18181b; }
+        .phase-header:hover { background: var(--bg-tertiary); }
 
         .phase-title {
             display: flex;
@@ -124,7 +147,7 @@
         }
 
         .phase-name { font-weight: 600; font-size: 14px; }
-        .phase-duration { font-size: 12px; color: #71717a; }
+        .phase-duration { font-size: 12px; color: var(--text-muted); }
 
         .phase-stats {
             display: flex;
@@ -138,7 +161,7 @@
         .stat.logs { color: #6366f1; }
 
         .phase-chevron {
-            color: #52525b;
+            color: var(--text-muted);
             transition: transform 0.2s;
         }
 
@@ -146,17 +169,17 @@
 
         .phase-body {
             display: none;
-            border-top: 1px solid #27272a;
+            border-top: 1px solid var(--border-color);
             padding: 16px;
-            background: #0a0a0f;
+            background: var(--bg-primary);
         }
 
         .phase.expanded .phase-body { display: block; }
 
         /* Log Entry */
         .log-entry {
-            background: #111116;
-            border: 1px solid #1f1f23;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
             border-radius: 8px;
             margin-bottom: 10px;
             overflow: hidden;
@@ -173,7 +196,7 @@
             cursor: pointer;
         }
 
-        .log-header:hover { background: #18181b; }
+        .log-header:hover { background: var(--bg-tertiary); }
 
         .log-severity {
             padding: 2px 6px;
@@ -329,6 +352,19 @@
     <div id="toast" class="toast"></div>
 
     <script>
+        // Theme initialization - read from URL or parent/localStorage
+        (function initTheme() {
+            const params = new URLSearchParams(window.location.search);
+            let theme = params.get('theme');
+            if (!theme) {
+                try { theme = window.parent?.document?.documentElement?.getAttribute('data-theme'); } catch(e) {}
+            }
+            if (!theme) {
+                theme = localStorage.getItem('nova-theme') || 'dark';
+            }
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+        
         const API = `http://${window.location.hostname}:9360/api/jita`;
         const params = new URLSearchParams(window.location.search);
         const runId = params.get('run');

@@ -1294,10 +1294,15 @@ class JitaService:
         self, 
         logbay_url: str, 
         result_id: str, 
-        test_name: str
+        test_name: str,
+        depth: int = 0
     ) -> List[Dict]:
-        """Parse logbay directory for error logs."""
+        """Parse logbay directory for error logs (recursively)."""
         events = []
+        
+        # Limit recursion depth to avoid infinite loops
+        if depth > 4:
+            return events
         
         try:
             # Get logbay directory listing
@@ -1307,18 +1312,56 @@ class JitaService:
             
             files = self._parse_directory_listing(response.text)
             
-            # Look for error-related files in logbay
-            error_patterns = ['ERROR', 'FATAL', 'crash', 'core', 'panic']
+            # Error file patterns to look for
+            error_file_patterns = [
+                '.FATAL',      # Service FATAL files (e.g., aplos.FATAL)
+                '.ERROR',      # Service ERROR files
+                'ERROR.',      # .log.ERROR files
+                'FATAL.',      # .log.FATAL files
+                'crash',       # Crash dumps
+                'core.',       # Core dumps
+                'panic',       # Panic logs
+            ]
+            
+            # Key directories to search in logbay
+            key_dirs = ['cvm_logs/', 'flowgateway_logs/', 'karbon/', 'msp/']
             
             for f in files:
-                if any(p.lower() in f.lower() for p in error_patterns):
-                    if f.endswith('.log') or f.endswith('.txt'):
-                        content = self._fetch_log_file(f"{logbay_url}{f}", max_size=5*1024*1024)
-                        if content:
-                            parsed = self._parse_log_content(
-                                content, f'logbay_{f}', result_id, test_name
-                            )
-                            events.extend(parsed)
+                full_url = f"{logbay_url}{f}"
+                
+                # Check if it's a directory we should recurse into
+                if f.endswith('/'):
+                    # At depth 0, go into node directories (nutest_* directories)
+                    if depth == 0 and f.startswith('nutest_'):
+                        sub_events = self._parse_logbay_directory(
+                            full_url, result_id, test_name, depth + 1
+                        )
+                        events.extend(sub_events)
+                    # At depth 1, go into cvm_logs and other key directories
+                    elif depth == 1 and f in key_dirs:
+                        sub_events = self._parse_logbay_directory(
+                            full_url, result_id, test_name, depth + 1
+                        )
+                        events.extend(sub_events)
+                    continue
+                
+                # Check if it's an error-related file
+                is_error_file = any(p.lower() in f.lower() for p in error_file_patterns)
+                
+                # Also include files that end with specific extensions
+                is_log_file = f.endswith('.log') or f.endswith('.txt') or '.FATAL' in f or '.ERROR' in f
+                
+                if is_error_file and is_log_file:
+                    content = self._fetch_log_file(full_url, max_size=2*1024*1024)  # 2MB limit per file
+                    if content:
+                        # Extract service name from filename
+                        service_name = f.split('.')[0] if '.' in f else f
+                        parsed = self._parse_log_content(
+                            content, f'logbay:{service_name}', result_id, test_name
+                        )
+                        events.extend(parsed)
+                        if parsed:
+                            logger.info(f"Parsed {len(parsed)} events from logbay {f}")
             
         except Exception as e:
             logger.warning(f"Error parsing logbay directory: {e}")
