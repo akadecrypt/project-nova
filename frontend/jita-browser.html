@@ -1,0 +1,1191 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JITA Browser - NOVA</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/design-system.css">
+    <style>
+        .app-container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            width: var(--sidebar-width);
+            background: rgba(18, 18, 26, 0.85);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid var(--border-color);
+            padding: 24px;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 32px;
+            text-decoration: none;
+        }
+
+        .logo-icon {
+            width: 44px;
+            height: 44px;
+            background: var(--accent-gradient);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--shadow-glow);
+        }
+
+        .logo-icon svg { width: 24px; height: 24px; fill: white; }
+
+        .logo-text { display: flex; flex-direction: column; }
+
+        .logo-title {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .logo-subtitle {
+            font-size: 10px;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .nav-section { margin-bottom: 24px; }
+        .nav-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 12px;
+            padding-left: 4px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 14px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all var(--transition-normal);
+            margin-bottom: 4px;
+            color: var(--text-secondary);
+            text-decoration: none;
+        }
+
+        .nav-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+        .nav-item.active { background: var(--bg-hover); color: var(--text-primary); border: 1px solid var(--border-color); }
+        .nav-icon { width: 20px; height: 20px; opacity: 0.7; }
+
+        .main-content {
+            flex: 1;
+            margin-left: var(--sidebar-width);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .header {
+            padding: 20px 32px;
+            background: rgba(18, 18, 26, 0.7);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .page-title { font-size: 24px; font-weight: 600; }
+        .page-desc { font-size: 14px; color: var(--text-muted); margin-top: 4px; }
+
+        .content-area {
+            flex: 1;
+            padding: 24px 32px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        /* Input Card */
+        .input-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+        }
+
+        .input-row {
+            display: flex;
+            gap: 16px;
+            align-items: flex-end;
+        }
+
+        .input-group {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .input-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .input-field {
+            padding: 12px 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 14px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .input-field:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all var(--transition-normal);
+            border: none;
+            font-size: 14px;
+        }
+
+        .btn-primary {
+            background: var(--accent-gradient);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-glow);
+        }
+
+        .btn-secondary {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-hover);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            margin-top: 8px;
+        }
+
+        .stat-value.success { color: var(--success); }
+        .stat-value.error { color: var(--error); }
+        .stat-value.warning { color: var(--warning); }
+
+        /* Results Section */
+        .results-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            overflow: hidden;
+        }
+
+        .results-header {
+            padding: 16px 20px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .results-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .results-tabs {
+            display: flex;
+            gap: 8px;
+        }
+
+        .tab-btn {
+            padding: 8px 16px;
+            border-radius: 8px;
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all var(--transition-normal);
+        }
+
+        .tab-btn.active {
+            background: var(--accent-primary);
+            color: white;
+            border-color: var(--accent-primary);
+        }
+
+        .results-body {
+            padding: 20px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        /* Table Styles */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .data-table th {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 500;
+        }
+
+        .data-table tr:hover {
+            background: var(--bg-hover);
+        }
+
+        .status-badge {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-badge.failed { background: rgba(239, 68, 68, 0.15); color: var(--error); }
+        .status-badge.succeeded { background: rgba(34, 197, 94, 0.15); color: var(--success); }
+        .status-badge.error { background: rgba(239, 68, 68, 0.15); color: var(--error); }
+        .status-badge.fatal { background: rgba(220, 38, 38, 0.2); color: #f87171; }
+        .status-badge.warn { background: rgba(234, 179, 8, 0.15); color: var(--warning); }
+
+        /* Stack Trace Viewer */
+        .stack-trace {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 300px;
+            overflow-y: auto;
+            color: var(--text-secondary);
+        }
+
+        .stack-trace-toggle {
+            color: var(--accent-primary);
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        /* Loading State */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 60px;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px;
+            color: var(--text-muted);
+        }
+
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        /* Run History */
+        .history-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .history-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all var(--transition-normal);
+        }
+
+        .history-item:hover {
+            border-color: var(--accent-primary);
+        }
+
+        .history-id {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+        }
+
+        .history-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .history-btn {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all var(--transition-normal);
+        }
+
+        /* Filter Row */
+        .filter-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .filter-select {
+            padding: 8px 12px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 13px;
+        }
+
+        /* Test Row Expansion */
+        .test-row { cursor: pointer; }
+        .test-row.expanded { background: var(--bg-hover); }
+        .test-details {
+            display: none;
+            padding: 16px;
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border-color);
+        }
+        .test-details.show { display: block; }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .detail-item label {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .detail-item span {
+            font-size: 14px;
+            color: var(--text-primary);
+        }
+
+        .cmd-display {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            background: var(--bg-primary);
+            padding: 12px;
+            border-radius: 8px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <a href="index.html" class="logo">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                </div>
+                <div class="logo-text">
+                    <span class="logo-title">NOVA</span>
+                    <span class="logo-subtitle">AI Assistant</span>
+                </div>
+            </a>
+
+            <nav class="nav-section">
+                <div class="nav-label">Navigation</div>
+                <a href="index.html" class="nav-item">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    Chat
+                </a>
+                <a href="log-browser.html" class="nav-item">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+                    </svg>
+                    Log Browser
+                </a>
+                <a href="db-browser.html" class="nav-item">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+                    </svg>
+                    Database
+                </a>
+                <a href="jita-browser.html" class="nav-item active">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                    </svg>
+                    JITA Browser
+                </a>
+                <a href="settings.html" class="nav-item">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                    </svg>
+                    Settings
+                </a>
+            </nav>
+
+            <!-- Previous Runs -->
+            <div class="nav-section">
+                <div class="nav-label">Previous Runs</div>
+                <div id="previousRuns" class="history-list">
+                    <div class="empty-state" style="padding: 20px;">
+                        <p style="font-size: 13px;">No analyzed runs yet</p>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="header">
+                <div>
+                    <h1 class="page-title">JITA Browser</h1>
+                    <p class="page-desc">Analyze JITA test runs and view logs</p>
+                </div>
+            </header>
+
+            <div class="content-area">
+                <!-- Input Section -->
+                <div class="input-card">
+                    <div class="input-row">
+                        <div class="input-group">
+                            <label class="input-label">JITA Run ID</label>
+                            <input type="text" id="runIdInput" class="input-field" 
+                                   placeholder="Enter JITA task ID (e.g., 697a296e8e79ce6b2202f970)"
+                                   onkeydown="if(event.key==='Enter') analyzeRun()">
+                        </div>
+                        <button class="btn btn-primary" onclick="analyzeRun()" id="analyzeBtn">
+                            Analyze Run
+                        </button>
+                        <button class="btn btn-secondary" onclick="previewRun()">
+                            Preview
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Stats Section (hidden until results) -->
+                <div id="statsSection" class="stats-grid" style="display: none;">
+                    <div class="stat-card">
+                        <div class="stat-label">Tests Analyzed</div>
+                        <div class="stat-value" id="statTests">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Passed</div>
+                        <div class="stat-value success" id="statPassed">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Failed</div>
+                        <div class="stat-value error" id="statFailed">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Log Events</div>
+                        <div class="stat-value" id="statEvents">0</div>
+                    </div>
+                </div>
+
+                <!-- Results Section -->
+                <div id="resultsSection" style="display: none;">
+                    <div class="results-card">
+                        <div class="results-header">
+                            <div class="results-title" id="resultsTitle">Analysis Results</div>
+                            <div class="results-tabs">
+                                <button class="tab-btn active" onclick="showTab('summary')">Summary</button>
+                                <button class="tab-btn" onclick="showTab('tests')">Tests</button>
+                                <button class="tab-btn" onclick="showTab('logs')">Logs</button>
+                            </div>
+                        </div>
+                        <div class="results-body">
+                            <!-- Summary Tab -->
+                            <div id="summaryTab" class="tab-content">
+                                <div id="summaryContent"></div>
+                            </div>
+
+                            <!-- Tests Tab -->
+                            <div id="testsTab" class="tab-content" style="display: none;">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Test Name</th>
+                                            <th>Status</th>
+                                            <th>Operations</th>
+                                            <th>Duration</th>
+                                            <th>Error</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="testsTableBody"></tbody>
+                                </table>
+                            </div>
+
+                            <!-- Logs Tab -->
+                            <div id="logsTab" class="tab-content" style="display: none;">
+                                <div class="filter-row">
+                                    <select id="severityFilter" class="filter-select" onchange="loadLogs()">
+                                        <option value="">All Severities</option>
+                                        <option value="FATAL">FATAL</option>
+                                        <option value="ERROR">ERROR</option>
+                                        <option value="WARN">WARN</option>
+                                    </select>
+                                    <select id="eventTypeFilter" class="filter-select" onchange="loadLogs()">
+                                        <option value="">All Event Types</option>
+                                    </select>
+                                </div>
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Severity</th>
+                                            <th>Event Type</th>
+                                            <th>Source</th>
+                                            <th>Message</th>
+                                            <th>Test</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="logsTableBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Loading State -->
+                <div id="loadingState" style="display: none;">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <p>Analyzing JITA run...</p>
+                        <p style="font-size: 13px; color: var(--text-muted);">Fetching logs and parsing errors</p>
+                    </div>
+                </div>
+
+                <!-- Empty State -->
+                <div id="emptyState">
+                    <div class="empty-state">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                        </svg>
+                        <h3>Enter a JITA Run ID to Analyze</h3>
+                        <p>Paste a JITA task ID from your test run to analyze logs and errors.</p>
+                        <p style="margin-top: 10px; font-size: 12px; color: var(--text-muted);">
+                            Example: 697a296e8e79ce6b2202f970
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Stack Trace Modal -->
+    <div id="stackTraceModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 1000; padding: 40px;">
+        <div style="background: var(--bg-card); border-radius: 16px; max-width: 900px; margin: 0 auto; max-height: calc(100vh - 80px); display: flex; flex-direction: column;">
+            <div style="padding: 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+                <h3 id="modalTitle">Stack Trace</h3>
+                <button onclick="closeModal()" style="background: none; border: none; color: var(--text-primary); font-size: 24px; cursor: pointer;">&times;</button>
+            </div>
+            <div style="padding: 20px; overflow-y: auto; flex: 1;">
+                <pre id="modalContent" class="stack-trace"></pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:9360/api/jita';
+        let currentRunId = null;
+        let currentAnalysis = null;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadPreviousRuns();
+            
+            // Check URL params
+            const params = new URLSearchParams(window.location.search);
+            const runId = params.get('run');
+            if (runId) {
+                document.getElementById('runIdInput').value = runId;
+                loadExistingRun(runId);
+            }
+        });
+
+        async function analyzeRun() {
+            const runId = document.getElementById('runIdInput').value.trim();
+            if (!runId) {
+                alert('Please enter a JITA run ID');
+                return;
+            }
+
+            showLoading(true);
+            currentRunId = runId;
+
+            try {
+                const response = await fetch(`${API_BASE}/analyze/${runId}`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'error') {
+                    alert('Error: ' + data.error);
+                    showLoading(false);
+                    return;
+                }
+
+                currentAnalysis = data;
+                displayResults(data);
+                loadPreviousRuns();
+                
+                // Update URL
+                window.history.pushState({}, '', `?run=${runId}`);
+                
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to analyze run: ' + error.message);
+            }
+
+            showLoading(false);
+        }
+
+        async function previewRun() {
+            const runId = document.getElementById('runIdInput').value.trim();
+            if (!runId) {
+                alert('Please enter a JITA run ID');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/task/${runId}`);
+                const data = await response.json();
+                
+                if (data.status !== 'success') {
+                    alert('Task not found');
+                    return;
+                }
+
+                const info = `Task: ${data.label}
+Service: ${data.service}
+Status: ${data.task_status}
+Created By: ${data.created_by}
+Tests: ${data.test_results}
+
+Test Results:
+- Total: ${data.test_result_count.Total || 0}
+- Succeeded: ${data.test_result_count.Succeeded || 0}
+- Failed: ${data.test_result_count.Failed || 0}`;
+                
+                alert(info);
+                
+            } catch (error) {
+                alert('Failed to preview: ' + error.message);
+            }
+        }
+
+        async function loadExistingRun(runId) {
+            showLoading(true);
+            currentRunId = runId;
+
+            try {
+                const response = await fetch(`${API_BASE}/runs/${runId}`);
+                const data = await response.json();
+                
+                if (data.status !== 'success') {
+                    // Run not analyzed yet, trigger analysis
+                    await analyzeRun();
+                    return;
+                }
+
+                currentAnalysis = data;
+                displayStoredResults(data);
+                
+            } catch (error) {
+                console.error('Error:', error);
+            }
+
+            showLoading(false);
+        }
+
+        function displayResults(data) {
+            document.getElementById('emptyState').style.display = 'none';
+            document.getElementById('statsSection').style.display = 'grid';
+            document.getElementById('resultsSection').style.display = 'block';
+
+            // Update stats
+            const counts = data.test_result_count || {};
+            document.getElementById('statTests').textContent = data.tests_analyzed || 0;
+            document.getElementById('statPassed').textContent = counts.Succeeded || 0;
+            document.getElementById('statFailed').textContent = counts.Failed || 0;
+            document.getElementById('statEvents').textContent = data.log_events_found || 0;
+
+            // Update title
+            document.getElementById('resultsTitle').textContent = 
+                `Analysis: ${data.task?.label || currentRunId}`;
+
+            // Display summary
+            displaySummary(data);
+
+            // Display tests
+            displayTests(data.summaries || []);
+
+            // Populate event type filter
+            populateEventTypes(data.event_types || {});
+
+            // Load logs
+            loadLogs();
+        }
+
+        function displayStoredResults(data) {
+            document.getElementById('emptyState').style.display = 'none';
+            document.getElementById('statsSection').style.display = 'grid';
+            document.getElementById('resultsSection').style.display = 'block';
+
+            // Calculate stats from tests
+            const tests = data.tests || [];
+            const passed = tests.filter(t => t.status === 'Succeeded').length;
+            const failed = tests.filter(t => t.status === 'Failed').length;
+
+            document.getElementById('statTests').textContent = tests.length;
+            document.getElementById('statPassed').textContent = passed;
+            document.getElementById('statFailed').textContent = failed;
+            document.getElementById('statEvents').textContent = '-';
+
+            // Update title
+            document.getElementById('resultsTitle').textContent = `Run: ${currentRunId}`;
+
+            // Display summary
+            displayStoredSummary(data);
+
+            // Display tests
+            displayTests(tests);
+
+            // Populate event type filter
+            populateEventTypes(data.event_types || {});
+
+            // Load logs
+            loadLogs();
+        }
+
+        function displaySummary(data) {
+            const task = data.task || {};
+            const errorCounts = data.error_counts || {};
+            const eventTypes = data.event_types || {};
+
+            let html = `
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <label>Run ID</label>
+                        <span style="font-family: 'JetBrains Mono', monospace;">${currentRunId}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Label</label>
+                        <span>${task.label || '-'}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Service</label>
+                        <span>${task.service || '-'}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Status</label>
+                        <span>${task.status || '-'}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Created By</label>
+                        <span>${task.created_by || '-'}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Tests Analyzed</label>
+                        <span>${data.tests_analyzed || 0}</span>
+                    </div>
+                </div>
+
+                <h4 style="margin: 20px 0 12px;">Error Distribution</h4>
+                <div class="detail-grid">
+                    ${Object.entries(errorCounts).map(([sev, count]) => `
+                        <div class="detail-item">
+                            <label>${sev}</label>
+                            <span class="${sev.toLowerCase()}">${count}</span>
+                        </div>
+                    `).join('')}
+                </div>
+
+                <h4 style="margin: 20px 0 12px;">Top Event Types</h4>
+                <div class="detail-grid">
+                    ${Object.entries(eventTypes).slice(0, 6).map(([type, count]) => `
+                        <div class="detail-item">
+                            <label>${type}</label>
+                            <span>${count}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+
+            document.getElementById('summaryContent').innerHTML = html;
+        }
+
+        function displayStoredSummary(data) {
+            const tests = data.tests || [];
+            const errorCounts = data.error_counts || {};
+            const eventTypes = data.event_types || {};
+
+            let html = `
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <label>Run ID</label>
+                        <span style="font-family: 'JetBrains Mono', monospace;">${currentRunId}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Tests</label>
+                        <span>${tests.length}</span>
+                    </div>
+                </div>
+
+                <h4 style="margin: 20px 0 12px;">Error Distribution</h4>
+                <div class="detail-grid">
+                    ${Object.entries(errorCounts).map(([sev, count]) => `
+                        <div class="detail-item">
+                            <label>${sev}</label>
+                            <span class="${sev.toLowerCase()}">${count}</span>
+                        </div>
+                    `).join('')}
+                </div>
+
+                <h4 style="margin: 20px 0 12px;">Top Event Types</h4>
+                <div class="detail-grid">
+                    ${Object.entries(eventTypes).slice(0, 6).map(([type, count]) => `
+                        <div class="detail-item">
+                            <label>${type}</label>
+                            <span>${count}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+
+            document.getElementById('summaryContent').innerHTML = html;
+        }
+
+        function displayTests(tests) {
+            const tbody = document.getElementById('testsTableBody');
+            
+            if (!tests || tests.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px;">No tests found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = tests.map((test, idx) => {
+                const testName = test.test_name || 'Unknown';
+                const shortName = testName.split('.').slice(-2).join('.');
+                const ops = `${test.successful_ops || 0}/${test.total_ops || 0}`;
+                const duration = test.duration_seconds ? `${Math.round(test.duration_seconds / 60)}m` : '-';
+                const error = test.exception_summary || '-';
+                const statusClass = (test.status || '').toLowerCase();
+
+                return `
+                    <tr class="test-row" onclick="toggleTestDetails(${idx})">
+                        <td title="${testName}">${shortName}</td>
+                        <td><span class="status-badge ${statusClass}">${test.status || '-'}</span></td>
+                        <td>${ops}</td>
+                        <td>${duration}</td>
+                        <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis;">${error.substring(0, 50)}${error.length > 50 ? '...' : ''}</td>
+                    </tr>
+                    <tr>
+                        <td colspan="5" style="padding: 0;">
+                            <div class="test-details" id="testDetails${idx}">
+                                <div class="detail-grid">
+                                    <div class="detail-item">
+                                        <label>Full Test Name</label>
+                                        <span style="font-size: 12px; word-break: break-all;">${testName}</span>
+                                    </div>
+                                    <div class="detail-item">
+                                        <label>Cluster Info</label>
+                                        <span style="font-size: 12px;">${test.cluster_info || '-'}</span>
+                                    </div>
+                                </div>
+                                ${test.exception_full ? `
+                                    <h4 style="margin: 16px 0 8px;">Exception</h4>
+                                    <pre class="stack-trace">${escapeHtml(test.exception_full)}</pre>
+                                ` : ''}
+                                ${test.cmd_executed ? `
+                                    <h4 style="margin: 16px 0 8px;">Command</h4>
+                                    <div class="cmd-display">${escapeHtml(test.cmd_executed)}</div>
+                                ` : ''}
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function toggleTestDetails(idx) {
+            const details = document.getElementById(`testDetails${idx}`);
+            details.classList.toggle('show');
+        }
+
+        async function loadLogs() {
+            if (!currentRunId) return;
+
+            const severity = document.getElementById('severityFilter').value;
+            const eventType = document.getElementById('eventTypeFilter').value;
+
+            let url = `${API_BASE}/runs/${currentRunId}/logs?limit=200`;
+            if (severity) url += `&severity=${severity}`;
+            if (eventType) url += `&event_type=${eventType}`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+
+                displayLogs(data.logs || []);
+            } catch (error) {
+                console.error('Error loading logs:', error);
+            }
+        }
+
+        function displayLogs(logs) {
+            const tbody = document.getElementById('logsTableBody');
+
+            if (!logs || logs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px;">No log events found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = logs.map(log => {
+                const sevClass = (log.severity || '').toLowerCase();
+                const shortTest = (log.test_name || '').split('.').slice(-1)[0];
+                const hasStack = log.stack_trace && log.stack_trace.length > 0;
+
+                return `
+                    <tr>
+                        <td><span class="status-badge ${sevClass}">${log.severity || '-'}</span></td>
+                        <td>${log.event_type || '-'}</td>
+                        <td>${log.log_source || '-'}</td>
+                        <td style="max-width: 400px;">
+                            <span style="display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(log.message || '-')}</span>
+                            ${hasStack ? `<span class="stack-trace-toggle" onclick="showStackTrace('${escapeHtml(log.stack_trace)}')">View Stack Trace</span>` : ''}
+                        </td>
+                        <td title="${log.test_name || ''}">${shortTest}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function populateEventTypes(eventTypes) {
+            const select = document.getElementById('eventTypeFilter');
+            const current = select.value;
+            
+            // Keep first option
+            select.innerHTML = '<option value="">All Event Types</option>';
+            
+            Object.keys(eventTypes).sort().forEach(type => {
+                const option = document.createElement('option');
+                option.value = type;
+                option.textContent = `${type} (${eventTypes[type]})`;
+                select.appendChild(option);
+            });
+
+            select.value = current;
+        }
+
+        function showTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.style.display = 'none';
+            });
+            
+            // Remove active from all buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // Show selected tab
+            document.getElementById(`${tabName}Tab`).style.display = 'block';
+            
+            // Activate button
+            event.target.classList.add('active');
+        }
+
+        async function loadPreviousRuns() {
+            try {
+                const response = await fetch(`${API_BASE}/runs`);
+                const data = await response.json();
+
+                const container = document.getElementById('previousRuns');
+                
+                if (!data.runs || data.runs.length === 0) {
+                    container.innerHTML = '<div class="empty-state" style="padding: 20px;"><p style="font-size: 13px;">No analyzed runs yet</p></div>';
+                    return;
+                }
+
+                container.innerHTML = data.runs.map(runId => `
+                    <div class="history-item" onclick="loadRun('${runId}')">
+                        <span class="history-id">${runId.substring(0, 12)}...</span>
+                        <button class="history-btn btn-secondary" onclick="event.stopPropagation(); deleteRun('${runId}')">
+                            Delete
+                        </button>
+                    </div>
+                `).join('');
+
+            } catch (error) {
+                console.error('Error loading runs:', error);
+            }
+        }
+
+        function loadRun(runId) {
+            document.getElementById('runIdInput').value = runId;
+            window.history.pushState({}, '', `?run=${runId}`);
+            loadExistingRun(runId);
+        }
+
+        async function deleteRun(runId) {
+            if (!confirm(`Delete analysis for run ${runId}?`)) return;
+
+            try {
+                await fetch(`${API_BASE}/runs/${runId}`, { method: 'DELETE' });
+                loadPreviousRuns();
+                
+                if (currentRunId === runId) {
+                    document.getElementById('statsSection').style.display = 'none';
+                    document.getElementById('resultsSection').style.display = 'none';
+                    document.getElementById('emptyState').style.display = 'block';
+                    currentRunId = null;
+                    currentAnalysis = null;
+                }
+            } catch (error) {
+                alert('Failed to delete: ' + error.message);
+            }
+        }
+
+        function showLoading(show) {
+            document.getElementById('loadingState').style.display = show ? 'block' : 'none';
+            document.getElementById('emptyState').style.display = show ? 'none' : (currentAnalysis ? 'none' : 'block');
+            document.getElementById('statsSection').style.display = show ? 'none' : (currentAnalysis ? 'grid' : 'none');
+            document.getElementById('resultsSection').style.display = show ? 'none' : (currentAnalysis ? 'block' : 'none');
+            document.getElementById('analyzeBtn').disabled = show;
+        }
+
+        function showStackTrace(content) {
+            document.getElementById('modalContent').textContent = content;
+            document.getElementById('stackTraceModal').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('stackTraceModal').style.display = 'none';
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Close modal on escape
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeModal();
+        });
+
+        // Close modal on outside click
+        document.getElementById('stackTraceModal').addEventListener('click', (e) => {
+            if (e.target.id === 'stackTraceModal') closeModal();
+        });
+    </script>
+</body>
+</html>
