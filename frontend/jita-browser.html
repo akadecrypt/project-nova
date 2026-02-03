@@ -446,6 +446,48 @@
         }
 
         .toast.show { display: block; }
+
+        /* Recent Runs in Main Area */
+        .recent-runs-main {
+            margin-bottom: 24px;
+        }
+
+        .recent-runs-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #a1a1aa;
+            margin-bottom: 12px;
+        }
+
+        .recent-runs-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .recent-run-chip {
+            background: #18181b;
+            border: 1px solid #27272a;
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-family: 'JetBrains Mono', monospace;
+            color: #a1a1aa;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .recent-run-chip:hover {
+            background: #27272a;
+            border-color: #6366f1;
+            color: #e4e4e7;
+        }
+
+        .recent-run-chip.active {
+            background: #6366f1;
+            border-color: #6366f1;
+            color: white;
+        }
     </style>
 </head>
 <body>
@@ -487,6 +529,12 @@
                 <div class="input-hint">
                     Analysis runs in the background. You can continue using the app while it processes.
                 </div>
+            </div>
+
+            <!-- Recent Runs (shown in main area, especially for iframe) -->
+            <div id="recentRunsMain" class="recent-runs-main" style="display: none;">
+                <div class="recent-runs-title">Recently Analyzed</div>
+                <div id="recentRunsGrid" class="recent-runs-grid"></div>
             </div>
 
             <!-- Loading State -->
@@ -545,21 +593,33 @@
             try {
                 const res = await fetch(`${API}/runs`);
                 const data = await res.json();
-                const list = document.getElementById('recentList');
+                const sidebarList = document.getElementById('recentList');
+                const mainSection = document.getElementById('recentRunsMain');
+                const mainGrid = document.getElementById('recentRunsGrid');
                 
                 if (!data.runs?.length) {
-                    list.innerHTML = '<div style="color: #52525b; font-size: 12px;">No runs yet</div>';
+                    sidebarList.innerHTML = '<div style="color: #52525b; font-size: 12px;">No runs yet</div>';
+                    mainSection.style.display = 'none';
                     return;
                 }
 
-                list.innerHTML = data.runs.map(id => `
+                // Update sidebar
+                sidebarList.innerHTML = data.runs.map(id => `
                     <div class="run-item ${id === currentRunId ? 'active' : ''}" onclick="loadResults('${id}')">
                         ${id.slice(0,6)}...${id.slice(-4)}
                         <button class="delete" onclick="event.stopPropagation(); deleteRun('${id}')">×</button>
                     </div>
                 `).join('');
+
+                // Update main area (always show, useful when sidebar hidden in iframe)
+                mainSection.style.display = 'block';
+                mainGrid.innerHTML = data.runs.map(id => `
+                    <div class="recent-run-chip ${id === currentRunId ? 'active' : ''}" onclick="loadResults('${id}')">
+                        ${id}
+                    </div>
+                `).join('');
             } catch (e) {
-                console.error(e);
+                console.error('Error loading recent runs:', e);
             }
         }
 
@@ -673,6 +733,9 @@
         }
 
         function displayResults(tests) {
+            // Hide recent runs section when showing results
+            document.getElementById('recentRunsMain').style.display = 'none';
+            
             const failed = tests.filter(t => t.status !== 'Succeeded');
             const passed = tests.filter(t => t.status === 'Succeeded');
             
