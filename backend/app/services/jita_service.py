@@ -471,59 +471,237 @@ class JitaService:
         }
     
     def _extract_timeline_phases(self, result_id: str, result: Dict) -> List[Dict]:
-        """Extract timeline phases from time_breakup in test result."""
+        """Extract detailed timeline phases from test result and nutest logs."""
         phases = []
         test_info = result.get('test', {})
         test_name = test_info.get('name', 'Unknown')
         time_breakup = result.get('time_breakup', {})
         
-        # Define phase order and display names
-        phase_config = [
-            ('test_scheduling', 'Scheduling', 1),
-            ('pre_run_plugin', 'Pre-Run Plugin', 2),
-            ('test_execution', 'Test Execution', 3),
-            ('post_run_plugin', 'Post-Run Plugin', 4),
-        ]
-        
-        # Get log URLs for each phase
+        # Get log URLs
         plugin_logs = result.get('plugin_log_url', {})
+        test_log_url = result.get('test_log_url', '')
+        scheduler_log_url = result.get('scheduler_logs', '')
         
-        for phase_key, phase_name, order in phase_config:
-            phase_data = time_breakup.get(phase_key, {})
-            if not phase_data:
-                continue
+        # Overall test status
+        overall_status = result.get('status', 'Unknown')
+        error_stage = result.get('error_stage', '')
+        
+        # Try to fetch detailed timeline from nutest log
+        nutest_timeline = self._fetch_nutest_timeline(result_id, result)
+        
+        if nutest_timeline:
+            # Use detailed timeline from nutest
+            phases = self._build_detailed_timeline(
+                result_id, test_name, nutest_timeline, 
+                overall_status, error_stage, test_log_url
+            )
+        else:
+            # Fallback to time_breakup from JITA API
+            phase_config = [
+                ('test_scheduling', 'Scheduling', 1, scheduler_log_url),
+                ('pre_run_plugin', 'Pre-Run Plugin', 2, plugin_logs.get('pre_run', '')),
+                ('test_execution', 'Test Execution', 3, test_log_url),
+                ('post_run_plugin', 'Post-Run Plugin', 4, plugin_logs.get('post_run', '')),
+            ]
             
-            start_ms = phase_data.get('start_time', {}).get('$date', 0)
-            end_ms = phase_data.get('end_time', {}).get('$date', 0)
+            for phase_key, phase_name, order, log_url in phase_config:
+                phase_data = time_breakup.get(phase_key, {})
+                if not phase_data:
+                    continue
+                
+                start_ms = phase_data.get('start_time', {}).get('$date', 0)
+                end_ms = phase_data.get('end_time', {}).get('$date', 0)
+                
+                status = overall_status if phase_key == 'test_execution' else 'Completed'
+                
+                phases.append({
+                    'test_result_id': result_id,
+                    'test_name': test_name,
+                    'phase_name': phase_name,
+                    'phase_order': order,
+                    'start_time': start_ms // 1000 if start_ms else 0,
+                    'end_time': end_ms // 1000 if end_ms else 0,
+                    'duration_seconds': (end_ms - start_ms) // 1000 if start_ms and end_ms else 0,
+                    'status': status,
+                    'log_url': log_url
+                })
+        
+        return phases
+    
+    def _fetch_nutest_timeline(self, result_id: str, result: Dict) -> Optional[Dict]:
+        """Fetch detailed timeline from nutest test log."""
+        try:
+            test_log_url = result.get('test_log_url', '')
+            if not test_log_url:
+                return None
             
-            # Determine log URL for this phase
-            log_url = ''
-            if phase_key == 'pre_run_plugin':
-                log_url = plugin_logs.get('pre_run', '')
-            elif phase_key == 'post_run_plugin':
-                log_url = plugin_logs.get('post_run', '')
-            elif phase_key == 'test_execution':
-                log_url = result.get('test_log_url', '')
-            elif phase_key == 'test_scheduling':
-                log_url = result.get('scheduler_logs', '')
+            # Resolve to direct URL
+            direct_url = self._resolve_jita_log_url(test_log_url)
+            if not direct_url:
+                return None
             
-            # Determine status based on overall result
-            status = result.get('status', 'Unknown')
-            if phase_key != 'test_execution':
-                # For non-execution phases, assume success unless overall failed
-                status = 'Succeeded' if status == 'Succeeded' else 'Completed'
+            # Fetch first part of log to find timeline JSON
+            response = requests.get(direct_url, timeout=30, stream=True)
+            if response.status_code != 200:
+                return None
+            
+            # Read first 50KB to find timeline
+            content = ''
+            for chunk in response.iter_content(chunk_size=1024, decode_unicode=True):
+                if chunk:
+                    content += chunk
+                    if len(content) > 50000:
+                        break
+            
+            # Look for timeline JSON in the log
+            import json
+            timeline_match = re.search(r'"timeline":\s*(\{[^}]+(?:\{[^}]+\}[^}]*)*\})', content)
+            if timeline_match:
+                try:
+                    timeline_str = timeline_match.group(1)
+                    # Fix JSON (nutest uses single quotes sometimes)
+                    timeline_str = timeline_str.replace("'", '"')
+                    timeline = json.loads(timeline_str)
+                    logger.info(f"Found nutest timeline with {len(timeline)} phases")
+                    return timeline
+                except:
+                    pass
+            
+            return None
+            
+        except Exception as e:
+            logger.warning(f"Error fetching nutest timeline: {e}")
+            return None
+    
+    def _build_detailed_timeline(
+        self, 
+        result_id: str, 
+        test_name: str, 
+        timeline: Dict, 
+        overall_status: str,
+        error_stage: str,
+        test_log_url: str
+    ) -> List[Dict]:
+        """Build detailed phases from nutest timeline."""
+        phases = []
+        order = 1
+        
+        # Define display names and order for nutest phases
+        phase_display = {
+            'class_resource_object_creation': 'Resource Creation',
+            'class_prerun': 'Class Pre-Run',
+            'class_setup': 'Class Setup',
+            'test_resource_object_creation': 'Test Resource Creation',
+            'setup': 'Test Setup',
+            'test_body': 'Test Body',
+            'teardown': 'Test Teardown',
+            'test_post_run': 'Test Post-Run',
+            'log_normalization': 'Log Normalization',
+        }
+        
+        # Sub-phase display names
+        sub_phase_display = {
+            'update_start_time': 'Update Start Time',
+            'check_esxi_license': 'Check ESXi License',
+            'allow_unencrypted_login_for_hyperv': 'HyperV Login Config',
+            'copy_yum_repos': 'Copy YUM Repos',
+            'update_end_time': 'Update End Time',
+            'log_analyser': 'Log Analysis',
+            'log_collection': 'Log Collection',
+            'scatter_logs': 'Scatter Logs',
+        }
+        
+        def add_phase(name: str, data: Dict, parent: str = None):
+            nonlocal order
+            
+            if not isinstance(data, dict):
+                return
+            
+            start = data.get('start_time', 0)
+            end = data.get('end_time', 0)
+            duration = data.get('time_diff', 0)
+            
+            # Handle float timestamps (convert to int)
+            if isinstance(start, float):
+                start = int(start)
+            if isinstance(end, float):
+                end = int(end)
+            if isinstance(duration, float):
+                duration = int(duration)
+            
+            # Skip if no valid times
+            if not start and not end:
+                return
+            
+            # Determine display name
+            display_name = phase_display.get(name) or sub_phase_display.get(name) or name.replace('_', ' ').title()
+            if parent:
+                display_name = f"  → {display_name}"  # Indent sub-phases
+            
+            # Determine status
+            status = 'Completed'
+            if error_stage and name.lower().replace('_', '') in error_stage.lower().replace('_', ''):
+                status = 'Failed'
+            elif name == 'test_body' and overall_status == 'Failed':
+                status = 'Failed'
             
             phases.append({
                 'test_result_id': result_id,
                 'test_name': test_name,
-                'phase_name': phase_name,
+                'phase_name': display_name,
                 'phase_order': order,
-                'start_time': start_ms // 1000 if start_ms else 0,
-                'end_time': end_ms // 1000 if end_ms else 0,
-                'duration_seconds': (end_ms - start_ms) // 1000 if start_ms and end_ms else 0,
+                'start_time': start,
+                'end_time': end,
+                'duration_seconds': duration,
                 'status': status,
-                'log_url': log_url
+                'log_url': test_log_url if name == 'test_body' else ''
             })
+            order += 1
+        
+        # Process phases in order
+        phase_order = [
+            'class_resource_object_creation',
+            'class_prerun',
+            'class_setup', 
+            'test_resource_object_creation',
+            'setup',
+            'teardown',
+            'test_post_run',
+        ]
+        
+        for phase_key in phase_order:
+            if phase_key in timeline:
+                phase_data = timeline[phase_key]
+                add_phase(phase_key, phase_data)
+                
+                # Check for sub-phases
+                for sub_key, sub_data in phase_data.items():
+                    if isinstance(sub_data, dict) and 'start_time' in sub_data:
+                        add_phase(sub_key, sub_data, parent=phase_key)
+        
+        # Add test body phase (inferred from setup end to teardown start)
+        if 'setup' in timeline and 'teardown' in timeline:
+            setup_end = timeline['setup'].get('end_time', 0)
+            teardown_start = timeline['teardown'].get('start_time', 0)
+            if setup_end and teardown_start:
+                phases.append({
+                    'test_result_id': result_id,
+                    'test_name': test_name,
+                    'phase_name': 'Test Body (Execution)',
+                    'phase_order': 5,  # After setup
+                    'start_time': int(setup_end) if isinstance(setup_end, float) else setup_end,
+                    'end_time': int(teardown_start) if isinstance(teardown_start, float) else teardown_start,
+                    'duration_seconds': int(teardown_start - setup_end) if teardown_start > setup_end else 0,
+                    'status': 'Failed' if overall_status == 'Failed' else 'Completed',
+                    'log_url': test_log_url
+                })
+        
+        # Sort by phase_order
+        phases.sort(key=lambda p: p['phase_order'])
+        
+        # Re-number
+        for i, p in enumerate(phases):
+            p['phase_order'] = i + 1
         
         return phases
     
