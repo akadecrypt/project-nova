@@ -30,14 +30,22 @@ class JitaService:
     JITA_BASE_URL = "https://jita.eng.nutanix.com/api/v2"
     AUTH = ("agave_bot", "admin")
     
-    # Log source types
-    LOG_SOURCES = {
-        'scheduler': 'scheduler_logs',
-        'driver': 'tester_log_url',
-        'test': 'test_log_url',
-        'plugin_pre': 'plugin_log_url.pre_run',
-        'plugin_post': 'plugin_log_url.post_run',
-    }
+    # Direct log server URL (contains actual log files)
+    LOG_SERVER_URL = "http://10.46.1.200/logs"
+    
+    # Key log files to analyze (in priority order)
+    KEY_LOG_FILES = [
+        'nutest_test.log',           # Main test log
+        'steps.log',                  # Test steps
+        'nutest_class.log',          # Class-level log
+        'log_normalization.log',     # Normalized logs
+    ]
+    
+    # Failure log patterns
+    FAILURE_LOG_PATTERNS = [
+        r'.*_failure_.*\.log',       # Failure logs
+        r'.*Error.*\.log',           # Error logs
+    ]
     
     def __init__(self):
         self.session = requests.Session()
@@ -177,7 +185,8 @@ class JitaService:
             exception_full TEXT,
             duration_seconds INTEGER,
             cluster_info TEXT,
-            cmd_executed TEXT
+            cmd_executed TEXT,
+            log_url TEXT
         )
         """
         execute_sql(create_summary_sql)
@@ -302,6 +311,9 @@ class JitaService:
             for r in resources
         ])
         
+        # Build direct log URL
+        log_url = self._build_direct_log_url(result_id, result) or ''
+        
         return {
             'test_result_id': result_id,
             'test_name': test_info.get('name', 'Unknown'),
@@ -312,7 +324,8 @@ class JitaService:
             'exception_full': result.get('exception', '')[:2000] if result.get('exception') else '',
             'duration_seconds': duration,
             'cluster_info': cluster_info,
-            'cmd_executed': result.get('cmd_executed', '')
+            'cmd_executed': result.get('cmd_executed', ''),
+            'log_url': log_url
         }
     
     def _extract_events_from_result(self, result_id: str, result: Dict) -> List[Dict]:
@@ -362,38 +375,226 @@ class JitaService:
         return events
     
     def _fetch_and_parse_logs(self, result_id: str, result: Dict) -> List[Dict]:
-        """Fetch logs from JITA and parse for errors."""
+        """Fetch logs from direct log server and parse for errors."""
         events = []
         test_info = result.get('test', {})
         test_name = test_info.get('name', 'Unknown')
         
-        # Collect all log URLs
-        log_urls = {
-            'scheduler': result.get('scheduler_logs'),
-            'driver': result.get('tester_log_url'),
-            'test': result.get('test_log_url'),
-        }
+        # Build direct log URL
+        log_base_url = self._build_direct_log_url(result_id, result)
         
-        # Plugin logs
-        plugin_logs = result.get('plugin_log_url', {})
-        if isinstance(plugin_logs, dict):
-            log_urls['plugin_pre'] = plugin_logs.get('pre_run')
-            log_urls['plugin_post'] = plugin_logs.get('post_run')
-        
-        # Fetch and parse each log
-        for source, url in log_urls.items():
-            if not url:
-                continue
-            
-            content = self.fetch_log_content(url)
-            if not content:
-                continue
-            
-            # Parse log content for errors
-            parsed_events = self._parse_log_content(
-                content, source, result_id, test_name
+        if log_base_url:
+            # Fetch and parse logs from direct server
+            direct_events = self._fetch_logs_from_server(
+                log_base_url, result_id, test_name
             )
-            events.extend(parsed_events)
+            events.extend(direct_events)
+        
+        # Fallback: Try JITA API URLs (usually empty but worth trying)
+        if not events:
+            log_urls = {
+                'scheduler': result.get('scheduler_logs'),
+                'driver': result.get('tester_log_url'),
+            }
+            
+            for source, url in log_urls.items():
+                if not url:
+                    continue
+                
+                content = self.fetch_log_content(url)
+                if not content:
+                    continue
+                
+                parsed_events = self._parse_log_content(
+                    content, source, result_id, test_name
+                )
+                events.extend(parsed_events)
+        
+        return events
+    
+    def _build_direct_log_url(self, result_id: str, result: Dict) -> Optional[str]:
+        """
+        Build direct log server URL from test result metadata.
+        
+        URL structure: http://10.46.1.200/logs/{task_id}/{run_id}/{test_result_id}/{test_path}/
+        """
+        try:
+            # Get task_id from agave_task_id
+            task_ref = result.get('agave_task_id', {})
+            if isinstance(task_ref, dict):
+                task_id = task_ref.get('$oid', '')
+            else:
+                task_id = str(task_ref) if task_ref else ''
+            
+            # Get run_id
+            run_id = result.get('run_id', '')
+            
+            if not task_id or not run_id:
+                logger.warning(f"Missing task_id or run_id for result {result_id}")
+                return None
+            
+            # Parse test name to get path components
+            test_info = result.get('test', {})
+            test_name = test_info.get('name', '')
+            
+            if not test_name:
+                return None
+            
+            # Parse test name: systest.env_setup.test_env_setup.TestEnvSetup.test_cdp___objects_1PE
+            parts = test_name.split('.')
+            if len(parts) < 4:
+                return None
+            
+            # Module path (all parts except last two: class and method)
+            module_parts = parts[:-2]
+            test_class = parts[-2]
+            test_method = parts[-1]
+            
+            # Convert module path to directory path
+            module_path = '/'.join(module_parts)
+            
+            # Build URL
+            url = f"{self.LOG_SERVER_URL}/{task_id}/{run_id}/{result_id}/{module_path}/{test_class}/{test_method}/"
+            
+            logger.info(f"Built direct log URL: {url}")
+            return url
+            
+        except Exception as e:
+            logger.warning(f"Error building direct log URL: {e}")
+            return None
+    
+    def _fetch_logs_from_server(
+        self, 
+        base_url: str, 
+        result_id: str, 
+        test_name: str
+    ) -> List[Dict]:
+        """Fetch and parse logs from direct log server."""
+        events = []
+        
+        try:
+            # Get directory listing
+            response = requests.get(base_url, timeout=30)
+            if response.status_code != 200:
+                logger.warning(f"Failed to fetch log directory: {response.status_code}")
+                return events
+            
+            # Parse directory listing for log files
+            log_files = self._parse_directory_listing(response.text)
+            logger.info(f"Found {len(log_files)} files in log directory")
+            
+            # Fetch key log files
+            for log_file in log_files:
+                # Check if it's a key log file or failure log
+                is_key_log = log_file in self.KEY_LOG_FILES
+                is_failure_log = any(
+                    re.match(pattern, log_file) 
+                    for pattern in self.FAILURE_LOG_PATTERNS
+                )
+                
+                if is_key_log or is_failure_log:
+                    log_url = f"{base_url}{log_file}"
+                    source = log_file.replace('.log', '')
+                    
+                    content = self._fetch_log_file(log_url)
+                    if content:
+                        parsed_events = self._parse_log_content(
+                            content, source, result_id, test_name
+                        )
+                        events.extend(parsed_events)
+                        logger.info(f"Parsed {len(parsed_events)} events from {log_file}")
+            
+            # Also check for logbay directories
+            logbay_dirs = [f for f in log_files if f.startswith('logbay_') and f.endswith('/')]
+            for logbay_dir in logbay_dirs[:2]:  # Limit to 2 logbay dirs
+                logbay_events = self._parse_logbay_directory(
+                    f"{base_url}{logbay_dir}", result_id, test_name
+                )
+                events.extend(logbay_events)
+            
+        except Exception as e:
+            logger.error(f"Error fetching logs from server: {e}")
+        
+        return events
+    
+    def _parse_directory_listing(self, html: str) -> List[str]:
+        """Parse Apache directory listing HTML to extract file names."""
+        files = []
+        # Match href="filename" in directory listing
+        pattern = r'href="([^"?]+)"'
+        matches = re.findall(pattern, html)
+        
+        for match in matches:
+            # Skip parent directory and icon links
+            if match.startswith('/') or match.startswith('?'):
+                continue
+            files.append(match)
+        
+        return files
+    
+    def _fetch_log_file(self, url: str, max_size: int = 10 * 1024 * 1024) -> str:
+        """Fetch a log file with size limit."""
+        try:
+            # Stream to check size first
+            response = requests.get(url, timeout=60, stream=True)
+            if response.status_code != 200:
+                return ""
+            
+            # Check content length
+            content_length = response.headers.get('Content-Length')
+            if content_length and int(content_length) > max_size:
+                logger.warning(f"Log file too large ({content_length} bytes), fetching partial")
+                # Fetch only the last portion for large files
+                return self._fetch_log_tail(url, max_size // 2)
+            
+            return response.text
+            
+        except Exception as e:
+            logger.warning(f"Error fetching log file {url}: {e}")
+            return ""
+    
+    def _fetch_log_tail(self, url: str, size: int) -> str:
+        """Fetch the tail of a large log file."""
+        try:
+            # Use Range header to get last N bytes
+            headers = {'Range': f'bytes=-{size}'}
+            response = requests.get(url, headers=headers, timeout=60)
+            return response.text
+        except:
+            return ""
+    
+    def _parse_logbay_directory(
+        self, 
+        logbay_url: str, 
+        result_id: str, 
+        test_name: str
+    ) -> List[Dict]:
+        """Parse logbay directory for error logs."""
+        events = []
+        
+        try:
+            # Get logbay directory listing
+            response = requests.get(logbay_url, timeout=30)
+            if response.status_code != 200:
+                return events
+            
+            files = self._parse_directory_listing(response.text)
+            
+            # Look for error-related files in logbay
+            error_patterns = ['ERROR', 'FATAL', 'crash', 'core', 'panic']
+            
+            for f in files:
+                if any(p.lower() in f.lower() for p in error_patterns):
+                    if f.endswith('.log') or f.endswith('.txt'):
+                        content = self._fetch_log_file(f"{logbay_url}{f}", max_size=5*1024*1024)
+                        if content:
+                            parsed = self._parse_log_content(
+                                content, f'logbay_{f}', result_id, test_name
+                            )
+                            events.extend(parsed)
+            
+        except Exception as e:
+            logger.warning(f"Error parsing logbay directory: {e}")
         
         return events
     
@@ -576,7 +777,7 @@ class JitaService:
             sql = f"""
                 INSERT OR REPLACE INTO {table} 
                 (test_result_id, test_name, status, total_ops, successful_ops, 
-                 exception_summary, exception_full, duration_seconds, cluster_info, cmd_executed)
+                 exception_summary, exception_full, duration_seconds, cluster_info, cmd_executed, log_url)
                 VALUES (
                     '{escape(summary["test_result_id"])}',
                     '{escape(summary["test_name"])}',
@@ -587,7 +788,8 @@ class JitaService:
                     '{escape(summary["exception_full"])}',
                     {summary["duration_seconds"]},
                     '{escape(summary["cluster_info"])}',
-                    '{escape(summary["cmd_executed"])}'
+                    '{escape(summary["cmd_executed"])}',
+                    '{escape(summary.get("log_url", ""))}'
                 )
             """
             execute_sql(sql)
