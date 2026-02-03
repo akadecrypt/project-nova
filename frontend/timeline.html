@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Timeline - NOVA</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0a0a0f;
+            color: #e4e4e7;
+            min-height: 100vh;
+            padding: 24px;
+        }
+
+        .container { max-width: 1200px; margin: 0 auto; }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 24px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #27272a;
+        }
+
+        .header h1 { font-size: 20px; font-weight: 600; margin-bottom: 6px; }
+        .header-meta { font-size: 13px; color: #71717a; }
+        
+        .header-actions { display: flex; gap: 10px; }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s;
+            text-decoration: none;
+        }
+        .btn-primary { background: #6366f1; color: white; }
+        .btn-primary:hover { background: #4f46e5; }
+        .btn-secondary { background: #27272a; color: #e4e4e7; }
+        .btn-secondary:hover { background: #3f3f46; }
+
+        /* Timeline */
+        .timeline {
+            position: relative;
+            padding-left: 40px;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 15px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: linear-gradient(to bottom, #6366f1, #27272a);
+        }
+
+        .phase {
+            position: relative;
+            margin-bottom: 24px;
+        }
+
+        .phase-marker {
+            position: absolute;
+            left: -40px;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #111116;
+            border: 2px solid #27272a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .phase.succeeded .phase-marker { border-color: #22c55e; color: #22c55e; }
+        .phase.failed .phase-marker { border-color: #ef4444; color: #ef4444; }
+        .phase.running .phase-marker { border-color: #f59e0b; color: #f59e0b; animation: pulse 2s infinite; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .phase-content {
+            background: #111116;
+            border: 1px solid #27272a;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .phase.has-errors .phase-content { border-left: 3px solid #ef4444; }
+        .phase.has-warnings .phase-content { border-left: 3px solid #f59e0b; }
+
+        .phase-header {
+            padding: 14px 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .phase-header:hover { background: #18181b; }
+
+        .phase-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .phase-name { font-weight: 600; font-size: 14px; }
+        .phase-duration { font-size: 12px; color: #71717a; }
+
+        .phase-stats {
+            display: flex;
+            gap: 16px;
+            font-size: 12px;
+        }
+
+        .stat { display: flex; align-items: center; gap: 4px; }
+        .stat.errors { color: #ef4444; }
+        .stat.warnings { color: #f59e0b; }
+        .stat.logs { color: #6366f1; }
+
+        .phase-chevron {
+            color: #52525b;
+            transition: transform 0.2s;
+        }
+
+        .phase.expanded .phase-chevron { transform: rotate(180deg); }
+
+        .phase-body {
+            display: none;
+            border-top: 1px solid #27272a;
+            padding: 16px;
+            background: #0a0a0f;
+        }
+
+        .phase.expanded .phase-body { display: block; }
+
+        /* Log Entry */
+        .log-entry {
+            background: #111116;
+            border: 1px solid #1f1f23;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            overflow: hidden;
+        }
+
+        .log-entry.error { border-left: 3px solid #ef4444; }
+        .log-entry.warn { border-left: 3px solid #f59e0b; }
+
+        .log-header {
+            padding: 10px 14px;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            cursor: pointer;
+        }
+
+        .log-header:hover { background: #18181b; }
+
+        .log-severity {
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            flex-shrink: 0;
+        }
+
+        .log-severity.error { background: #450a0a; color: #fca5a5; }
+        .log-severity.warn { background: #451a03; color: #fcd34d; }
+
+        .log-info { flex: 1; min-width: 0; }
+        .log-message {
+            font-size: 12px;
+            font-family: 'JetBrains Mono', monospace;
+            color: #a1a1aa;
+            word-break: break-word;
+        }
+
+        .log-meta {
+            display: flex;
+            gap: 12px;
+            margin-top: 6px;
+            font-size: 11px;
+            color: #52525b;
+        }
+
+        .log-details {
+            display: none;
+            padding: 12px 14px;
+            border-top: 1px solid #1f1f23;
+            background: #050507;
+        }
+
+        .log-entry.expanded .log-details { display: block; }
+
+        .stack-trace {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            color: #71717a;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .stack-trace .hl { color: #fca5a5; }
+
+        /* Empty State */
+        .empty-logs {
+            padding: 30px;
+            text-align: center;
+            color: #52525b;
+            font-size: 13px;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 60px;
+        }
+
+        .spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid #27272a;
+            border-top-color: #6366f1;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 12px;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* View Log Link */
+        .view-log-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            color: #6366f1;
+            text-decoration: none;
+            margin-top: 8px;
+        }
+
+        .view-log-link:hover { text-decoration: underline; }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #27272a;
+            color: #e4e4e7;
+            padding: 10px 18px;
+            border-radius: 8px;
+            display: none;
+            z-index: 100;
+            font-size: 13px;
+        }
+
+        .toast.show { display: block; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <h1 id="pageTitle">Test Timeline</h1>
+                <div class="header-meta" id="testMeta"></div>
+            </div>
+            <div class="header-actions">
+                <a href="#" id="jitaLink" target="_blank" class="btn btn-primary">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
+                        <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                    </svg>
+                    View in JITA
+                </a>
+                <a href="#" id="backLink" class="btn btn-secondary">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 12H5M12 19l-7-7 7-7"/>
+                    </svg>
+                    Back
+                </a>
+            </div>
+        </div>
+
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <div>Loading timeline...</div>
+        </div>
+
+        <div id="timeline" class="timeline" style="display: none;"></div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+        const API = `http://${window.location.hostname}:9360/api/jita`;
+        const params = new URLSearchParams(window.location.search);
+        const runId = params.get('run');
+        const testId = params.get('test');
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!runId) {
+                document.body.innerHTML = '<div style="padding: 40px; text-align: center;">Missing run ID</div>';
+                return;
+            }
+            document.getElementById('backLink').href = `jita-browser.html?run=${runId}`;
+            loadTimeline();
+        });
+
+        async function loadTimeline() {
+            try {
+                let url = `${API}/runs/${runId}/timeline`;
+                if (testId) {
+                    url += `?test_result_id=${testId}`;
+                }
+
+                const res = await fetch(url);
+                const data = await res.json();
+
+                if (data.status !== 'success') {
+                    throw new Error(data.error || 'Failed to load timeline');
+                }
+
+                // Also get test info
+                const summaryRes = await fetch(`${API}/runs/${runId}/summary`);
+                const summaryData = await summaryRes.json();
+                
+                let testInfo = null;
+                if (testId && summaryData.tests) {
+                    testInfo = summaryData.tests.find(t => t.test_result_id === testId);
+                }
+
+                displayTimeline(data, testInfo);
+
+            } catch (e) {
+                console.error(e);
+                showToast('Error: ' + e.message);
+            }
+        }
+
+        function displayTimeline(data, testInfo) {
+            document.getElementById('loading').style.display = 'none';
+            
+            // Update header
+            if (testInfo) {
+                const shortName = testInfo.test_name.split('.').slice(-2).join('.');
+                document.getElementById('pageTitle').textContent = shortName;
+                document.getElementById('testMeta').textContent = 
+                    `${testInfo.status} • ${formatDuration(testInfo.duration_seconds)} • Run: ${runId.slice(0,8)}...`;
+                
+                if (testInfo.log_url) {
+                    document.getElementById('jitaLink').href = testInfo.log_url;
+                }
+            } else {
+                document.getElementById('pageTitle').textContent = `Timeline - ${runId.slice(0,8)}...`;
+                document.getElementById('testMeta').textContent = `${data.phases?.length || 0} phases • ${data.total_logs || 0} log events`;
+            }
+
+            const container = document.getElementById('timeline');
+            const phases = data.phases || [];
+
+            if (phases.length === 0) {
+                container.innerHTML = '<div class="empty-logs">No timeline data available</div>';
+                container.style.display = 'block';
+                return;
+            }
+
+            container.innerHTML = phases.map((phase, i) => {
+                const statusClass = phase.status === 'Failed' ? 'failed' : 
+                                   phase.status === 'Running' ? 'running' : 'succeeded';
+                const hasErrors = phase.error_count > 0;
+                const hasWarnings = phase.warn_count > 0;
+                const logs = phase.logs || [];
+
+                return `
+                    <div class="phase ${statusClass} ${hasErrors ? 'has-errors' : ''} ${hasWarnings ? 'has-warnings' : ''}" id="phase-${i}">
+                        <div class="phase-marker">${i + 1}</div>
+                        <div class="phase-content">
+                            <div class="phase-header" onclick="togglePhase(${i})">
+                                <div class="phase-title">
+                                    <span class="phase-name">${phase.phase_name}</span>
+                                    <span class="phase-duration">${formatDuration(phase.duration_seconds)}</span>
+                                </div>
+                                <div class="phase-stats">
+                                    ${phase.error_count > 0 ? `<span class="stat errors">${phase.error_count} errors</span>` : ''}
+                                    ${phase.warn_count > 0 ? `<span class="stat warnings">${phase.warn_count} warnings</span>` : ''}
+                                    <span class="stat logs">${logs.length} logs</span>
+                                    <svg class="phase-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="6 9 12 15 18 9"/>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div class="phase-body">
+                                ${logs.length > 0 ? logs.map((log, j) => renderLog(log, i, j)).join('') : 
+                                    '<div class="empty-logs">No log events in this phase</div>'}
+                                ${phase.log_url ? `
+                                    <a href="${resolveLogUrl(phase.log_url)}" target="_blank" class="view-log-link">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
+                                            <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                                        </svg>
+                                        View raw log file
+                                    </a>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            container.style.display = 'block';
+
+            // Auto-expand phase with errors
+            const errorPhaseIdx = phases.findIndex(p => p.error_count > 0);
+            if (errorPhaseIdx >= 0) {
+                togglePhase(errorPhaseIdx);
+            }
+        }
+
+        function renderLog(log, phaseIdx, logIdx) {
+            const sevClass = (log.severity || 'info').toLowerCase();
+            const hasStack = log.stack_trace && log.stack_trace.length > 10;
+
+            return `
+                <div class="log-entry ${sevClass}" id="log-${phaseIdx}-${logIdx}">
+                    <div class="log-header" onclick="toggleLog(${phaseIdx}, ${logIdx})">
+                        <span class="log-severity ${sevClass}">${log.severity || 'INFO'}</span>
+                        <div class="log-info">
+                            <div class="log-message">${escapeHtml(truncate(log.message, 200))}</div>
+                            <div class="log-meta">
+                                <span>${log.event_type || 'General'}</span>
+                                <span>${log.log_source}</span>
+                                ${log.timestamp ? `<span>${formatTime(log.timestamp)}</span>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                    ${hasStack ? `
+                        <div class="log-details">
+                            <div class="stack-trace">${formatStack(log.stack_trace)}</div>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        function togglePhase(i) {
+            document.getElementById(`phase-${i}`).classList.toggle('expanded');
+        }
+
+        function toggleLog(p, l) {
+            document.getElementById(`log-${p}-${l}`).classList.toggle('expanded');
+        }
+
+        function resolveLogUrl(url) {
+            // JITA API URLs need to be accessed directly
+            return url;
+        }
+
+        function formatDuration(s) {
+            if (!s) return '-';
+            if (s < 60) return s + 's';
+            if (s < 3600) return Math.floor(s/60) + 'm ' + (s%60) + 's';
+            return Math.floor(s/3600) + 'h ' + Math.floor((s%3600)/60) + 'm';
+        }
+
+        function formatTime(ts) {
+            if (!ts) return '';
+            const d = new Date(ts * 1000);
+            return d.toLocaleTimeString();
+        }
+
+        function formatStack(text) {
+            if (!text) return '';
+            return escapeHtml(text).split('\n').map(line => {
+                if (/Error|Exception|raise|assert|Failed/i.test(line)) {
+                    return `<span class="hl">${line}</span>`;
+                }
+                return line;
+            }).join('\n');
+        }
+
+        function truncate(s, len) {
+            if (!s) return '';
+            return s.length > len ? s.slice(0, len) + '...' : s;
+        }
+
+        function escapeHtml(s) {
+            if (!s) return '';
+            return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 3000);
+        }
+    </script>
+</body>
+</html>

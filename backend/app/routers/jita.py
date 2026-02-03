@@ -315,6 +315,38 @@ async def get_run_test_summary(run_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/runs/{run_id}/timeline")
+async def get_run_timeline(
+    run_id: str,
+    test_result_id: Optional[str] = Query(None, description="Filter by specific test result")
+):
+    """
+    Get timeline data for a run showing phases with their logs.
+    
+    Each test execution has phases: Scheduling, Pre-Run Plugin, Test Execution, Post-Run Plugin.
+    Logs are correlated with their respective phases by timestamp.
+    
+    Args:
+        run_id: JITA run ID
+        test_result_id: Optional filter for specific test
+        
+    Returns:
+        Timeline phases with associated logs and error counts
+    """
+    try:
+        service = get_jita_service()
+        result = service.get_timeline(run_id, test_result_id)
+        
+        return {
+            "status": "success",
+            **result
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting timeline for run {run_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.delete("/runs/{run_id}")
 async def delete_run_analysis(run_id: str):
     """
@@ -335,10 +367,12 @@ async def delete_run_analysis(run_id: str):
         safe_id = re.sub(r'[^a-zA-Z0-9]', '', run_id)
         logs_table = f"jita_{safe_id}_logs"
         summary_table = f"jita_{safe_id}_summary"
+        timeline_table = f"jita_{safe_id}_timeline"
         
         # Drop tables
         execute_sql(f"DROP TABLE IF EXISTS {logs_table}")
         execute_sql(f"DROP TABLE IF EXISTS {summary_table}")
+        execute_sql(f"DROP TABLE IF EXISTS {timeline_table}")
         
         logger.info(f"Deleted analysis for run {run_id}")
         

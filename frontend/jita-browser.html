@@ -980,11 +980,17 @@
                             </div>
                             
                             <div class="detail-block" style="display: flex; gap: 10px; flex-wrap: wrap;">
-                                <a href="log-details.html?run=${currentRunId}&test=${test.test_result_id}" class="log-link" style="background: #6366f1;">
+                                <a href="timeline.html?run=${currentRunId}&test=${test.test_result_id}" class="log-link" style="background: #6366f1;">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="3"/><path d="M12 3v3m0 12v3M3 12h3m12 0h3"/>
+                                    </svg>
+                                    View Timeline
+                                </a>
+                                <a href="log-details.html?run=${currentRunId}&test=${test.test_result_id}" class="log-link" style="background: #3f3f46;">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>
                                     </svg>
-                                    View Error Analysis
+                                    Error Analysis
                                 </a>
                                 ${test.log_url ? `
                                     <a href="${test.log_url}" target="_blank" class="log-link" style="background: #27272a;">

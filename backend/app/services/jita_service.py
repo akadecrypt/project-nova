@@ -88,13 +88,19 @@ class JitaService:
             summary = self._extract_test_summary(result_id, result)
             test_summaries.append(summary)
             
+            # Extract timeline phases
+            timeline_phases = self._extract_timeline_phases(result_id, result)
+            
             # Extract log events from exception/stack trace
             events = self._extract_events_from_result(result_id, result)
             all_log_events.extend(events)
             
-            # Fetch and parse logs
-            log_events = self._fetch_and_parse_logs(result_id, result)
+            # Fetch and parse logs with timeline correlation
+            log_events = self._fetch_and_parse_logs(result_id, result, timeline_phases)
             all_log_events.extend(log_events)
+            
+            # Insert timeline data
+            self._insert_timeline(run_id, timeline_phases)
         
         # 5. Insert data into SQL
         self._insert_summaries(run_id, test_summaries)
@@ -176,7 +182,8 @@ class JitaService:
             event_type TEXT,
             message TEXT,
             stack_trace TEXT,
-            line_number INTEGER
+            line_number INTEGER,
+            phase TEXT
         )
         """
         execute_sql(create_logs_sql)
@@ -214,6 +221,27 @@ class JitaService:
                 analyzed_at TEXT
             )
         """)
+        
+        # Create timeline table for this run
+        timeline_table = f"jita_{safe_id}_timeline"
+        create_timeline_sql = f"""
+        CREATE TABLE IF NOT EXISTS {timeline_table} (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            test_result_id TEXT,
+            test_name TEXT,
+            phase_name TEXT,
+            phase_order INTEGER,
+            start_time INTEGER,
+            end_time INTEGER,
+            duration_seconds INTEGER,
+            status TEXT,
+            log_url TEXT
+        )
+        """
+        execute_sql(create_timeline_sql)
+        
+        if clear_existing:
+            execute_sql(f"DELETE FROM {timeline_table}")
         
         # Clear existing data if re-analyzing (to avoid duplicates)
         if clear_existing:
@@ -330,6 +358,49 @@ class JitaService:
         result = execute_sql(sql)
         return result
     
+    def get_timeline(self, run_id: str, test_result_id: str = None) -> Dict[str, Any]:
+        """Get timeline data for a run or specific test."""
+        safe_id = re.sub(r'[^a-zA-Z0-9]', '', run_id)
+        timeline_table = f"jita_{safe_id}_timeline"
+        logs_table = f"jita_{safe_id}_logs"
+        
+        # Build query
+        if test_result_id:
+            timeline_sql = f"""
+                SELECT * FROM {timeline_table}
+                WHERE test_result_id = '{test_result_id}'
+                ORDER BY phase_order
+            """
+            logs_sql = f"""
+                SELECT * FROM {logs_table}
+                WHERE test_result_id = '{test_result_id}'
+                ORDER BY timestamp
+            """
+        else:
+            timeline_sql = f"SELECT * FROM {timeline_table} ORDER BY test_result_id, phase_order"
+            logs_sql = f"SELECT * FROM {logs_table} ORDER BY timestamp LIMIT 500"
+        
+        timeline_result = execute_sql(timeline_sql)
+        logs_result = execute_sql(logs_sql)
+        
+        # Group logs by phase
+        phases = timeline_result.get("rows", [])
+        logs = logs_result.get("rows", [])
+        
+        # Enrich phases with log counts
+        for phase in phases:
+            phase_name = phase.get('phase_name')
+            phase['error_count'] = sum(1 for l in logs if l.get('phase') == phase_name and l.get('severity') in ['ERROR', 'FATAL'])
+            phase['warn_count'] = sum(1 for l in logs if l.get('phase') == phase_name and l.get('severity') == 'WARN')
+            phase['logs'] = [l for l in logs if l.get('phase') == phase_name]
+        
+        return {
+            "run_id": run_id,
+            "test_result_id": test_result_id,
+            "phases": phases,
+            "total_logs": len(logs)
+        }
+    
     def list_analyzed_runs(self) -> List[str]:
         """List all analyzed JITA runs (by finding jita_*_summary tables)."""
         result = execute_sql(
@@ -398,6 +469,94 @@ class JitaService:
             'log_url': log_url
         }
     
+    def _extract_timeline_phases(self, result_id: str, result: Dict) -> List[Dict]:
+        """Extract timeline phases from time_breakup in test result."""
+        phases = []
+        test_info = result.get('test', {})
+        test_name = test_info.get('name', 'Unknown')
+        time_breakup = result.get('time_breakup', {})
+        
+        # Define phase order and display names
+        phase_config = [
+            ('test_scheduling', 'Scheduling', 1),
+            ('pre_run_plugin', 'Pre-Run Plugin', 2),
+            ('test_execution', 'Test Execution', 3),
+            ('post_run_plugin', 'Post-Run Plugin', 4),
+        ]
+        
+        # Get log URLs for each phase
+        plugin_logs = result.get('plugin_log_url', {})
+        
+        for phase_key, phase_name, order in phase_config:
+            phase_data = time_breakup.get(phase_key, {})
+            if not phase_data:
+                continue
+            
+            start_ms = phase_data.get('start_time', {}).get('$date', 0)
+            end_ms = phase_data.get('end_time', {}).get('$date', 0)
+            
+            # Determine log URL for this phase
+            log_url = ''
+            if phase_key == 'pre_run_plugin':
+                log_url = plugin_logs.get('pre_run', '')
+            elif phase_key == 'post_run_plugin':
+                log_url = plugin_logs.get('post_run', '')
+            elif phase_key == 'test_execution':
+                log_url = result.get('test_log_url', '')
+            elif phase_key == 'test_scheduling':
+                log_url = result.get('scheduler_logs', '')
+            
+            # Determine status based on overall result
+            status = result.get('status', 'Unknown')
+            if phase_key != 'test_execution':
+                # For non-execution phases, assume success unless overall failed
+                status = 'Succeeded' if status == 'Succeeded' else 'Completed'
+            
+            phases.append({
+                'test_result_id': result_id,
+                'test_name': test_name,
+                'phase_name': phase_name,
+                'phase_order': order,
+                'start_time': start_ms // 1000 if start_ms else 0,
+                'end_time': end_ms // 1000 if end_ms else 0,
+                'duration_seconds': (end_ms - start_ms) // 1000 if start_ms and end_ms else 0,
+                'status': status,
+                'log_url': log_url
+            })
+        
+        return phases
+    
+    def _insert_timeline(self, run_id: str, phases: List[Dict]):
+        """Insert timeline phases into SQL."""
+        if not phases:
+            return
+        
+        safe_id = re.sub(r'[^a-zA-Z0-9]', '', run_id)
+        table = f"jita_{safe_id}_timeline"
+        
+        for phase in phases:
+            def escape(val):
+                if isinstance(val, str):
+                    return val.replace("'", "''")
+                return val or ''
+            
+            sql = f"""
+                INSERT INTO {table} 
+                (test_result_id, test_name, phase_name, phase_order, start_time, end_time, duration_seconds, status, log_url)
+                VALUES (
+                    '{phase['test_result_id']}',
+                    '{escape(phase['test_name'])}',
+                    '{escape(phase['phase_name'])}',
+                    {phase['phase_order']},
+                    {phase['start_time']},
+                    {phase['end_time']},
+                    {phase['duration_seconds']},
+                    '{escape(phase['status'])}',
+                    '{escape(phase['log_url'])}'
+                )
+            """
+            execute_sql(sql)
+    
     def _extract_events_from_result(self, result_id: str, result: Dict) -> List[Dict]:
         """Extract log events from test result metadata (exception, stack trace)."""
         events = []
@@ -444,7 +603,7 @@ class JitaService:
         
         return events
     
-    def _fetch_and_parse_logs(self, result_id: str, result: Dict) -> List[Dict]:
+    def _fetch_and_parse_logs(self, result_id: str, result: Dict, timeline_phases: List[Dict] = None) -> List[Dict]:
         """Fetch logs from direct log server and parse for errors."""
         events = []
         test_info = result.get('test', {})
@@ -458,6 +617,9 @@ class JitaService:
             direct_events = self._fetch_logs_from_server(
                 log_base_url, result_id, test_name
             )
+            # Correlate with timeline phases
+            if timeline_phases:
+                direct_events = self._correlate_events_with_phases(direct_events, timeline_phases)
             events.extend(direct_events)
         
         # Also fetch scheduler logs if available
@@ -470,6 +632,9 @@ class JitaService:
                     parsed_events = self._parse_log_content(
                         content, 'scheduler', result_id, test_name
                     )
+                    # Tag as Scheduling phase
+                    for e in parsed_events:
+                        e['phase'] = 'Scheduling'
                     events.extend(parsed_events)
                     logger.info(f"Parsed {len(parsed_events)} events from scheduler log")
         
@@ -483,8 +648,45 @@ class JitaService:
                     parsed_events = self._parse_log_content(
                         content, 'driver', result_id, test_name
                     )
+                    # Tag as Test Execution phase
+                    for e in parsed_events:
+                        e['phase'] = 'Test Execution'
                     events.extend(parsed_events)
                     logger.info(f"Parsed {len(parsed_events)} events from driver log")
+        
+        # Fetch plugin logs
+        plugin_logs = result.get('plugin_log_url', {})
+        for plugin_type, plugin_url in plugin_logs.items():
+            if plugin_url:
+                direct_plugin_url = self._resolve_jita_log_url(plugin_url)
+                if direct_plugin_url:
+                    content = self._fetch_log_file(direct_plugin_url)
+                    if content:
+                        phase_name = 'Pre-Run Plugin' if 'pre' in plugin_type else 'Post-Run Plugin'
+                        parsed_events = self._parse_log_content(
+                            content, f'plugin_{plugin_type}', result_id, test_name
+                        )
+                        for e in parsed_events:
+                            e['phase'] = phase_name
+                        events.extend(parsed_events)
+                        logger.info(f"Parsed {len(parsed_events)} events from {plugin_type} plugin log")
+        
+        return events
+    
+    def _correlate_events_with_phases(self, events: List[Dict], phases: List[Dict]) -> List[Dict]:
+        """Correlate log events with timeline phases based on timestamp."""
+        for event in events:
+            event_ts = event.get('timestamp', 0)
+            event['phase'] = 'Unknown'
+            
+            for phase in sorted(phases, key=lambda p: p['phase_order']):
+                if phase['start_time'] <= event_ts <= phase['end_time']:
+                    event['phase'] = phase['phase_name']
+                    break
+            
+            # Default to Test Execution if no match
+            if event['phase'] == 'Unknown':
+                event['phase'] = 'Test Execution'
         
         return events
     
@@ -949,7 +1151,7 @@ class JitaService:
             sql = f"""
                 INSERT INTO {table}
                 (test_result_id, test_name, log_source, timestamp, severity, 
-                 event_type, message, stack_trace, line_number)
+                 event_type, message, stack_trace, line_number, phase)
                 VALUES (
                     '{escape(event["test_result_id"])}',
                     '{escape(event["test_name"])}',
@@ -959,7 +1161,8 @@ class JitaService:
                     '{escape(event.get("event_type") or "")}',
                     '{escape(event["message"])}',
                     '{escape(event.get("stack_trace") or "")}',
-                    {event.get("line_number", 0)}
+                    {event.get("line_number", 0)},
+                    '{escape(event.get("phase") or "Unknown")}'
                 )
             """
             execute_sql(sql)
