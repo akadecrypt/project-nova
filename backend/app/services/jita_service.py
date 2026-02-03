@@ -30,14 +30,6 @@ class JitaService:
     JITA_BASE_URL = "https://jita.eng.nutanix.com/api/v2"
     AUTH = ("agave_bot", "admin")
     
-    # Log server mapping by lab/infra (can be extended)
-    # Format: {lab}_{infra} -> server URL
-    LOG_SERVERS = {
-        'phx1_systest': 'http://10.46.1.200',
-        'phx1-services_systest': 'http://10.46.1.200',
-        'default': 'http://10.46.1.200',  # Fallback
-    }
-    
     # Key log files to analyze (in priority order)
     KEY_LOG_FILES = [
         'nutest_test.log',           # Main test log
@@ -56,6 +48,8 @@ class JitaService:
         self.session = requests.Session()
         self.session.verify = False
         self.session.auth = self.AUTH
+        # Cache for resolved log server URLs (jita_url -> direct_url)
+        self._log_url_cache = {}
     
     def analyze_run(self, run_id: str) -> Dict[str, Any]:
         """
@@ -385,7 +379,7 @@ class JitaService:
         test_info = result.get('test', {})
         test_name = test_info.get('name', 'Unknown')
         
-        # Build direct log URL
+        # Build direct log URL by resolving JITA redirect
         log_base_url = self._build_direct_log_url(result_id, result)
         
         if log_base_url:
@@ -395,58 +389,112 @@ class JitaService:
             )
             events.extend(direct_events)
         
-        # Fallback: Try JITA API URLs (usually empty but worth trying)
-        if not events:
-            log_urls = {
-                'scheduler': result.get('scheduler_logs'),
-                'driver': result.get('tester_log_url'),
-            }
-            
-            for source, url in log_urls.items():
-                if not url:
-                    continue
-                
-                content = self.fetch_log_content(url)
-                if not content:
-                    continue
-                
-                parsed_events = self._parse_log_content(
-                    content, source, result_id, test_name
-                )
-                events.extend(parsed_events)
+        # Also fetch scheduler logs if available
+        scheduler_log_url = result.get('scheduler_logs')
+        if scheduler_log_url:
+            direct_scheduler_url = self._resolve_jita_log_url(scheduler_log_url)
+            if direct_scheduler_url:
+                content = self._fetch_log_file(direct_scheduler_url)
+                if content:
+                    parsed_events = self._parse_log_content(
+                        content, 'scheduler', result_id, test_name
+                    )
+                    events.extend(parsed_events)
+                    logger.info(f"Parsed {len(parsed_events)} events from scheduler log")
+        
+        # Also fetch driver log if available
+        driver_log_url = result.get('tester_log_url')
+        if driver_log_url:
+            direct_driver_url = self._resolve_jita_log_url(driver_log_url)
+            if direct_driver_url:
+                content = self._fetch_log_file(direct_driver_url)
+                if content:
+                    parsed_events = self._parse_log_content(
+                        content, 'driver', result_id, test_name
+                    )
+                    events.extend(parsed_events)
+                    logger.info(f"Parsed {len(parsed_events)} events from driver log")
         
         return events
     
     def _build_direct_log_url(self, result_id: str, result: Dict) -> Optional[str]:
         """
-        Build direct log server URL from test result metadata.
+        Build direct log server URL by resolving JITA API redirect.
         
-        Extracts the log path from JITA API URL and determines the correct log server.
+        The JITA API's /log endpoint returns a 302 redirect to the actual log server.
+        We capture that redirect to get the real log server URL dynamically.
         """
         try:
-            # First, try to get log path from test_log_url (JITA API URL)
+            # Get test_log_url from result
             test_log_url = result.get('test_log_url', '')
             
-            if test_log_url:
-                # Parse JITA API URL to extract log path and server info
-                # Example: https://jita.eng.nutanix.com/api/v2/log?log_type=test_log&url=/logs/697a.../697a.../697a...&lab=phx1&infra=systest
-                url_info = self._parse_jita_log_url(test_log_url)
-                if url_info:
-                    return url_info
+            if not test_log_url:
+                logger.warning(f"No test_log_url for result {result_id}")
+                return None
             
-            # Fallback: Construct URL from test result metadata
-            return self._construct_log_url_from_metadata(result_id, result)
+            # Resolve the JITA API URL to get actual log server URL
+            direct_url = self._resolve_jita_log_url(test_log_url)
+            
+            if direct_url:
+                # Ensure trailing slash for directory URLs
+                if not direct_url.endswith('/') and not direct_url.endswith('.log'):
+                    direct_url += '/'
+                logger.info(f"Resolved log URL: {direct_url}")
+                return direct_url
+            
+            return None
             
         except Exception as e:
             logger.warning(f"Error building direct log URL: {e}")
             return None
     
-    def _parse_jita_log_url(self, jita_url: str) -> Optional[str]:
+    def _resolve_jita_log_url(self, jita_url: str) -> Optional[str]:
         """
-        Parse JITA API log URL to extract direct log server URL.
+        Resolve JITA API log URL to get the actual log server URL.
+        
+        JITA's /api/v2/log endpoint returns a 302 redirect with the actual
+        log server URL in the Location header. This dynamically determines
+        the correct log server based on lab/infra configuration.
         
         Input: https://jita.eng.nutanix.com/api/v2/log?log_type=test_log&url=/logs/...&lab=phx1&infra=systest
         Output: http://10.46.1.200/logs/.../
+        """
+        # Check cache first
+        if jita_url in self._log_url_cache:
+            return self._log_url_cache[jita_url]
+        
+        try:
+            # Make a HEAD request without following redirects
+            response = self.session.head(
+                jita_url, 
+                allow_redirects=False, 
+                timeout=10
+            )
+            
+            # Check for redirect (302)
+            if response.status_code in [301, 302, 303, 307, 308]:
+                location = response.headers.get('Location', '')
+                if location:
+                    # Cache the resolved URL
+                    self._log_url_cache[jita_url] = location
+                    logger.info(f"JITA redirect resolved: {jita_url[:80]}... -> {location}")
+                    return location
+            
+            # If no redirect, maybe JITA returns the content directly
+            # In that case, parse the URL parameters to build direct URL
+            logger.warning(f"No redirect from JITA log endpoint (status: {response.status_code})")
+            return self._parse_jita_log_url_fallback(jita_url)
+            
+        except Exception as e:
+            logger.warning(f"Error resolving JITA log URL: {e}")
+            # Try fallback parsing
+            return self._parse_jita_log_url_fallback(jita_url)
+    
+    def _parse_jita_log_url_fallback(self, jita_url: str) -> Optional[str]:
+        """
+        Fallback: Parse JITA API log URL when redirect doesn't work.
+        
+        Extracts the URL path and tries common log server patterns.
         """
         try:
             from urllib.parse import urlparse, parse_qs
@@ -459,79 +507,20 @@ class JitaService:
             if not log_path:
                 return None
             
-            # Extract lab and infra for server lookup
-            lab = params.get('lab', [''])[0]
-            infra = params.get('infra', [''])[0]
+            # We don't know the exact server, but most are accessible via common IPs
+            # This is a last resort fallback
+            common_servers = [
+                'http://10.46.1.200',  # PHX1 systest
+                'http://10.47.1.200',  # PHX2 systest
+            ]
             
-            # Determine log server
-            server_key = f"{lab}_{infra}" if lab and infra else 'default'
-            log_server = self.LOG_SERVERS.get(server_key, self.LOG_SERVERS['default'])
-            
-            # Build full URL - log_path already includes /logs/
-            # Add trailing slash if path is a directory
-            full_url = f"{log_server}{log_path}"
-            if not full_url.endswith('/') and not full_url.endswith('.log'):
-                full_url += '/'
-            
-            logger.info(f"Parsed log URL: {full_url} (lab={lab}, infra={infra})")
+            # Try the first server (most common)
+            full_url = f"{common_servers[0]}{log_path}"
+            logger.warning(f"Using fallback log server: {full_url}")
             return full_url
             
         except Exception as e:
-            logger.warning(f"Error parsing JITA log URL: {e}")
-            return None
-    
-    def _construct_log_url_from_metadata(self, result_id: str, result: Dict) -> Optional[str]:
-        """
-        Construct log URL from test result metadata (fallback method).
-        
-        URL structure: {server}/logs/{task_id}/{run_id}/{test_result_id}/{test_path}/
-        """
-        try:
-            # Get task_id from agave_task_id
-            task_ref = result.get('agave_task_id', {})
-            if isinstance(task_ref, dict):
-                task_id = task_ref.get('$oid', '')
-            else:
-                task_id = str(task_ref) if task_ref else ''
-            
-            # Get run_id
-            run_id = result.get('run_id', '')
-            
-            if not task_id or not run_id:
-                logger.warning(f"Missing task_id or run_id for result {result_id}")
-                return None
-            
-            # Parse test name to get path components
-            test_info = result.get('test', {})
-            test_name = test_info.get('name', '')
-            
-            if not test_name:
-                return None
-            
-            # Parse test name: systest.env_setup.test_env_setup.TestEnvSetup.test_cdp___objects_1PE
-            parts = test_name.split('.')
-            if len(parts) < 4:
-                return None
-            
-            # Module path (all parts except last two: class and method)
-            module_parts = parts[:-2]
-            test_class = parts[-2]
-            test_method = parts[-1]
-            
-            # Convert module path to directory path
-            module_path = '/'.join(module_parts)
-            
-            # Use default server (can be improved by checking allocated resources for lab info)
-            log_server = self.LOG_SERVERS['default']
-            
-            # Build URL
-            url = f"{log_server}/logs/{task_id}/{run_id}/{result_id}/{module_path}/{test_class}/{test_method}/"
-            
-            logger.info(f"Constructed log URL from metadata: {url}")
-            return url
-            
-        except Exception as e:
-            logger.warning(f"Error constructing log URL: {e}")
+            logger.warning(f"Error in fallback URL parsing: {e}")
             return None
     
     def _fetch_logs_from_server(
