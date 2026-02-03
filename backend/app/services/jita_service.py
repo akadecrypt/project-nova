@@ -75,8 +75,13 @@ class JitaService:
     # Key log files to analyze (in priority order)
     KEY_LOG_FILES = [
         'nutest_test.log',           # Main test log
+        'nutest_test_ERROR.log',     # Filtered error log
+        'nutest_test_WARN.log',      # Filtered warning log
         'steps.log',                  # Test steps
         'nutest_class.log',          # Class-level log
+        'nutest.log',                 # Root nutest log
+        'nutest_resource_object_creation.log',  # Resource creation
+        'test_exit_details.log',     # Exit details
         'log_normalization.log',     # Normalized logs
     ]
     
@@ -84,6 +89,7 @@ class JitaService:
     FAILURE_LOG_PATTERNS = [
         r'.*_failure_.*\.log',       # Failure logs
         r'.*Error.*\.log',           # Error logs
+        r'.*_error\.log',            # Error suffix logs
     ]
     
     def __init__(self):
@@ -1045,11 +1051,62 @@ class JitaService:
             
             # Parse directory listing for log files
             log_files = self._parse_directory_listing(response.text)
-            logger.info(f"Found {len(log_files)} files in log directory")
+            logger.info(f"Found {len(log_files)} files in root log directory")
+            
+            # Fetch key log files at root level (nutest.log, etc.)
+            for log_file in log_files:
+                if log_file in ['nutest.log', 'nutest_webserver.log']:
+                    log_url = f"{base_url}{log_file}"
+                    content = self._fetch_log_file(log_url)
+                    if content:
+                        parsed_events = self._parse_log_content(
+                            content, log_file.replace('.log', ''), result_id, test_name
+                        )
+                        events.extend(parsed_events)
+                        logger.info(f"Parsed {len(parsed_events)} events from root {log_file}")
+            
+            # Find the test directory path (contains nutest_test.log)
+            test_dir_path = None
+            for f in log_files:
+                if 'nutest_test.log' in f:
+                    # Extract directory path from the file path
+                    test_dir_path = '/'.join(f.split('/')[:-1]) + '/'
+                    break
+            
+            if test_dir_path:
+                test_dir_url = f"{base_url}{test_dir_path}"
+                logger.info(f"Found test directory: {test_dir_path}")
+                
+                # Fetch test directory contents
+                test_events = self._parse_test_directory(
+                    test_dir_url, result_id, test_name
+                )
+                events.extend(test_events)
+            
+        except Exception as e:
+            logger.error(f"Error fetching logs from server: {e}")
+        
+        return events
+    
+    def _parse_test_directory(
+        self, 
+        test_dir_url: str, 
+        result_id: str, 
+        test_name: str
+    ) -> List[Dict]:
+        """Parse logs from the test directory (contains nutest_test.log, logs/, etc.)."""
+        events = []
+        
+        try:
+            response = requests.get(test_dir_url, timeout=30)
+            if response.status_code != 200:
+                return events
+            
+            files = self._parse_directory_listing(response.text)
+            logger.info(f"Found {len(files)} files in test directory")
             
             # Fetch key log files
-            for log_file in log_files:
-                # Check if it's a key log file or failure log
+            for log_file in files:
                 is_key_log = log_file in self.KEY_LOG_FILES
                 is_failure_log = any(
                     re.match(pattern, log_file) 
@@ -1057,7 +1114,7 @@ class JitaService:
                 )
                 
                 if is_key_log or is_failure_log:
-                    log_url = f"{base_url}{log_file}"
+                    log_url = f"{test_dir_url}{log_file}"
                     source = log_file.replace('.log', '')
                     
                     content = self._fetch_log_file(log_url)
@@ -1068,16 +1125,122 @@ class JitaService:
                         events.extend(parsed_events)
                         logger.info(f"Parsed {len(parsed_events)} events from {log_file}")
             
+            # Parse operation-specific logs in logs/ directory
+            if 'logs/' in files:
+                op_events = self._parse_operation_logs(
+                    f"{test_dir_url}logs/", result_id, test_name
+                )
+                events.extend(op_events)
+                logger.info(f"Parsed {len(op_events)} events from operation logs")
+            
             # Also check for logbay directories
-            logbay_dirs = [f for f in log_files if f.startswith('logbay_') and f.endswith('/')]
+            logbay_dirs = [f for f in files if f.startswith('logbay_') and f.endswith('/')]
             for logbay_dir in logbay_dirs[:2]:  # Limit to 2 logbay dirs
                 logbay_events = self._parse_logbay_directory(
-                    f"{base_url}{logbay_dir}", result_id, test_name
+                    f"{test_dir_url}{logbay_dir}", result_id, test_name
                 )
                 events.extend(logbay_events)
             
         except Exception as e:
-            logger.error(f"Error fetching logs from server: {e}")
+            logger.warning(f"Error parsing test directory: {e}")
+        
+        return events
+    
+    def _parse_operation_logs(
+        self, 
+        logs_url: str, 
+        result_id: str, 
+        test_name: str
+    ) -> List[Dict]:
+        """Parse operation-specific logs in the logs/ directory."""
+        events = []
+        
+        try:
+            # Get listing of operation directories
+            response = requests.get(logs_url, timeout=30)
+            if response.status_code != 200:
+                return events
+            
+            op_dirs = self._parse_directory_listing(response.text)
+            # Filter to only directories (end with /)
+            op_dirs = [d for d in op_dirs if d.endswith('/')]
+            
+            logger.info(f"Found {len(op_dirs)} operation directories")
+            
+            # Parse each operation's log file
+            for op_dir in op_dirs:
+                op_name = op_dir.rstrip('/')
+                # The log file is usually named same as the directory
+                log_file_name = f"{op_name}.log"
+                log_url = f"{logs_url}{op_dir}{log_file_name}"
+                
+                content = self._fetch_log_file(log_url, max_size=5 * 1024 * 1024)  # 5MB limit per op
+                if content:
+                    parsed_events = self._parse_log_content(
+                        content, f"op:{op_name}", result_id, test_name
+                    )
+                    events.extend(parsed_events)
+                    if parsed_events:
+                        logger.debug(f"Parsed {len(parsed_events)} events from {op_name}")
+                
+                # Also check for failed_tasks.json for more context
+                failed_tasks_url = f"{logs_url}{op_dir}failed_tasks.json"
+                try:
+                    ft_response = requests.get(failed_tasks_url, timeout=10)
+                    if ft_response.status_code == 200:
+                        failed_tasks = ft_response.json()
+                        if failed_tasks:
+                            task_events = self._parse_failed_tasks(
+                                failed_tasks, op_name, result_id, test_name
+                            )
+                            events.extend(task_events)
+                except:
+                    pass  # failed_tasks.json may not exist
+            
+        except Exception as e:
+            logger.warning(f"Error parsing operation logs: {e}")
+        
+        return events
+    
+    def _parse_failed_tasks(
+        self, 
+        failed_tasks: Any, 
+        op_name: str, 
+        result_id: str, 
+        test_name: str
+    ) -> List[Dict]:
+        """Parse failed_tasks.json for task failure details."""
+        events = []
+        
+        try:
+            tasks = failed_tasks if isinstance(failed_tasks, list) else [failed_tasks]
+            
+            for task in tasks:
+                if not isinstance(task, dict):
+                    continue
+                
+                error_detail = task.get('error_detail', '')
+                error_code = task.get('error_code', '')
+                status = task.get('status', '')
+                operation_type = task.get('operation_type', '')
+                
+                if status == 'FAILED' or error_detail:
+                    message = error_detail or f"Task failed with code {error_code}"
+                    
+                    events.append({
+                        'test_result_id': result_id,
+                        'test_name': test_name,
+                        'log_source': f"op:{op_name}/failed_tasks",
+                        'timestamp': int(datetime.now().timestamp()),
+                        'severity': 'ERROR',
+                        'event_type': 'TASK_FAILED',
+                        'message': f"[{operation_type}] {message}"[:500],
+                        'stack_trace': None,
+                        'line_number': 0,
+                        'priority': 'P1'  # Task failures are important
+                    })
+        except Exception as e:
+            logger.warning(f"Error parsing failed_tasks: {e}")
         
         return events
     
