@@ -319,12 +319,128 @@
             </div>
         </div>
 
+        <!-- Tab Navigation -->
+        <div class="tabs" style="display: flex; gap: 8px; margin-bottom: 24px;">
+            <button class="tab-btn active" data-tab="phases" onclick="switchView('phases')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/><path d="M12 3v3m0 12v3M3 12h3m12 0h3"/>
+                </svg>
+                Phases
+            </button>
+            <button class="tab-btn" data-tab="operations" onclick="switchView('operations')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/>
+                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+                </svg>
+                Operations (<span id="opsCount">0</span>)
+            </button>
+        </div>
+
+        <style>
+            .tabs { display: flex; gap: 8px; margin-bottom: 24px; }
+            .tab-btn {
+                padding: 10px 18px;
+                border-radius: 8px;
+                border: 1px solid var(--border-color);
+                background: var(--bg-secondary);
+                color: var(--text-secondary);
+                font-size: 13px;
+                font-weight: 500;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                transition: all 0.15s;
+            }
+            .tab-btn:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+            .tab-btn.active { background: var(--accent-primary, #6366f1); color: white; border-color: var(--accent-primary, #6366f1); }
+            
+            .ops-list { display: flex; flex-direction: column; gap: 12px; }
+            .op-card {
+                background: var(--bg-secondary);
+                border: 1px solid var(--border-color);
+                border-radius: 10px;
+                overflow: hidden;
+            }
+            .op-card.has-failure { border-left: 3px solid #ef4444; }
+            .op-card.has-warnings { border-left: 3px solid #f59e0b; }
+            .op-header {
+                padding: 14px 18px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                cursor: pointer;
+                transition: background 0.15s;
+            }
+            .op-header:hover { background: var(--bg-tertiary); }
+            .op-number {
+                width: 28px;
+                height: 28px;
+                background: var(--bg-tertiary);
+                border-radius: 6px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 11px;
+                font-weight: 600;
+                color: var(--text-muted);
+                margin-right: 12px;
+            }
+            .op-card.has-failure .op-number { background: #450a0a; color: #fca5a5; }
+            .op-title { display: flex; align-items: center; flex: 1; }
+            .op-name { font-weight: 600; font-size: 14px; }
+            .op-id { font-size: 11px; color: var(--text-muted); margin-left: 12px; font-family: 'JetBrains Mono', monospace; }
+            .op-stats { display: flex; gap: 16px; font-size: 12px; }
+            .op-stat { display: flex; align-items: center; gap: 4px; }
+            .op-stat.errors { color: #ef4444; }
+            .op-stat.warnings { color: #f59e0b; }
+            .op-stat.fatal { color: #dc2626; font-weight: 600; }
+            .op-chevron { color: var(--text-muted); transition: transform 0.2s; }
+            .op-card.expanded .op-chevron { transform: rotate(180deg); }
+            .op-body {
+                display: none;
+                border-top: 1px solid var(--border-color);
+                padding: 16px;
+                background: var(--bg-primary);
+            }
+            .op-card.expanded .op-body { display: block; }
+            .op-error-list { display: flex; flex-direction: column; gap: 8px; }
+            .op-error {
+                padding: 10px 14px;
+                background: var(--bg-secondary);
+                border: 1px solid var(--border-color);
+                border-radius: 6px;
+                font-size: 12px;
+            }
+            .op-error.fatal { border-left: 3px solid #dc2626; }
+            .op-error.error { border-left: 3px solid #ef4444; }
+            .op-error.warn { border-left: 3px solid #f59e0b; }
+            .op-error-type { font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; }
+            .op-error-msg { color: var(--text-muted); word-break: break-word; }
+            .ops-summary {
+                background: var(--bg-secondary);
+                border: 1px solid var(--border-color);
+                border-radius: 10px;
+                padding: 16px 20px;
+                margin-bottom: 20px;
+                display: flex;
+                gap: 24px;
+            }
+            .summary-stat { text-align: center; }
+            .summary-stat .value { font-size: 24px; font-weight: 700; }
+            .summary-stat .label { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+            .summary-stat.errors .value { color: #ef4444; }
+            .summary-stat.warnings .value { color: #f59e0b; }
+            .summary-stat.failed .value { color: #dc2626; }
+        </style>
+
         <div id="loading" class="loading">
             <div class="spinner"></div>
             <div>Loading timeline...</div>
         </div>
 
-        <div id="timeline" class="timeline" style="display: none;"></div>
+        <div id="phasesView" class="timeline" style="display: none;"></div>
+        <div id="operationsView" style="display: none;"></div>
     </div>
 
     <div id="toast" class="toast"></div>
@@ -348,6 +464,11 @@
         const runId = params.get('run');
         const testId = params.get('test');
 
+        let cachedPhases = null;
+        let cachedOperations = null;
+        let cachedTestInfo = null;
+        let currentView = 'phases';
+
         document.addEventListener('DOMContentLoaded', () => {
             if (!runId) {
                 document.body.innerHTML = '<div style="padding: 40px; text-align: center;">Missing run ID</div>';
@@ -359,32 +480,52 @@
 
         async function loadTimeline() {
             try {
+                // Load phases
                 let url = `${API}/runs/${runId}/timeline`;
-                if (testId) {
-                    url += `?test_result_id=${testId}`;
-                }
-
+                if (testId) url += `?test_result_id=${testId}`;
                 const res = await fetch(url);
                 const data = await res.json();
-
                 if (data.status !== 'success') {
                     throw new Error(data.error || 'Failed to load timeline');
                 }
+                cachedPhases = data;
 
-                // Also get test info
-                const summaryRes = await fetch(`${API}/runs/${runId}/summary`);
-                const summaryData = await summaryRes.json();
-                
-                let testInfo = null;
-                if (testId && summaryData.tests) {
-                    testInfo = summaryData.tests.find(t => t.test_result_id === testId);
+                // Load operations
+                let opsUrl = `${API}/runs/${runId}/operations`;
+                if (testId) opsUrl += `?test_result_id=${testId}`;
+                const opsRes = await fetch(opsUrl);
+                const opsData = await opsRes.json();
+                if (opsData.status === 'success') {
+                    cachedOperations = opsData;
+                    document.getElementById('opsCount').textContent = opsData.operation_count || 0;
                 }
 
-                displayTimeline(data, testInfo);
+                // Get test info
+                const summaryRes = await fetch(`${API}/runs/${runId}/summary`);
+                const summaryData = await summaryRes.json();
+                if (testId && summaryData.tests) {
+                    cachedTestInfo = summaryData.tests.find(t => t.test_result_id === testId);
+                }
+
+                displayTimeline(cachedPhases, cachedTestInfo);
 
             } catch (e) {
                 console.error(e);
                 showToast('Error: ' + e.message);
+            }
+        }
+
+        function switchView(view) {
+            currentView = view;
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.tab === view);
+            });
+            
+            document.getElementById('phasesView').style.display = view === 'phases' ? 'block' : 'none';
+            document.getElementById('operationsView').style.display = view === 'operations' ? 'block' : 'none';
+            
+            if (view === 'operations' && cachedOperations) {
+                displayOperations(cachedOperations);
             }
         }
 
@@ -406,7 +547,7 @@
                 document.getElementById('testMeta').textContent = `${data.phases?.length || 0} phases • ${data.total_logs || 0} log events`;
             }
 
-            const container = document.getElementById('timeline');
+            const container = document.getElementById('phasesView');
             const phases = data.phases || [];
 
             if (phases.length === 0) {
@@ -465,6 +606,107 @@
             if (errorPhaseIdx >= 0) {
                 togglePhase(errorPhaseIdx);
             }
+        }
+
+        function displayOperations(data) {
+            const container = document.getElementById('operationsView');
+            const operations = data.operations || [];
+
+            if (operations.length === 0) {
+                container.innerHTML = '<div class="empty-logs">No operations data available</div>';
+                return;
+            }
+
+            // Summary section
+            let html = `
+                <div class="ops-summary">
+                    <div class="summary-stat">
+                        <div class="value">${data.operation_count}</div>
+                        <div class="label">Operations</div>
+                    </div>
+                    <div class="summary-stat errors">
+                        <div class="value">${data.total_errors}</div>
+                        <div class="label">Errors</div>
+                    </div>
+                    <div class="summary-stat warnings">
+                        <div class="value">${data.total_warnings}</div>
+                        <div class="label">Warnings</div>
+                    </div>
+                    <div class="summary-stat failed">
+                        <div class="value">${data.failed_operations}</div>
+                        <div class="label">Failed Ops</div>
+                    </div>
+                </div>
+                <div class="ops-list">
+            `;
+
+            operations.forEach((op, i) => {
+                const hasFailure = op.has_task_failure || op.fatal_count > 0;
+                const hasWarnings = op.warn_count > 0 && !hasFailure;
+                const totalIssues = op.error_count + op.warn_count + op.fatal_count;
+
+                html += `
+                    <div class="op-card ${hasFailure ? 'has-failure' : ''} ${hasWarnings ? 'has-warnings' : ''}" id="op-${i}">
+                        <div class="op-header" onclick="toggleOp(${i})">
+                            <div class="op-title">
+                                <div class="op-number">${op.order}</div>
+                                <span class="op-name">${escapeHtml(op.display_name)}</span>
+                                <span class="op-id">${escapeHtml(op.name)}</span>
+                            </div>
+                            <div class="op-stats">
+                                ${op.fatal_count > 0 ? `<span class="op-stat fatal">${op.fatal_count} fatal</span>` : ''}
+                                ${op.error_count > 0 ? `<span class="op-stat errors">${op.error_count} errors</span>` : ''}
+                                ${op.warn_count > 0 ? `<span class="op-stat warnings">${op.warn_count} warnings</span>` : ''}
+                                ${totalIssues === 0 ? `<span class="op-stat" style="color: #22c55e;">✓ OK</span>` : ''}
+                                <svg class="op-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="6 9 12 15 18 9"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="op-body">
+                            <div class="op-error-list">
+                                ${op.fatal.length > 0 ? `
+                                    <div style="font-size: 11px; color: #dc2626; font-weight: 600; margin-bottom: 6px;">FATAL ERRORS</div>
+                                    ${op.fatal.map(e => renderOpError(e, 'fatal')).join('')}
+                                ` : ''}
+                                ${op.errors.length > 0 ? `
+                                    <div style="font-size: 11px; color: #ef4444; font-weight: 600; margin-bottom: 6px; margin-top: 12px;">ERRORS</div>
+                                    ${op.errors.map(e => renderOpError(e, 'error')).join('')}
+                                ` : ''}
+                                ${op.warnings.length > 0 ? `
+                                    <div style="font-size: 11px; color: #f59e0b; font-weight: 600; margin-bottom: 6px; margin-top: 12px;">WARNINGS</div>
+                                    ${op.warnings.map(e => renderOpError(e, 'warn')).join('')}
+                                ` : ''}
+                                ${totalIssues === 0 ? `
+                                    <div style="color: var(--text-muted); font-size: 13px;">This operation completed without errors.</div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += '</div>';
+            container.innerHTML = html;
+
+            // Auto-expand first failed operation
+            const failedIdx = operations.findIndex(op => op.has_task_failure || op.fatal_count > 0);
+            if (failedIdx >= 0) {
+                toggleOp(failedIdx);
+            }
+        }
+
+        function renderOpError(err, severity) {
+            return `
+                <div class="op-error ${severity}">
+                    <div class="op-error-type">${err.event_type || 'Error'} ${err.priority ? `<span style="opacity: 0.6;">(${err.priority})</span>` : ''}</div>
+                    <div class="op-error-msg">${escapeHtml(truncate(err.message, 300))}</div>
+                </div>
+            `;
+        }
+
+        function toggleOp(i) {
+            document.getElementById(`op-${i}`).classList.toggle('expanded');
         }
 
         function renderLog(log, phaseIdx, logIdx) {

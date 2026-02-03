@@ -347,6 +347,38 @@ async def get_run_timeline(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/runs/{run_id}/operations")
+async def get_run_operations(
+    run_id: str,
+    test_result_id: Optional[str] = Query(None, description="Filter by specific test result")
+):
+    """
+    Get operations timeline with errors grouped by operation in execution order.
+    
+    Operations are extracted from log sources like 'op:3.2.1_OpGroup'.
+    They are sorted by their numeric prefix to maintain execution order.
+    
+    Args:
+        run_id: JITA run ID
+        test_result_id: Optional filter for specific test
+        
+    Returns:
+        Operations with their error counts and details, in execution order
+    """
+    try:
+        service = get_jita_service()
+        result = service.get_operations_timeline(run_id, test_result_id)
+        
+        return {
+            "status": "success",
+            **result
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting operations for run {run_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.delete("/runs/{run_id}")
 async def delete_run_analysis(run_id: str):
     """

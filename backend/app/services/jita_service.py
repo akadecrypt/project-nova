@@ -450,6 +450,128 @@ class JitaService:
             "total_logs": len(logs)
         }
     
+    def get_operations_timeline(self, run_id: str, test_result_id: str = None) -> Dict[str, Any]:
+        """Get operations timeline with errors grouped by operation in execution order."""
+        safe_id = re.sub(r'[^a-zA-Z0-9]', '', run_id)
+        logs_table = f"jita_{safe_id}_logs"
+        
+        # Build query to get all operation logs
+        if test_result_id:
+            sql = f"""
+                SELECT log_source, severity, event_type, message, timestamp, priority
+                FROM {logs_table}
+                WHERE test_result_id = '{test_result_id}'
+                  AND log_source LIKE 'op:%'
+                ORDER BY log_source, timestamp
+            """
+        else:
+            sql = f"""
+                SELECT log_source, severity, event_type, message, timestamp, priority, test_result_id
+                FROM {logs_table}
+                WHERE log_source LIKE 'op:%'
+                ORDER BY log_source, timestamp
+            """
+        
+        result = execute_sql(sql)
+        logs = result.get("rows", [])
+        
+        # Group logs by operation
+        operations = {}
+        for log in logs:
+            source = log.get('log_source', '')
+            # Remove 'op:' prefix and '/failed_tasks' suffix for grouping
+            op_name = source.replace('op:', '').replace('/failed_tasks', '')
+            
+            if op_name not in operations:
+                operations[op_name] = {
+                    'name': op_name,
+                    'display_name': self._format_op_name(op_name),
+                    'errors': [],
+                    'warnings': [],
+                    'fatal': [],
+                    'error_count': 0,
+                    'warn_count': 0,
+                    'fatal_count': 0,
+                    'has_task_failure': False
+                }
+            
+            op = operations[op_name]
+            severity = log.get('severity', '')
+            event_type = log.get('event_type', '')
+            
+            log_entry = {
+                'message': log.get('message', '')[:500],
+                'timestamp': log.get('timestamp', 0),
+                'event_type': event_type,
+                'priority': log.get('priority', 'P3'),
+                'source': source
+            }
+            
+            if severity == 'FATAL':
+                op['fatal'].append(log_entry)
+                op['fatal_count'] += 1
+            elif severity == 'ERROR':
+                op['errors'].append(log_entry)
+                op['error_count'] += 1
+            elif severity == 'WARN':
+                op['warnings'].append(log_entry)
+                op['warn_count'] += 1
+            
+            if event_type == 'TASK_FAILED':
+                op['has_task_failure'] = True
+        
+        # Sort operations by numeric prefix (execution order)
+        def sort_key(op_name):
+            # Extract numeric prefix for sorting (e.g., "3.2.1" from "3.2.1_OpGroup")
+            parts = op_name.split('_')[0].split('.')
+            try:
+                return tuple(int(p) for p in parts)
+            except:
+                return (9999,)
+        
+        sorted_ops = sorted(operations.values(), key=lambda x: sort_key(x['name']))
+        
+        # Add execution order
+        for i, op in enumerate(sorted_ops):
+            op['order'] = i + 1
+            # Limit logs per operation to avoid huge responses
+            op['errors'] = op['errors'][:20]
+            op['warnings'] = op['warnings'][:10]
+            op['fatal'] = op['fatal'][:10]
+        
+        # Compute summary stats
+        total_errors = sum(op['error_count'] for op in sorted_ops)
+        total_warnings = sum(op['warn_count'] for op in sorted_ops)
+        failed_ops = [op for op in sorted_ops if op['has_task_failure'] or op['fatal_count'] > 0]
+        
+        return {
+            "run_id": run_id,
+            "test_result_id": test_result_id,
+            "operations": sorted_ops,
+            "operation_count": len(sorted_ops),
+            "total_errors": total_errors,
+            "total_warnings": total_warnings,
+            "failed_operations": len(failed_ops),
+            "failed_op_names": [op['name'] for op in failed_ops]
+        }
+    
+    def _format_op_name(self, op_name: str) -> str:
+        """Format operation name for display."""
+        # Remove numeric prefix
+        parts = op_name.split('_', 1)
+        if len(parts) > 1:
+            name = parts[1]
+        else:
+            name = op_name
+        
+        # Add spaces before capitals and clean up
+        import re
+        name = re.sub(r'([a-z])([A-Z])', r'\1 \2', name)
+        name = name.replace('Op', ' Op').replace('Group', ' Group').strip()
+        
+        # Capitalize first letter
+        return name if name else op_name
+    
     def list_analyzed_runs(self) -> List[str]:
         """List all analyzed JITA runs (by finding jita_*_summary tables)."""
         result = execute_sql(
