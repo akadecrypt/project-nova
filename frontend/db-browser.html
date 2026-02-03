@@ -936,6 +936,10 @@ ORDER BY status, source_bucket`
         
         // Load tables on page load
         document.addEventListener('DOMContentLoaded', () => {
+            // Sync theme from localStorage
+            const savedTheme = localStorage.getItem('nova-theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            
             loadTables();
             renderHistoryMenu();
         });

@@ -710,6 +710,10 @@
                 document.documentElement.classList.add('in-iframe');
             }
             
+            // Sync theme from localStorage
+            const savedTheme = localStorage.getItem('nova-theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            
             loadPreviousRuns();
             
             // Check URL params

@@ -1353,6 +1353,17 @@
             document.querySelectorAll('.theme-btn').forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.theme === theme);
             });
+            
+            // Sync theme to all iframes
+            document.querySelectorAll('iframe').forEach(iframe => {
+                try {
+                    if (iframe.contentDocument) {
+                        iframe.contentDocument.documentElement.setAttribute('data-theme', theme);
+                    }
+                } catch (e) {
+                    // Cross-origin iframe, skip
+                }
+            });
         }
 
         // Sidebar toggle (mobile)
