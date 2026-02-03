@@ -660,20 +660,19 @@
                     </div>
                 </div>
 
-                <!-- SQL Agent Configuration -->
+                <!-- SQL Agent Status (Auto-configured) -->
                 <div class="settings-section">
                     <div class="section-header">
                         <div class="section-icon">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M12 3v18"></path>
-                                <rect x="4" y="8" width="16" height="8" rx="1"></rect>
-                                <path d="M8 8V5a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v3"></path>
-                                <path d="M8 16v3a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-3"></path>
+                                <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+                                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
                             </svg>
                         </div>
                         <div>
-                            <div class="section-title">SQL Agent</div>
-                            <div class="section-desc">Configure analytics database connection</div>
+                            <div class="section-title">Database</div>
+                            <div class="section-desc">Local SQLite database (auto-configured)</div>
                         </div>
                         <span class="status-badge" id="sqlStatus">
                             <span class="status-dot"></span>
@@ -682,17 +681,16 @@
                     </div>
                     <div class="settings-card">
                         <div class="form-group">
-                            <label class="form-label">SQL Agent URL</label>
-                            <input type="text" class="form-input" id="sqlAgentUrl" placeholder="http://10.0.0.1:9001/execute">
-                            <div class="form-hint">URL of the SQL agent service for analytics queries</div>
+                            <div class="form-hint" style="margin-bottom: 0;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; display: inline; vertical-align: middle; margin-right: 6px;">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                </svg>
+                                The database is bundled with NOVA and auto-configured on startup. No configuration needed.
+                            </div>
                         </div>
                         <div class="form-actions">
-                            <button class="btn btn-primary" onclick="saveSQLConfig()">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-                                </svg>
-                                Save
-                            </button>
                             <button class="btn btn-secondary" onclick="testSQLConnection()">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
@@ -946,12 +944,8 @@
                     }
                 }
                 
-                // Load SQL Agent config
-                const sqlRes = await fetch(`${API_BASE}/api/config/sql`);
-                if (sqlRes.ok) {
-                    const sql = await sqlRes.json();
-                    document.getElementById('sqlAgentUrl').value = sql.url || '';
-                }
+                // SQL Agent is auto-configured, just test connection
+                testSQLConnection();
             } catch (e) {
                 console.log('Could not load configurations:', e);
             }
@@ -1106,30 +1100,6 @@
                 }
             } catch (e) {
                 showToast('Configure Prism Central first', 'error');
-            }
-        }
-
-        // Save SQL Agent config
-        async function saveSQLConfig() {
-            const config = {
-                url: document.getElementById('sqlAgentUrl').value
-            };
-            
-            try {
-                const response = await fetch(`${API_BASE}/api/config/sql`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(config)
-                });
-                
-                if (response.ok) {
-                    showToast('SQL Agent configuration saved', 'success');
-                    updateStatusBadge('sqlStatus', true);
-                } else {
-                    showToast('Failed to save configuration', 'error');
-                }
-            } catch (e) {
-                showToast('Backend not available', 'error');
             }
         }
 
