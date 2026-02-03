@@ -699,7 +699,8 @@
     </div>
 
     <script>
-        const API_BASE = 'http://localhost:9360/api/jita';
+        const API_HOST = localStorage.getItem('nova-backend-url') || `http://${window.location.hostname}:9360`;
+        const API_BASE = `${API_HOST}/api/jita`;
         let currentRunId = null;
         let currentAnalysis = null;
 
