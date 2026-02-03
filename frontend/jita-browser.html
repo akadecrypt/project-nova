@@ -472,11 +472,57 @@
             margin-bottom: 24px;
         }
 
+        .recent-runs-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
         .recent-runs-title {
             font-size: 14px;
             font-weight: 600;
             color: #a1a1aa;
-            margin-bottom: 12px;
+        }
+
+        .filter-bar {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .filter-bar label {
+            font-size: 12px;
+            color: #71717a;
+        }
+
+        .filter-select {
+            background: #18181b;
+            border: 1px solid #27272a;
+            border-radius: 6px;
+            padding: 6px 12px;
+            color: #e4e4e7;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .filter-select:focus {
+            outline: none;
+            border-color: #6366f1;
+        }
+
+        .filter-input {
+            background: #18181b;
+            border: 1px solid #27272a;
+            border-radius: 6px;
+            padding: 6px 12px;
+            color: #e4e4e7;
+            font-size: 12px;
+            width: 180px;
+        }
+
+        .filter-input::placeholder {
+            color: #52525b;
         }
 
         .recent-runs-grid {
@@ -599,7 +645,22 @@
 
             <!-- Recent Runs (shown in main area, especially for iframe) -->
             <div id="recentRunsMain" class="recent-runs-main" style="display: none;">
-                <div class="recent-runs-title">Recently Analyzed</div>
+                <div class="recent-runs-header">
+                    <div class="recent-runs-title">Recently Analyzed</div>
+                    <div class="filter-bar">
+                        <input type="text" class="filter-input" id="searchFilter" placeholder="Search by label or ID..." oninput="filterRecentRuns()">
+                        <select class="filter-select" id="statusFilter" onchange="filterRecentRuns()">
+                            <option value="all">All Status</option>
+                            <option value="failed">Has Failures</option>
+                            <option value="passed">All Passed</option>
+                        </select>
+                        <select class="filter-select" id="sortFilter" onchange="filterRecentRuns()">
+                            <option value="recent">Most Recent</option>
+                            <option value="tests">Most Tests</option>
+                            <option value="failed">Most Failures</option>
+                        </select>
+                    </div>
+                </div>
                 <div id="recentRunsGrid" class="recent-runs-grid"></div>
             </div>
 
@@ -662,6 +723,9 @@
             }
         });
 
+        // Store all runs for filtering
+        let allRuns = [];
+
         async function loadRecentRuns() {
             try {
                 // Fetch with metadata for rich cards
@@ -669,18 +733,17 @@
                 const data = await res.json();
                 const sidebarList = document.getElementById('recentList');
                 const mainSection = document.getElementById('recentRunsMain');
-                const mainGrid = document.getElementById('recentRunsGrid');
                 
-                const runs = data.runs || [];
+                allRuns = data.runs || [];
                 
-                if (runs.length === 0) {
+                if (allRuns.length === 0) {
                     sidebarList.innerHTML = '<div style="color: #52525b; font-size: 12px;">No runs yet</div>';
                     mainSection.style.display = 'none';
                     return;
                 }
 
                 // Update sidebar with simple list
-                sidebarList.innerHTML = runs.map(run => {
+                sidebarList.innerHTML = allRuns.map(run => {
                     const id = run.run_id || run;
                     const label = run.label || id.slice(0,12);
                     return `
@@ -693,48 +756,93 @@
 
                 // Update main area with rich cards
                 mainSection.style.display = 'block';
-                mainGrid.innerHTML = runs.map(run => {
-                    const id = run.run_id || run;
-                    const label = run.label || 'Unknown Run';
-                    const failed = run.failed_tests || 0;
-                    const passed = run.passed_tests || 0;
-                    const total = run.total_tests || 0;
-                    const time = run.analyzed_at ? formatTimeAgo(run.analyzed_at) : '';
-                    
-                    return `
-                        <div class="run-card" onclick="loadResults('${id}')">
-                            <div class="run-card-header">
-                                <div>
-                                    <div class="run-card-label">${escapeHtml(label)}</div>
-                                    <div class="run-card-id">${id}</div>
-                                </div>
-                                <button class="run-card-delete" onclick="event.stopPropagation(); deleteRun('${id}')" title="Delete">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-                                    </svg>
-                                </button>
-                            </div>
-                            <div class="run-card-stats">
-                                <span class="run-card-stat">${total} tests</span>
-                                <span class="run-card-stat passed">${passed} passed</span>
-                                <span class="run-card-stat failed">${failed} failed</span>
-                            </div>
-                            ${time ? `<div class="run-card-time">${time}</div>` : ''}
-                        </div>
-                    `;
-                }).join('');
+                filterRecentRuns();
             } catch (e) {
                 console.error('Error loading recent runs:', e);
                 // Fallback to simple list
                 try {
                     const res = await fetch(`${API}/runs`);
                     const data = await res.json();
-                    const runs = data.runs || [];
-                    document.getElementById('recentList').innerHTML = runs.map(id => `
-                        <div class="run-item" onclick="loadResults('${id}')">${id.slice(0,12)}...</div>
+                    allRuns = (data.runs || []).map(id => ({ run_id: id }));
+                    document.getElementById('recentList').innerHTML = allRuns.map(run => `
+                        <div class="run-item" onclick="loadResults('${run.run_id}')">${run.run_id.slice(0,12)}...</div>
                     `).join('') || '<div style="color: #52525b;">No runs</div>';
                 } catch (e2) {}
             }
+        }
+
+        function filterRecentRuns() {
+            const searchTerm = (document.getElementById('searchFilter')?.value || '').toLowerCase();
+            const statusFilter = document.getElementById('statusFilter')?.value || 'all';
+            const sortFilter = document.getElementById('sortFilter')?.value || 'recent';
+            const mainGrid = document.getElementById('recentRunsGrid');
+
+            // Filter runs
+            let filteredRuns = allRuns.filter(run => {
+                const id = run.run_id || '';
+                const label = run.label || '';
+                const matchesSearch = !searchTerm || 
+                    id.toLowerCase().includes(searchTerm) || 
+                    label.toLowerCase().includes(searchTerm);
+                
+                const failed = run.failed_tests || 0;
+                const matchesStatus = statusFilter === 'all' ||
+                    (statusFilter === 'failed' && failed > 0) ||
+                    (statusFilter === 'passed' && failed === 0);
+                
+                return matchesSearch && matchesStatus;
+            });
+
+            // Sort runs
+            if (sortFilter === 'tests') {
+                filteredRuns.sort((a, b) => (b.total_tests || 0) - (a.total_tests || 0));
+            } else if (sortFilter === 'failed') {
+                filteredRuns.sort((a, b) => (b.failed_tests || 0) - (a.failed_tests || 0));
+            } else {
+                // recent - sort by analyzed_at descending
+                filteredRuns.sort((a, b) => {
+                    const dateA = a.analyzed_at ? new Date(a.analyzed_at) : new Date(0);
+                    const dateB = b.analyzed_at ? new Date(b.analyzed_at) : new Date(0);
+                    return dateB - dateA;
+                });
+            }
+
+            // Render filtered cards
+            if (filteredRuns.length === 0) {
+                mainGrid.innerHTML = '<div style="color: #52525b; padding: 40px; text-align: center; grid-column: 1/-1;">No runs match your filters</div>';
+                return;
+            }
+
+            mainGrid.innerHTML = filteredRuns.map(run => {
+                const id = run.run_id || run;
+                const label = run.label || 'Unknown Run';
+                const failed = run.failed_tests || 0;
+                const passed = run.passed_tests || 0;
+                const total = run.total_tests || 0;
+                const time = run.analyzed_at ? formatTimeAgo(run.analyzed_at) : '';
+                
+                return `
+                    <div class="run-card" onclick="loadResults('${id}')">
+                        <div class="run-card-header">
+                            <div>
+                                <div class="run-card-label">${escapeHtml(label)}</div>
+                                <div class="run-card-id">${id}</div>
+                            </div>
+                            <button class="run-card-delete" onclick="event.stopPropagation(); deleteRun('${id}')" title="Delete">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="run-card-stats">
+                            <span class="run-card-stat">${total} tests</span>
+                            <span class="run-card-stat passed">${passed} passed</span>
+                            <span class="run-card-stat failed">${failed} failed</span>
+                        </div>
+                        ${time ? `<div class="run-card-time">${time}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
         }
 
         function formatTimeAgo(isoString) {

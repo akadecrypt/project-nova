@@ -1132,27 +1132,93 @@ class JitaService:
         lines = content.split('\n')
         total_lines = len(lines)
         
+        # Track seen messages to deduplicate
+        seen_messages = set()
+        
         # Patterns for severity detection
         severity_patterns = {
             'FATAL': [r'\bFATAL\b', r'\bCRITICAL\b', r'\bPANIC\b'],
-            'ERROR': [r'\bERROR\b', r'\bERR\b', r'\bFAILED\b', r'\bFAILURE\b', r'\bException\b'],
+            'ERROR': [r'\bERROR\b', r'\bERR\s', r'\bFAILED\b', r'\bFAILURE\b'],
             'WARN': [r'\bWARN\b', r'\bWARNING\b'],
         }
+        
+        # Patterns for JSON failures (higher priority)
+        json_fail_patterns = [
+            (r'"status"\s*:\s*"FAILED"', 'TASK_FAILED'),
+            (r'"error_detail"\s*:\s*"([^"]+)"', 'API_ERROR'),
+            (r'"error_code"\s*:\s*"?(\d+)"?', 'ERROR_CODE'),
+        ]
+        
+        # Low-value error patterns to deprioritize or skip
+        low_value_patterns = [
+            r'Operation is none, returning',
+            r'ExceptionVerification',
+            r'expected_errors',
+            r'error_patterns',
+        ]
         
         # First pass: identify error line numbers
         error_lines = []
         for line_num, line in enumerate(lines):
+            # Skip low-value patterns
+            if any(re.search(p, line) for p in low_value_patterns):
+                continue
+            
+            # Check for JSON failures first (higher priority)
+            json_found = False
+            for pattern, json_type in json_fail_patterns:
+                match = re.search(pattern, line)
+                if match:
+                    # Extract error detail if present
+                    error_detail_match = re.search(r'"error_detail"\s*:\s*"([^"]{1,500})"', line)
+                    detail_msg = error_detail_match.group(1) if error_detail_match else ''
+                    
+                    # Create a unique key for deduplication
+                    msg_key = f"{json_type}:{detail_msg[:100]}"
+                    if msg_key not in seen_messages:
+                        seen_messages.add(msg_key)
+                        error_lines.append((line_num, 'ERROR', line.strip(), json_type, detail_msg))
+                        json_found = True
+                    break
+            
+            if json_found:
+                continue
+            
+            # Check for standard severity patterns
             for sev, patterns in severity_patterns.items():
-                if sev in ['ERROR', 'FATAL']:
-                    for pattern in patterns:
-                        if re.search(pattern, line, re.IGNORECASE):
-                            error_lines.append((line_num, sev, line.strip()))
-                            break
+                matched = False
+                for pattern in patterns:
+                    if re.search(pattern, line, re.IGNORECASE):
+                        # Create dedup key from first 80 chars of message after timestamp
+                        msg_part = re.sub(r'^\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}[^Z]*Z?\s*', '', line)[:80]
+                        msg_key = f"{sev}:{msg_part}"
+                        
+                        if msg_key not in seen_messages:
+                            seen_messages.add(msg_key)
+                            error_lines.append((line_num, sev, line.strip(), None, None))
+                        matched = True
+                        break
+                if matched:
+                    break
         
         # Second pass: extract events with context
-        for error_line_num, severity, error_line in error_lines:
+        for error_entry in error_lines:
+            if len(error_entry) == 5:
+                error_line_num, severity, error_line, json_type, detail_msg = error_entry
+            else:
+                error_line_num, severity, error_line = error_entry
+                json_type, detail_msg = None, None
+            
             timestamp = self._extract_timestamp(error_line)
-            event_type = self._classify_log_line(error_line)
+            
+            # Use json_type if detected, otherwise classify
+            if json_type:
+                event_type = json_type
+                # Use detail_msg as the primary message if available
+                message = detail_msg if detail_msg else error_line[:500]
+            else:
+                event_type = self._classify_log_line(error_line)
+                message = error_line[:500]
             
             # Collect stack trace lines following the error
             stack_lines = []
@@ -1184,8 +1250,11 @@ class JitaService:
                 if context_lines:
                     stack_trace = "--- Context (±10 lines) ---\n" + '\n'.join(context_lines)
             
-            # Classify priority
-            priority = self._classify_priority(severity, event_type, error_line)
+            # Classify priority - JSON failures are typically important
+            if json_type in ['TASK_FAILED', 'API_ERROR']:
+                priority = 'P1'  # Task/API failures are important
+            else:
+                priority = self._classify_priority(severity, event_type, error_line)
             
             event = {
                 'test_result_id': result_id,
@@ -1194,7 +1263,7 @@ class JitaService:
                 'timestamp': timestamp,
                 'severity': severity,
                 'event_type': event_type,
-                'message': error_line[:500],
+                'message': message,
                 'stack_trace': stack_trace,
                 'line_number': error_line_num + 1,  # 1-based
                 'priority': priority
