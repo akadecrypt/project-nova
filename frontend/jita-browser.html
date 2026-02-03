@@ -3,955 +3,584 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JITA Browser - NOVA</title>
+    <title>JITA Analysis - NOVA</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/design-system.css">
     <style>
-        * { box-sizing: border-box; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         
         body {
-            margin: 0;
-            min-height: 100vh;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             background: var(--bg-primary);
             color: var(--text-primary);
-            font-family: var(--font-primary);
-        }
-
-        .app-container {
-            display: flex;
             min-height: 100vh;
-        }
-
-        /* Sidebar - Hidden in iframe mode */
-        .sidebar {
-            width: 280px;
-            background: var(--bg-secondary);
-            border-right: 1px solid var(--border-color);
-            padding: 24px;
-            position: fixed;
-            height: 100vh;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
         }
 
         .in-iframe .sidebar { display: none; }
-        .in-iframe .main-content { margin-left: 0; }
+        .in-iframe .main { margin-left: 0; }
 
+        /* Layout */
+        .app { display: flex; min-height: 100vh; }
+        
+        .sidebar {
+            width: 260px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            padding: 20px;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .main {
+            flex: 1;
+            margin-left: 260px;
+            padding: 24px 32px;
+        }
+
+        /* Sidebar */
         .logo {
             display: flex;
             align-items: center;
-            gap: 12px;
-            margin-bottom: 32px;
+            gap: 10px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 20px;
             text-decoration: none;
         }
 
         .logo-icon {
-            width: 44px;
-            height: 44px;
+            width: 36px;
+            height: 36px;
             background: var(--accent-gradient);
-            border-radius: 12px;
+            border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
         }
 
-        .logo-icon svg { width: 24px; height: 24px; fill: white; }
-        .logo-title {
-            font-size: 22px;
-            font-weight: 700;
-            background: var(--accent-gradient);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
+        .logo-icon svg { width: 20px; height: 20px; fill: white; }
+        .logo span { font-weight: 700; font-size: 18px; }
 
-        .nav-section { margin-bottom: 24px; }
-        .nav-label {
+        .sidebar-section { margin-bottom: 24px; }
+        .sidebar-title {
             font-size: 11px;
-            color: var(--text-muted);
             text-transform: uppercase;
-            letter-spacing: 1.5px;
+            letter-spacing: 1px;
+            color: var(--text-muted);
             margin-bottom: 12px;
         }
 
-        .nav-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 12px 14px;
-            border-radius: 10px;
-            color: var(--text-secondary);
-            text-decoration: none;
-            transition: all 0.2s;
-            margin-bottom: 4px;
-        }
-
-        .nav-item:hover { background: var(--bg-hover); color: var(--text-primary); }
-        .nav-item.active { background: var(--accent-primary); color: white; }
-        .nav-icon { width: 20px; height: 20px; opacity: 0.7; }
-
-        .history-section {
-            flex: 1;
-            overflow-y: auto;
-            margin-top: auto;
-        }
-
-        .history-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
+        .run-list { display: flex; flex-direction: column; gap: 4px; }
+        
+        .run-item {
             padding: 10px 12px;
-            background: var(--bg-primary);
             border-radius: 8px;
-            margin-bottom: 6px;
             cursor: pointer;
-            transition: all 0.2s;
             font-size: 12px;
             font-family: 'JetBrains Mono', monospace;
+            color: var(--text-secondary);
+            transition: all 0.15s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
-        .history-item:hover { background: var(--bg-hover); }
+        .run-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+        .run-item.active { background: var(--accent-primary); color: white; }
 
-        .history-delete {
+        .run-item .delete-btn {
             opacity: 0;
             background: none;
             border: none;
-            color: var(--error);
+            color: inherit;
             cursor: pointer;
-            padding: 4px;
-            transition: opacity 0.2s;
+            padding: 2px;
         }
 
-        .history-item:hover .history-delete { opacity: 1; }
+        .run-item:hover .delete-btn { opacity: 0.7; }
+        .run-item .delete-btn:hover { opacity: 1; }
 
-        /* Main Content */
-        .main-content {
-            flex: 1;
-            margin-left: 280px;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
+        /* Header */
+        .header {
+            margin-bottom: 24px;
         }
 
-        /* Hero Section */
-        .hero {
-            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.05) 100%);
-            border-bottom: 1px solid var(--border-color);
-            padding: 48px;
-        }
-
-        .hero-content {
-            max-width: 800px;
-        }
-
-        .hero h1 {
-            font-size: 32px;
-            font-weight: 700;
-            margin: 0 0 8px 0;
-        }
-
-        .hero p {
-            color: var(--text-muted);
-            margin: 0 0 32px 0;
-            font-size: 16px;
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 16px;
         }
 
         /* Search Box */
-        .search-box {
+        .search-row {
             display: flex;
             gap: 12px;
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 16px;
-            padding: 8px;
         }
 
         .search-input {
             flex: 1;
-            padding: 16px 20px;
-            background: transparent;
-            border: none;
+            padding: 12px 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
             color: var(--text-primary);
-            font-size: 16px;
+            font-size: 14px;
             font-family: 'JetBrains Mono', monospace;
-            outline: none;
         }
 
-        .search-input::placeholder { color: var(--text-muted); }
+        .search-input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+        }
 
         .btn {
-            padding: 16px 28px;
-            border-radius: 12px;
-            font-weight: 600;
+            padding: 12px 20px;
+            border-radius: 10px;
+            font-weight: 500;
             cursor: pointer;
             border: none;
             font-size: 14px;
-            transition: all 0.2s;
+            transition: all 0.15s;
             display: flex;
             align-items: center;
             gap: 8px;
         }
 
         .btn-primary {
-            background: var(--accent-gradient);
+            background: var(--accent-primary);
             color: white;
         }
 
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.3);
-        }
+        .btn-primary:hover { background: #5558e3; }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
-        .btn-secondary {
-            background: var(--bg-secondary);
-            color: var(--text-primary);
-            border: 1px solid var(--border-color);
-        }
+        .btn svg { width: 16px; height: 16px; }
 
-        .btn-secondary:hover { background: var(--bg-hover); }
-
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-
-        .btn svg { width: 18px; height: 18px; }
-
-        /* Content Area */
-        .content-area {
-            flex: 1;
-            padding: 32px 48px;
-        }
-
-        /* Stats Grid */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 20px;
-            margin-bottom: 32px;
-        }
-
-        .stat-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 16px;
-            padding: 24px;
-            transition: all 0.2s;
-        }
-
-        .stat-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-        }
-
-        .stat-icon {
-            width: 48px;
-            height: 48px;
+        /* Failure Summary Banner */
+        .failure-banner {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(239, 68, 68, 0.05));
+            border: 1px solid rgba(239, 68, 68, 0.3);
             border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 16px;
+            padding: 20px 24px;
+            margin-bottom: 24px;
+            display: none;
         }
 
-        .stat-icon svg { width: 24px; height: 24px; }
+        .failure-banner.show { display: block; }
 
-        .stat-icon.blue { background: rgba(99, 102, 241, 0.15); color: var(--accent-primary); }
-        .stat-icon.green { background: rgba(34, 197, 94, 0.15); color: var(--success); }
-        .stat-icon.red { background: rgba(239, 68, 68, 0.15); color: var(--error); }
-        .stat-icon.yellow { background: rgba(234, 179, 8, 0.15); color: var(--warning); }
-
-        .stat-value {
-            font-size: 36px;
-            font-weight: 700;
-            line-height: 1;
-            margin-bottom: 4px;
-        }
-
-        .stat-label {
-            font-size: 14px;
-            color: var(--text-muted);
-        }
-
-        /* Tabs */
-        .tabs-container {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 20px;
-            overflow: hidden;
-        }
-
-        .tabs-header {
-            display: flex;
-            gap: 4px;
-            padding: 12px;
-            background: var(--bg-secondary);
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .tab-btn {
-            padding: 12px 24px;
-            border-radius: 10px;
-            background: transparent;
-            border: none;
-            color: var(--text-secondary);
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            transition: all 0.2s;
-        }
-
-        .tab-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
-        .tab-btn.active { background: var(--accent-primary); color: white; }
-
-        .tabs-body {
-            padding: 24px;
-            min-height: 400px;
-            max-height: 600px;
-            overflow-y: auto;
-        }
-
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-
-        /* Summary Grid */
-        .summary-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
-        }
-
-        .summary-card {
-            background: var(--bg-secondary);
-            border-radius: 12px;
-            padding: 20px;
-        }
-
-        .summary-card h4 {
-            font-size: 12px;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin: 0 0 8px 0;
-        }
-
-        .summary-card p {
-            margin: 0;
-            font-size: 15px;
-            word-break: break-all;
-        }
-
-        .summary-card.mono p { font-family: 'JetBrains Mono', monospace; font-size: 13px; }
-
-        /* Distribution Cards */
-        .distribution-section {
-            margin-top: 24px;
-        }
-
-        .distribution-title {
-            font-size: 16px;
-            font-weight: 600;
-            margin-bottom: 16px;
-        }
-
-        .distribution-grid {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-        }
-
-        .dist-chip {
-            background: var(--bg-secondary);
-            border-radius: 8px;
-            padding: 12px 16px;
+        .failure-banner h2 {
+            font-size: 18px;
+            color: var(--error);
+            margin-bottom: 8px;
             display: flex;
             align-items: center;
             gap: 10px;
         }
 
-        .dist-chip .label { color: var(--text-muted); font-size: 13px; }
-        .dist-chip .value { font-weight: 600; font-size: 18px; }
-        .dist-chip.error .value { color: var(--error); }
-        .dist-chip.fatal .value { color: #f87171; }
-
-        /* Tests Table */
-        .tests-list {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
+        .failure-banner p {
+            color: var(--text-secondary);
+            font-size: 14px;
         }
+
+        /* Stats Row */
+        .stats-row {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-box {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px 20px;
+            min-width: 120px;
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .stat-box.failed .stat-value { color: var(--error); }
+        .stat-box.passed .stat-value { color: var(--success); }
+
+        /* Filter Tabs */
+        .filter-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 12px;
+        }
+
+        .filter-tab {
+            padding: 8px 16px;
+            border-radius: 8px;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.15s;
+        }
+
+        .filter-tab:hover { background: var(--bg-hover); color: var(--text-primary); }
+        .filter-tab.active { background: var(--accent-primary); color: white; }
+
+        .filter-tab .count {
+            background: rgba(255,255,255,0.2);
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 12px;
+            margin-left: 6px;
+        }
+
+        /* Test Cards */
+        .tests-container { display: flex; flex-direction: column; gap: 12px; }
 
         .test-card {
             background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
             border-radius: 12px;
             overflow: hidden;
-            transition: all 0.2s;
         }
 
-        .test-card:hover { background: var(--bg-hover); }
+        .test-card.failed { border-left: 4px solid var(--error); }
+        .test-card.passed { border-left: 4px solid var(--success); }
 
         .test-header {
-            display: flex;
-            align-items: center;
             padding: 16px 20px;
             cursor: pointer;
+            display: flex;
+            align-items: flex-start;
             gap: 16px;
         }
 
+        .test-header:hover { background: var(--bg-hover); }
+
         .test-status {
-            padding: 6px 12px;
-            border-radius: 6px;
-            font-size: 12px;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-
-        .test-status.failed { background: rgba(239, 68, 68, 0.15); color: var(--error); }
-        .test-status.succeeded { background: rgba(34, 197, 94, 0.15); color: var(--success); }
-
-        .test-name {
-            flex: 1;
-            font-size: 14px;
-            font-family: 'JetBrains Mono', monospace;
-        }
-
-        .test-meta {
-            display: flex;
-            gap: 24px;
-            color: var(--text-muted);
-            font-size: 13px;
-        }
-
-        .test-meta span { display: flex; align-items: center; gap: 6px; }
-
-        .test-expand {
-            width: 24px;
-            height: 24px;
-            color: var(--text-muted);
-            transition: transform 0.2s;
-        }
-
-        .test-card.expanded .test-expand { transform: rotate(180deg); }
-
-        .test-details {
-            display: none;
-            padding: 0 20px 20px;
-            border-top: 1px solid var(--border-color);
-        }
-
-        .test-card.expanded .test-details { display: block; }
-
-        .exception-box {
-            background: var(--bg-primary);
-            border-radius: 8px;
-            padding: 16px;
-            margin-top: 16px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 12px;
-            line-height: 1.6;
-            white-space: pre-wrap;
-            word-break: break-all;
-            max-height: 300px;
-            overflow-y: auto;
-            color: var(--text-secondary);
-        }
-
-        .log-url-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            margin-top: 12px;
-            padding: 8px 12px;
-            background: var(--accent-primary);
-            color: white;
-            border-radius: 6px;
-            text-decoration: none;
-            font-size: 12px;
-            transition: all 0.2s;
-        }
-
-        .log-url-btn:hover { opacity: 0.9; }
-
-        /* Logs Table */
-        .logs-filters {
-            display: flex;
-            gap: 12px;
-            margin-bottom: 20px;
-        }
-
-        .filter-select {
-            padding: 10px 16px;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            color: var(--text-primary);
-            font-size: 14px;
-            cursor: pointer;
-        }
-
-        .logs-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .logs-table th {
-            text-align: left;
-            padding: 12px 16px;
-            font-size: 11px;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .logs-table td {
-            padding: 14px 16px;
-            border-bottom: 1px solid var(--border-color);
-            font-size: 13px;
-        }
-
-        .logs-table tr:hover { background: var(--bg-hover); }
-
-        .severity-badge {
             padding: 4px 10px;
             border-radius: 6px;
             font-size: 11px;
             font-weight: 600;
             text-transform: uppercase;
+            flex-shrink: 0;
         }
 
-        .severity-badge.error { background: rgba(239, 68, 68, 0.15); color: var(--error); }
-        .severity-badge.fatal { background: rgba(220, 38, 38, 0.2); color: #f87171; }
-        .severity-badge.warn { background: rgba(234, 179, 8, 0.15); color: var(--warning); }
+        .test-status.failed { background: rgba(239, 68, 68, 0.15); color: var(--error); }
+        .test-status.passed { background: rgba(34, 197, 94, 0.15); color: var(--success); }
 
-        .message-cell {
-            max-width: 400px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 12px;
-        }
+        .test-info { flex: 1; min-width: 0; }
 
-        .view-stack {
-            color: var(--accent-primary);
-            cursor: pointer;
-            font-size: 11px;
-            display: block;
-            margin-top: 4px;
-        }
-
-        /* Empty & Loading States */
-        .empty-state {
-            text-align: center;
-            padding: 80px 40px;
-        }
-
-        .empty-icon {
-            width: 80px;
-            height: 80px;
-            margin: 0 auto 24px;
-            background: var(--bg-secondary);
-            border-radius: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .empty-icon svg { width: 40px; height: 40px; color: var(--text-muted); }
-
-        .empty-state h3 { font-size: 20px; margin: 0 0 8px 0; }
-        .empty-state p { color: var(--text-muted); margin: 0; }
-
-        /* Analyzed Runs Grid */
-        .analyzed-runs-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 16px;
-        }
-
-        .run-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 16px;
-            padding: 20px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .run-card:hover {
-            border-color: var(--accent-primary);
-            transform: translateY(-2px);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-        }
-
-        .run-card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 12px;
-        }
-
-        .run-card-id {
-            font-family: 'JetBrains Mono', monospace;
+        .test-name {
             font-size: 14px;
-            color: var(--accent-primary);
+            font-weight: 500;
+            margin-bottom: 4px;
+            word-break: break-word;
         }
 
-        .run-card-delete {
-            background: none;
-            border: none;
+        .test-meta {
+            font-size: 12px;
             color: var(--text-muted);
-            cursor: pointer;
-            padding: 4px;
-            border-radius: 4px;
-            opacity: 0;
-            transition: all 0.2s;
-        }
-
-        .run-card:hover .run-card-delete { opacity: 1; }
-        .run-card-delete:hover { color: var(--error); background: rgba(239, 68, 68, 0.1); }
-
-        .run-card-stats {
             display: flex;
             gap: 16px;
-            margin-top: 12px;
+            flex-wrap: wrap;
         }
 
-        .run-card-stat {
-            display: flex;
-            align-items: center;
-            gap: 6px;
+        .test-error-preview {
+            margin-top: 8px;
+            padding: 8px 12px;
+            background: rgba(239, 68, 68, 0.1);
+            border-radius: 6px;
             font-size: 13px;
+            color: var(--error);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .test-expand {
             color: var(--text-muted);
+            flex-shrink: 0;
+            transition: transform 0.2s;
         }
 
-        .run-card-stat.success { color: var(--success); }
-        .run-card-stat.error { color: var(--error); }
+        .test-card.expanded .test-expand { transform: rotate(180deg); }
 
-        .loading-state {
-            text-align: center;
-            padding: 80px 40px;
-        }
-
-        .spinner {
-            width: 48px;
-            height: 48px;
-            border: 3px solid var(--border-color);
-            border-top-color: var(--accent-primary);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 24px;
-        }
-
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        /* Modal */
-        .modal-overlay {
+        /* Test Details */
+        .test-details {
             display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.8);
-            z-index: 1000;
-            padding: 40px;
-            overflow-y: auto;
+            border-top: 1px solid var(--border-color);
+            padding: 20px;
+            background: var(--bg-primary);
         }
 
-        .modal-overlay.show { display: flex; align-items: flex-start; justify-content: center; }
+        .test-card.expanded .test-details { display: block; }
 
-        .modal {
-            background: var(--bg-card);
-            border-radius: 20px;
-            width: 100%;
-            max-width: 900px;
-            max-height: calc(100vh - 80px);
-            display: flex;
-            flex-direction: column;
-        }
+        .detail-section { margin-bottom: 20px; }
+        .detail-section:last-child { margin-bottom: 0; }
 
-        .modal-header {
-            padding: 20px 24px;
-            border-bottom: 1px solid var(--border-color);
+        .detail-title {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
             display: flex;
-            justify-content: space-between;
             align-items: center;
+            justify-content: space-between;
         }
 
-        .modal-header h3 { margin: 0; font-size: 18px; }
-
-        .modal-close {
+        .detail-title button {
             background: none;
             border: none;
-            color: var(--text-muted);
+            color: var(--accent-primary);
             cursor: pointer;
-            padding: 8px;
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        .detail-title button:hover { background: var(--bg-hover); }
+
+        .stack-trace {
+            background: #1a1a24;
             border-radius: 8px;
-            transition: all 0.2s;
-        }
-
-        .modal-close:hover { background: var(--bg-hover); color: var(--text-primary); }
-
-        .modal-body {
-            padding: 24px;
-            overflow-y: auto;
-            flex: 1;
-        }
-
-        .modal-body pre {
-            background: var(--bg-secondary);
-            border-radius: 12px;
-            padding: 20px;
+            padding: 16px;
             font-family: 'JetBrains Mono', monospace;
             font-size: 12px;
             line-height: 1.6;
             white-space: pre-wrap;
-            word-break: break-all;
-            margin: 0;
-            color: var(--text-secondary);
+            word-break: break-word;
+            max-height: 300px;
+            overflow-y: auto;
+            color: #e0e0e0;
+        }
+
+        .stack-trace .error-line { color: var(--error); font-weight: 500; }
+
+        .cluster-info {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .cluster-tag {
+            background: var(--bg-secondary);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .action-btn {
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s;
+        }
+
+        .action-btn.primary {
+            background: var(--accent-primary);
+            color: white;
+        }
+
+        .action-btn.secondary {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+
+        .action-btn:hover { opacity: 0.9; }
+        .action-btn svg { width: 14px; height: 14px; }
+
+        /* Empty & Loading States */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+
+        .empty-state h3 { font-size: 18px; margin-bottom: 8px; color: var(--text-primary); }
+
+        .loading-state {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Toast Notification */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            padding: 12px 20px;
+            border-radius: 10px;
+            font-size: 14px;
+            display: none;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .toast.show { display: block; animation: slideIn 0.3s ease; }
+
+        @keyframes slideIn {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
         }
 
         /* Responsive */
-        @media (max-width: 1200px) {
-            .stats-grid { grid-template-columns: repeat(2, 1fr); }
-            .summary-grid { grid-template-columns: repeat(2, 1fr); }
-        }
-
-        @media (max-width: 768px) {
+        @media (max-width: 900px) {
             .sidebar { display: none; }
-            .main-content { margin-left: 0; }
-            .hero { padding: 32px 24px; }
-            .content-area { padding: 24px; }
-            .stats-grid { grid-template-columns: 1fr; }
-            .summary-grid { grid-template-columns: 1fr; }
-            .search-box { flex-direction: column; }
+            .main { margin-left: 0; }
+            .stats-row { flex-wrap: wrap; }
         }
     </style>
 </head>
 <body>
-    <div class="app-container">
+    <div class="app">
         <!-- Sidebar -->
         <aside class="sidebar">
             <a href="index.html" class="logo">
                 <div class="logo-icon">
                     <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
                 </div>
-                <span class="logo-title">NOVA</span>
+                <span>NOVA</span>
             </a>
 
-            <nav class="nav-section">
-                <div class="nav-label">Navigation</div>
-                <a href="index.html" class="nav-item">
-                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                    </svg>
-                    Chat
-                </a>
-                <a href="log-browser.html" class="nav-item">
-                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
-                    </svg>
-                    Log Browser
-                </a>
-                <a href="db-browser.html" class="nav-item">
-                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
-                    </svg>
-                    Database
-                </a>
-                <a href="jita-browser.html" class="nav-item active">
-                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
-                    </svg>
-                    JITA Browser
-                </a>
-                <a href="settings.html" class="nav-item">
-                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v10"/>
-                    </svg>
-                    Settings
-                </a>
-            </nav>
-
-            <div class="history-section">
-                <div class="nav-label">Recent Analyses</div>
-                <div id="previousRuns"></div>
+            <div class="sidebar-section">
+                <div class="sidebar-title">Analyzed Runs</div>
+                <div id="runList" class="run-list">
+                    <div style="color: var(--text-muted); font-size: 13px;">Loading...</div>
+                </div>
             </div>
         </aside>
 
         <!-- Main Content -->
-        <main class="main-content">
-            <!-- Hero Section -->
-            <section class="hero">
-                <div class="hero-content">
-                    <h1>JITA Test Analysis</h1>
-                    <p>Analyze test runs, view logs, and identify failures from JITA automation</p>
-                    
-                    <div class="search-box">
-                        <input type="text" id="runIdInput" class="search-input" 
-                               placeholder="Enter JITA Run ID (e.g., 697a296e8e79ce6b2202f970)"
-                               onkeydown="if(event.key==='Enter') analyzeRun()">
-                        <button class="btn btn-secondary" onclick="previewRun()">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-                            </svg>
-                            Preview
-                        </button>
-                        <button class="btn btn-primary" onclick="analyzeRun()" id="analyzeBtn">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                                <polyline points="22 4 12 14.01 9 11.01"/>
-                            </svg>
-                            Analyze
-                        </button>
-                    </div>
+        <main class="main">
+            <div class="header">
+                <h1>JITA Test Analysis</h1>
+                <div class="search-row">
+                    <input type="text" id="runIdInput" class="search-input" 
+                           placeholder="Enter JITA Run ID to analyze..."
+                           onkeydown="if(event.key==='Enter') analyzeRun()">
+                    <button class="btn btn-primary" onclick="analyzeRun()" id="analyzeBtn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                        </svg>
+                        Analyze
+                    </button>
                 </div>
-            </section>
+            </div>
 
-            <!-- Content Area -->
-            <div class="content-area">
-                <!-- Empty State with Analyzed Runs -->
-                <div id="emptyState">
-                    <div id="analyzedRunsSection" style="display: none;">
-                        <h2 style="font-size: 20px; margin-bottom: 20px;">Previously Analyzed Runs</h2>
-                        <div id="analyzedRunsGrid" class="analyzed-runs-grid"></div>
-                    </div>
-                    <div id="noRunsState" class="empty-state">
-                        <div class="empty-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
-                            </svg>
-                        </div>
-                        <h3>Ready to Analyze</h3>
-                        <p>Enter a JITA task ID above to analyze test logs and identify failures</p>
-                    </div>
+            <!-- Failure Banner -->
+            <div id="failureBanner" class="failure-banner">
+                <h2>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+                    </svg>
+                    <span id="failureCount">0</span> Test(s) Failed
+                </h2>
+                <p id="failureSummary">Review the failed tests below to identify issues</p>
+            </div>
+
+            <!-- Stats Row -->
+            <div id="statsRow" class="stats-row" style="display: none;">
+                <div class="stat-box">
+                    <div class="stat-value" id="statTotal">0</div>
+                    <div class="stat-label">Total Tests</div>
                 </div>
-
-                <!-- Loading State -->
-                <div id="loadingState" style="display: none;">
-                    <div class="loading-state">
-                        <div class="spinner"></div>
-                        <h3 id="loadingTitle">Analyzing Run...</h3>
-                        <p id="loadingDesc" style="color: var(--text-muted);">Fetching test results and parsing logs</p>
-                        <p style="color: var(--text-muted); font-size: 12px; margin-top: 16px;">This may take 1-3 minutes for large runs</p>
-                    </div>
+                <div class="stat-box passed">
+                    <div class="stat-value" id="statPassed">0</div>
+                    <div class="stat-label">Passed</div>
                 </div>
-
-                <!-- Results -->
-                <div id="resultsSection" style="display: none;">
-                    <!-- Stats Grid -->
-                    <div class="stats-grid" id="statsGrid">
-                        <div class="stat-card">
-                            <div class="stat-icon blue">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                                </svg>
-                            </div>
-                            <div class="stat-value" id="statTests">0</div>
-                            <div class="stat-label">Tests Analyzed</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon green">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                                    <polyline points="22 4 12 14.01 9 11.01"/>
-                                </svg>
-                            </div>
-                            <div class="stat-value" id="statPassed">0</div>
-                            <div class="stat-label">Passed</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon red">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
-                                </svg>
-                            </div>
-                            <div class="stat-value" id="statFailed">0</div>
-                            <div class="stat-label">Failed</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon yellow">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                                    <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                                </svg>
-                            </div>
-                            <div class="stat-value" id="statEvents">0</div>
-                            <div class="stat-label">Log Events</div>
-                        </div>
-                    </div>
-
-                    <!-- Tabs Container -->
-                    <div class="tabs-container">
-                        <div class="tabs-header">
-                            <button class="tab-btn active" onclick="showTab('summary', this)">Summary</button>
-                            <button class="tab-btn" onclick="showTab('tests', this)">Tests</button>
-                            <button class="tab-btn" onclick="showTab('logs', this)">Logs</button>
-                        </div>
-                        <div class="tabs-body">
-                            <!-- Summary Tab -->
-                            <div id="summaryTab" class="tab-content active">
-                                <div id="summaryContent"></div>
-                            </div>
-
-                            <!-- Tests Tab -->
-                            <div id="testsTab" class="tab-content">
-                                <div id="testsContent" class="tests-list"></div>
-                            </div>
-
-                            <!-- Logs Tab -->
-                            <div id="logsTab" class="tab-content">
-                                <div class="logs-filters">
-                                    <select id="severityFilter" class="filter-select" onchange="loadLogs()">
-                                        <option value="">All Severities</option>
-                                        <option value="FATAL">FATAL</option>
-                                        <option value="ERROR">ERROR</option>
-                                        <option value="WARN">WARN</option>
-                                    </select>
-                                    <select id="eventTypeFilter" class="filter-select" onchange="loadLogs()">
-                                        <option value="">All Event Types</option>
-                                    </select>
-                                </div>
-                                <table class="logs-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Severity</th>
-                                            <th>Event Type</th>
-                                            <th>Source</th>
-                                            <th>Message</th>
-                                            <th>Test</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="logsTableBody"></tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
+                <div class="stat-box failed">
+                    <div class="stat-value" id="statFailed">0</div>
+                    <div class="stat-label">Failed</div>
                 </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="statDuration">-</div>
+                    <div class="stat-label">Total Duration</div>
+                </div>
+            </div>
+
+            <!-- Filter Tabs -->
+            <div id="filterTabs" class="filter-tabs" style="display: none;">
+                <button class="filter-tab active" data-filter="failed" onclick="filterTests('failed', this)">
+                    Failed<span class="count" id="filterFailedCount">0</span>
+                </button>
+                <button class="filter-tab" data-filter="passed" onclick="filterTests('passed', this)">
+                    Passed<span class="count" id="filterPassedCount">0</span>
+                </button>
+                <button class="filter-tab" data-filter="all" onclick="filterTests('all', this)">
+                    All<span class="count" id="filterAllCount">0</span>
+                </button>
+            </div>
+
+            <!-- Tests Container -->
+            <div id="testsContainer" class="tests-container"></div>
+
+            <!-- Empty State -->
+            <div id="emptyState" class="empty-state">
+                <h3>Enter a JITA Run ID</h3>
+                <p>Paste a run ID above to analyze test results and failures</p>
+            </div>
+
+            <!-- Loading State -->
+            <div id="loadingState" class="loading-state" style="display: none;">
+                <div class="spinner"></div>
+                <h3>Analyzing...</h3>
+                <p style="color: var(--text-muted);">Fetching results and parsing logs. This may take 1-2 minutes.</p>
             </div>
         </main>
     </div>
 
-    <!-- Stack Trace Modal -->
-    <div id="stackTraceModal" class="modal-overlay">
-        <div class="modal">
-            <div class="modal-header">
-                <h3>Stack Trace</h3>
-                <button class="modal-close" onclick="closeModal()">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                    </svg>
-                </button>
-            </div>
-            <div class="modal-body">
-                <pre id="modalContent"></pre>
-            </div>
-        </div>
-    </div>
+    <!-- Toast -->
+    <div id="toast" class="toast"></div>
 
     <script>
         const API_HOST = localStorage.getItem('nova-backend-url') || `http://${window.location.hostname}:9360`;
         const API_BASE = `${API_HOST}/api/jita`;
+        
         let currentRunId = null;
-        let currentAnalysis = null;
+        let allTests = [];
+        let currentFilter = 'failed';
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
@@ -962,236 +591,244 @@
             const savedTheme = localStorage.getItem('nova-theme') || 'dark';
             document.documentElement.setAttribute('data-theme', savedTheme);
             
-            loadPreviousRuns();
+            loadAnalyzedRuns();
             
             const params = new URLSearchParams(window.location.search);
             const runId = params.get('run');
             if (runId) {
                 document.getElementById('runIdInput').value = runId;
-                loadExistingRun(runId);
+                loadRun(runId);
             }
         });
 
+        async function loadAnalyzedRuns() {
+            try {
+                const res = await fetch(`${API_BASE}/runs`);
+                const data = await res.json();
+                const container = document.getElementById('runList');
+                
+                if (!data.runs || data.runs.length === 0) {
+                    container.innerHTML = '<div style="color: var(--text-muted); font-size: 13px;">No runs analyzed yet</div>';
+                    return;
+                }
+
+                container.innerHTML = data.runs.map(runId => `
+                    <div class="run-item ${runId === currentRunId ? 'active' : ''}" onclick="loadRun('${runId}')">
+                        <span>${runId.slice(0, 8)}...${runId.slice(-4)}</span>
+                        <button class="delete-btn" onclick="event.stopPropagation(); deleteRun('${runId}')" title="Delete">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                            </svg>
+                        </button>
+                    </div>
+                `).join('');
+            } catch (e) {
+                console.error('Error loading runs:', e);
+            }
+        }
+
         async function analyzeRun() {
             const runId = document.getElementById('runIdInput').value.trim();
-            if (!runId) { alert('Please enter a JITA run ID'); return; }
+            if (!runId) { showToast('Please enter a Run ID'); return; }
 
             showLoading(true);
-            currentRunId = runId;
-
+            
             try {
-                const response = await fetch(`${API_BASE}/analyze/${runId}`, { method: 'POST' });
-                const data = await response.json();
+                const res = await fetch(`${API_BASE}/analyze/${runId}`, { method: 'POST' });
+                const data = await res.json();
                 
                 if (data.status === 'error') {
-                    alert('Error: ' + data.error);
+                    showToast('Error: ' + data.error);
                     showLoading(false);
                     return;
                 }
 
-                currentAnalysis = data;
-                displayResults(data);
-                loadPreviousRuns();
+                currentRunId = runId;
                 window.history.pushState({}, '', `?run=${runId}`);
-            } catch (error) {
-                console.error('Error:', error);
-                alert('Failed to analyze run: ' + error.message);
+                await loadRun(runId);
+                loadAnalyzedRuns();
+            } catch (e) {
+                showToast('Failed to analyze: ' + e.message);
             }
-
+            
             showLoading(false);
         }
 
-        async function previewRun() {
-            const runId = document.getElementById('runIdInput').value.trim();
-            if (!runId) { alert('Please enter a JITA run ID'); return; }
-
-            try {
-                const response = await fetch(`${API_BASE}/task/${runId}`);
-                const data = await response.json();
-                
-                if (data.status !== 'success') { alert('Task not found'); return; }
-
-                alert(`Task: ${data.label}\nService: ${data.service}\nStatus: ${data.task_status}\nCreated By: ${data.created_by}\nTests: ${data.test_results}\n\nResults:\n- Total: ${data.test_result_count.Total || 0}\n- Succeeded: ${data.test_result_count.Succeeded || 0}\n- Failed: ${data.test_result_count.Failed || 0}`);
-            } catch (error) {
-                alert('Failed to preview: ' + error.message);
-            }
-        }
-
-        async function loadExistingRun(runId) {
+        async function loadRun(runId) {
             showLoading(true);
             currentRunId = runId;
-
+            document.getElementById('runIdInput').value = runId;
+            window.history.pushState({}, '', `?run=${runId}`);
+            
             try {
-                const response = await fetch(`${API_BASE}/runs/${runId}`);
-                const data = await response.json();
+                const res = await fetch(`${API_BASE}/runs/${runId}/summary`);
+                const data = await res.json();
                 
-                if (data.status !== 'success') { await analyzeRun(); return; }
+                if (data.status !== 'success' || !data.tests) {
+                    // Not analyzed yet, trigger analysis
+                    await analyzeRun();
+                    return;
+                }
 
-                currentAnalysis = data;
-                displayStoredResults(data);
-            } catch (error) {
-                console.error('Error:', error);
+                allTests = data.tests;
+                displayResults();
+                loadAnalyzedRuns();
+            } catch (e) {
+                showToast('Error loading run: ' + e.message);
             }
-
+            
             showLoading(false);
         }
 
-        function displayResults(data) {
+        function displayResults() {
             document.getElementById('emptyState').style.display = 'none';
-            document.getElementById('resultsSection').style.display = 'block';
-
-            const counts = data.test_result_count || {};
-            document.getElementById('statTests').textContent = data.tests_analyzed || 0;
-            document.getElementById('statPassed').textContent = counts.Succeeded || 0;
-            document.getElementById('statFailed').textContent = counts.Failed || 0;
-            document.getElementById('statEvents').textContent = data.log_events_found || 0;
-
-            displaySummary(data);
-            displayTests(data.summaries || []);
-            populateEventTypes(data.event_types || {});
-            loadLogs();
-        }
-
-        function displayStoredResults(data) {
-            document.getElementById('emptyState').style.display = 'none';
-            document.getElementById('resultsSection').style.display = 'block';
-
-            const tests = data.tests || [];
-            document.getElementById('statTests').textContent = tests.length;
-            document.getElementById('statPassed').textContent = tests.filter(t => t.status === 'Succeeded').length;
-            document.getElementById('statFailed').textContent = tests.filter(t => t.status === 'Failed').length;
-            document.getElementById('statEvents').textContent = '-';
-
-            displayStoredSummary(data);
-            displayTests(tests);
-            populateEventTypes(data.event_types || {});
-            loadLogs();
-        }
-
-        function displaySummary(data) {
-            const task = data.task || {};
-            const errorCounts = data.error_counts || {};
-            const eventTypes = data.event_types || {};
-
-            let html = `
-                <div class="summary-grid">
-                    <div class="summary-card mono"><h4>Run ID</h4><p>${currentRunId}</p></div>
-                    <div class="summary-card"><h4>Label</h4><p>${task.label || '-'}</p></div>
-                    <div class="summary-card"><h4>Service</h4><p>${task.service || '-'}</p></div>
-                    <div class="summary-card"><h4>Status</h4><p>${task.status || '-'}</p></div>
-                    <div class="summary-card"><h4>Created By</h4><p>${task.created_by || '-'}</p></div>
-                    <div class="summary-card"><h4>Tests Analyzed</h4><p>${data.tests_analyzed || 0}</p></div>
-                </div>
-                
-                ${Object.keys(errorCounts).length ? `
-                <div class="distribution-section">
-                    <div class="distribution-title">Error Distribution</div>
-                    <div class="distribution-grid">
-                        ${Object.entries(errorCounts).map(([sev, count]) => `
-                            <div class="dist-chip ${sev.toLowerCase()}">
-                                <span class="label">${sev}</span>
-                                <span class="value">${count}</span>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>` : ''}
-                
-                ${Object.keys(eventTypes).length ? `
-                <div class="distribution-section">
-                    <div class="distribution-title">Top Event Types</div>
-                    <div class="distribution-grid">
-                        ${Object.entries(eventTypes).slice(0, 8).map(([type, count]) => `
-                            <div class="dist-chip">
-                                <span class="label">${type}</span>
-                                <span class="value">${count}</span>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>` : ''}
-            `;
-
-            document.getElementById('summaryContent').innerHTML = html;
-        }
-
-        function displayStoredSummary(data) {
-            const tests = data.tests || [];
-            const errorCounts = data.error_counts || {};
-            const eventTypes = data.event_types || {};
-
-            let html = `
-                <div class="summary-grid">
-                    <div class="summary-card mono"><h4>Run ID</h4><p>${currentRunId}</p></div>
-                    <div class="summary-card"><h4>Total Tests</h4><p>${tests.length}</p></div>
-                </div>
-                
-                ${Object.keys(errorCounts).length ? `
-                <div class="distribution-section">
-                    <div class="distribution-title">Error Distribution</div>
-                    <div class="distribution-grid">
-                        ${Object.entries(errorCounts).map(([sev, count]) => `
-                            <div class="dist-chip ${sev.toLowerCase()}">
-                                <span class="label">${sev}</span>
-                                <span class="value">${count}</span>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>` : ''}
-            `;
-
-            document.getElementById('summaryContent').innerHTML = html;
-        }
-
-        function displayTests(tests) {
-            const container = document.getElementById('testsContent');
+            document.getElementById('statsRow').style.display = 'flex';
+            document.getElementById('filterTabs').style.display = 'flex';
             
-            if (!tests || tests.length === 0) {
-                container.innerHTML = '<div class="empty-state" style="padding: 40px;"><p>No tests found</p></div>';
+            const passed = allTests.filter(t => t.status === 'Succeeded').length;
+            const failed = allTests.filter(t => t.status !== 'Succeeded').length;
+            const totalDuration = allTests.reduce((sum, t) => sum + (t.duration_seconds || 0), 0);
+            
+            // Update stats
+            document.getElementById('statTotal').textContent = allTests.length;
+            document.getElementById('statPassed').textContent = passed;
+            document.getElementById('statFailed').textContent = failed;
+            document.getElementById('statDuration').textContent = formatDuration(totalDuration);
+            
+            // Update filter counts
+            document.getElementById('filterFailedCount').textContent = failed;
+            document.getElementById('filterPassedCount').textContent = passed;
+            document.getElementById('filterAllCount').textContent = allTests.length;
+            
+            // Show failure banner if there are failures
+            const banner = document.getElementById('failureBanner');
+            if (failed > 0) {
+                banner.classList.add('show');
+                document.getElementById('failureCount').textContent = failed;
+                
+                // Summarize failure types
+                const errorTypes = {};
+                allTests.filter(t => t.status !== 'Succeeded').forEach(t => {
+                    const errorType = extractErrorType(t.exception_summary);
+                    errorTypes[errorType] = (errorTypes[errorType] || 0) + 1;
+                });
+                
+                const summary = Object.entries(errorTypes)
+                    .map(([type, count]) => `${type} (${count})`)
+                    .join(', ');
+                document.getElementById('failureSummary').textContent = summary || 'Review the failed tests below';
+            } else {
+                banner.classList.remove('show');
+            }
+            
+            // Default to showing failed tests first
+            currentFilter = failed > 0 ? 'failed' : 'all';
+            document.querySelectorAll('.filter-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.filter === currentFilter);
+            });
+            
+            filterTests(currentFilter);
+        }
+
+        function filterTests(filter, btn) {
+            currentFilter = filter;
+            
+            // Update active tab
+            if (btn) {
+                document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+                btn.classList.add('active');
+            }
+            
+            let filtered = allTests;
+            if (filter === 'failed') {
+                filtered = allTests.filter(t => t.status !== 'Succeeded');
+            } else if (filter === 'passed') {
+                filtered = allTests.filter(t => t.status === 'Succeeded');
+            }
+            
+            renderTests(filtered);
+        }
+
+        function renderTests(tests) {
+            const container = document.getElementById('testsContainer');
+            
+            if (tests.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <h3>No ${currentFilter === 'all' ? '' : currentFilter} tests</h3>
+                        <p>${currentFilter === 'failed' ? 'All tests passed!' : 'No tests match this filter'}</p>
+                    </div>
+                `;
                 return;
             }
 
             container.innerHTML = tests.map((test, idx) => {
-                const testName = test.test_name || 'Unknown';
-                const shortName = testName.split('.').slice(-2).join('.');
-                const statusClass = (test.status || '').toLowerCase();
-                const duration = test.duration_seconds ? `${Math.round(test.duration_seconds / 60)}m` : '-';
-                const ops = `${test.successful_ops || 0}/${test.total_ops || 0}`;
-
+                const isFailed = test.status !== 'Succeeded';
+                const shortName = extractTestName(test.test_name);
+                const duration = formatDuration(test.duration_seconds);
+                const ops = `${test.successful_ops || 0}/${test.total_ops || 0} ops`;
+                
                 return `
-                    <div class="test-card" id="testCard${idx}">
+                    <div class="test-card ${isFailed ? 'failed' : 'passed'}" id="test-${idx}">
                         <div class="test-header" onclick="toggleTest(${idx})">
-                            <span class="test-status ${statusClass}">${test.status || '-'}</span>
-                            <span class="test-name" title="${testName}">${shortName}</span>
-                            <div class="test-meta">
-                                <span>
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-                                    </svg>
-                                    ${duration}
-                                </span>
-                                <span>
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
-                                    </svg>
-                                    ${ops} ops
-                                </span>
+                            <span class="test-status ${isFailed ? 'failed' : 'passed'}">${test.status}</span>
+                            <div class="test-info">
+                                <div class="test-name">${shortName}</div>
+                                <div class="test-meta">
+                                    <span>${duration}</span>
+                                    <span>${ops}</span>
+                                </div>
+                                ${isFailed && test.exception_summary ? `
+                                    <div class="test-error-preview">${escapeHtml(test.exception_summary)}</div>
+                                ` : ''}
                             </div>
-                            <svg class="test-expand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <svg class="test-expand" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="6 9 12 15 18 9"/>
                             </svg>
                         </div>
                         <div class="test-details">
-                            <div class="summary-grid" style="margin-top: 16px;">
-                                <div class="summary-card mono"><h4>Full Name</h4><p style="font-size: 11px;">${testName}</p></div>
-                                <div class="summary-card"><h4>Cluster</h4><p>${test.cluster_info || '-'}</p></div>
+                            <div class="detail-section">
+                                <div class="detail-title">Full Test Name</div>
+                                <div class="cluster-tag" style="word-break: break-all;">${test.test_name}</div>
                             </div>
-                            ${test.exception_summary ? `<div class="summary-card" style="margin-top: 12px;"><h4>Error</h4><p>${escapeHtml(test.exception_summary)}</p></div>` : ''}
-                            ${test.exception_full ? `<div class="exception-box">${escapeHtml(test.exception_full)}</div>` : ''}
-                            ${test.log_url ? `<a href="${test.log_url}" target="_blank" class="log-url-btn">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
-                                </svg>
-                                View Logs
-                            </a>` : ''}
+                            
+                            ${test.cluster_info ? `
+                            <div class="detail-section">
+                                <div class="detail-title">Cluster Info</div>
+                                <div class="cluster-info">
+                                    ${test.cluster_info.split(',').map(c => `<span class="cluster-tag">${c.trim()}</span>`).join('')}
+                                </div>
+                            </div>
+                            ` : ''}
+                            
+                            ${test.exception_full ? `
+                            <div class="detail-section">
+                                <div class="detail-title">
+                                    Stack Trace
+                                    <button onclick="copyToClipboard(\`${escapeHtml(test.exception_full).replace(/`/g, '\\`')}\`)">Copy</button>
+                                </div>
+                                <div class="stack-trace">${formatStackTrace(test.exception_full)}</div>
+                            </div>
+                            ` : ''}
+                            
+                            <div class="action-buttons">
+                                ${test.log_url ? `
+                                    <a href="${test.log_url}" target="_blank" class="action-btn primary">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
+                                            <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                                        </svg>
+                                        View Full Logs
+                                    </a>
+                                ` : ''}
+                                <button class="action-btn secondary" onclick="copyToClipboard('${test.test_result_id}')">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                                        <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+                                    </svg>
+                                    Copy Test ID
+                                </button>
+                            </div>
                         </div>
                     </div>
                 `;
@@ -1199,204 +836,63 @@
         }
 
         function toggleTest(idx) {
-            document.getElementById(`testCard${idx}`).classList.toggle('expanded');
-        }
-
-        async function loadLogs() {
-            if (!currentRunId) return;
-
-            const severity = document.getElementById('severityFilter').value;
-            const eventType = document.getElementById('eventTypeFilter').value;
-
-            let url = `${API_BASE}/runs/${currentRunId}/logs?limit=200`;
-            if (severity) url += `&severity=${severity}`;
-            if (eventType) url += `&event_type=${eventType}`;
-
-            try {
-                const response = await fetch(url);
-                const data = await response.json();
-                displayLogs(data.logs || []);
-            } catch (error) {
-                console.error('Error loading logs:', error);
-            }
-        }
-
-        function displayLogs(logs) {
-            const tbody = document.getElementById('logsTableBody');
-
-            if (!logs || logs.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: var(--text-muted);">No log events found</td></tr>';
-                return;
-            }
-
-            tbody.innerHTML = logs.map(log => {
-                const sevClass = (log.severity || '').toLowerCase();
-                const shortTest = (log.test_name || '').split('.').slice(-1)[0];
-                const hasStack = log.stack_trace && log.stack_trace.length > 0;
-
-                return `
-                    <tr>
-                        <td><span class="severity-badge ${sevClass}">${log.severity || '-'}</span></td>
-                        <td>${log.event_type || '-'}</td>
-                        <td>${log.log_source || '-'}</td>
-                        <td>
-                            <div class="message-cell">${escapeHtml(log.message || '-')}</div>
-                            ${hasStack ? `<span class="view-stack" onclick="showStackTrace(\`${escapeHtml(log.stack_trace)}\`)">View Stack Trace</span>` : ''}
-                        </td>
-                        <td title="${log.test_name || ''}">${shortTest}</td>
-                    </tr>
-                `;
-            }).join('');
-        }
-
-        function populateEventTypes(eventTypes) {
-            const select = document.getElementById('eventTypeFilter');
-            const current = select.value;
-            select.innerHTML = '<option value="">All Event Types</option>';
-            
-            Object.keys(eventTypes).sort().forEach(type => {
-                const option = document.createElement('option');
-                option.value = type;
-                option.textContent = `${type} (${eventTypes[type]})`;
-                select.appendChild(option);
-            });
-
-            select.value = current;
-        }
-
-        function showTab(tabName, btn) {
-            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            document.getElementById(`${tabName}Tab`).classList.add('active');
-            btn.classList.add('active');
-        }
-
-        async function loadPreviousRuns() {
-            try {
-                const response = await fetch(`${API_BASE}/runs`);
-                const data = await response.json();
-                const sidebarContainer = document.getElementById('previousRuns');
-                const mainGrid = document.getElementById('analyzedRunsGrid');
-                const analyzedSection = document.getElementById('analyzedRunsSection');
-                const noRunsState = document.getElementById('noRunsState');
-                
-                if (!data.runs || data.runs.length === 0) {
-                    sidebarContainer.innerHTML = '<p style="color: var(--text-muted); font-size: 13px; padding: 8px 0;">No analyzed runs yet</p>';
-                    analyzedSection.style.display = 'none';
-                    noRunsState.style.display = 'block';
-                    return;
-                }
-
-                // Update sidebar
-                sidebarContainer.innerHTML = data.runs.map(runId => `
-                    <div class="history-item" onclick="loadRun('${runId}')">
-                        <span>${runId.substring(0, 16)}...</span>
-                        <button class="history-delete" onclick="event.stopPropagation(); deleteRun('${runId}')">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                            </svg>
-                        </button>
-                    </div>
-                `).join('');
-
-                // Update main content area with run cards
-                analyzedSection.style.display = 'block';
-                noRunsState.style.display = 'none';
-                
-                // Fetch details for each run to show in cards
-                const runDetails = await Promise.all(
-                    data.runs.slice(0, 12).map(async runId => {
-                        try {
-                            const res = await fetch(`${API_BASE}/runs/${runId}/summary`);
-                            const summary = await res.json();
-                            return { runId, ...summary };
-                        } catch {
-                            return { runId, tests: [], error_counts: {} };
-                        }
-                    })
-                );
-
-                mainGrid.innerHTML = runDetails.map(run => {
-                    const tests = run.tests || [];
-                    const passed = tests.filter(t => t.status === 'Succeeded').length;
-                    const failed = tests.filter(t => t.status === 'Failed').length;
-                    
-                    return `
-                        <div class="run-card" onclick="loadRun('${run.runId}')">
-                            <div class="run-card-header">
-                                <span class="run-card-id">${run.runId}</span>
-                                <button class="run-card-delete" onclick="event.stopPropagation(); deleteRun('${run.runId}')">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                                    </svg>
-                                </button>
-                            </div>
-                            <div class="run-card-stats">
-                                <span class="run-card-stat">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                                    </svg>
-                                    ${tests.length} tests
-                                </span>
-                                <span class="run-card-stat success">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <polyline points="20 6 9 17 4 12"/>
-                                    </svg>
-                                    ${passed}
-                                </span>
-                                <span class="run-card-stat error">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                                    </svg>
-                                    ${failed}
-                                </span>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-            } catch (error) {
-                console.error('Error loading runs:', error);
-            }
-        }
-
-        function loadRun(runId) {
-            document.getElementById('runIdInput').value = runId;
-            window.history.pushState({}, '', `?run=${runId}`);
-            loadExistingRun(runId);
+            document.getElementById(`test-${idx}`).classList.toggle('expanded');
         }
 
         async function deleteRun(runId) {
-            if (!confirm(`Delete analysis for run ${runId}?`)) return;
-
+            if (!confirm('Delete this analysis?')) return;
+            
             try {
                 await fetch(`${API_BASE}/runs/${runId}`, { method: 'DELETE' });
-                loadPreviousRuns();
+                showToast('Deleted');
                 
                 if (currentRunId === runId) {
-                    document.getElementById('resultsSection').style.display = 'none';
-                    document.getElementById('emptyState').style.display = 'block';
                     currentRunId = null;
-                    currentAnalysis = null;
+                    allTests = [];
+                    document.getElementById('emptyState').style.display = 'block';
+                    document.getElementById('statsRow').style.display = 'none';
+                    document.getElementById('filterTabs').style.display = 'none';
+                    document.getElementById('failureBanner').classList.remove('show');
+                    document.getElementById('testsContainer').innerHTML = '';
                 }
-            } catch (error) {
-                alert('Failed to delete: ' + error.message);
+                
+                loadAnalyzedRuns();
+            } catch (e) {
+                showToast('Delete failed');
             }
         }
 
-        function showLoading(show) {
-            document.getElementById('loadingState').style.display = show ? 'block' : 'none';
-            document.getElementById('emptyState').style.display = show ? 'none' : (currentAnalysis ? 'none' : 'block');
-            document.getElementById('resultsSection').style.display = show ? 'none' : (currentAnalysis ? 'block' : 'none');
-            document.getElementById('analyzeBtn').disabled = show;
+        // Helpers
+        function extractTestName(fullName) {
+            if (!fullName) return 'Unknown';
+            const parts = fullName.split('.');
+            return parts.slice(-2).join('.');
         }
 
-        function showStackTrace(content) {
-            document.getElementById('modalContent').textContent = content;
-            document.getElementById('stackTraceModal').classList.add('show');
+        function extractErrorType(summary) {
+            if (!summary) return 'Unknown';
+            const match = summary.match(/^(\w+Error|\w+Exception)/);
+            return match ? match[1] : 'Error';
         }
 
-        function closeModal() {
-            document.getElementById('stackTraceModal').classList.remove('show');
+        function formatDuration(seconds) {
+            if (!seconds) return '-';
+            if (seconds < 60) return `${seconds}s`;
+            if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+            return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
+        }
+
+        function formatStackTrace(trace) {
+            if (!trace) return '';
+            return escapeHtml(trace)
+                .split('\n')
+                .map(line => {
+                    if (line.includes('Error') || line.includes('Exception') || line.includes('raise')) {
+                        return `<span class="error-line">${line}</span>`;
+                    }
+                    return line;
+                })
+                .join('\n');
         }
 
         function escapeHtml(text) {
@@ -1406,10 +902,23 @@
             return div.innerHTML;
         }
 
-        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
-        document.getElementById('stackTraceModal').addEventListener('click', e => {
-            if (e.target.id === 'stackTraceModal') closeModal();
-        });
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text);
+            showToast('Copied to clipboard');
+        }
+
+        function showLoading(show) {
+            document.getElementById('loadingState').style.display = show ? 'block' : 'none';
+            document.getElementById('emptyState').style.display = show ? 'none' : (allTests.length ? 'none' : 'block');
+            document.getElementById('analyzeBtn').disabled = show;
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
     </script>
 </body>
 </html>
