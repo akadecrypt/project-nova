@@ -213,6 +213,26 @@
         .results-meta .failed { color: #ef4444; font-weight: 600; }
         .results-meta .passed { color: #22c55e; font-weight: 600; }
 
+        .btn-reanalyze {
+            background: transparent;
+            border: 1px solid #3f3f46;
+            color: #a1a1aa;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-left: 16px;
+            transition: all 0.15s;
+        }
+
+        .btn-reanalyze:hover {
+            border-color: #6366f1;
+            color: #e4e4e7;
+        }
+
         /* Test Case Card */
         .test-case {
             background: #111116;
@@ -586,7 +606,7 @@
             <!-- Loading State -->
             <div id="loadingState" class="loading">
                 <div class="spinner"></div>
-                <div>Loading results...</div>
+                <p>Loading results...</p>
             </div>
 
             <!-- Empty State -->
@@ -602,6 +622,13 @@
                     <div class="results-meta">
                         <span><span class="failed" id="metaFailed">0</span> failed</span>
                         <span><span class="passed" id="metaPassed">0</span> passed</span>
+                        <button class="btn-reanalyze" onclick="forceReanalyze()" title="Re-analyze this run">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M23 4v6h-6M1 20v-6h6"/>
+                                <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                            </svg>
+                            Re-analyze
+                        </button>
                     </div>
                 </div>
                 <div id="testCasesList"></div>
@@ -721,6 +748,34 @@
             return Math.floor(diff / 86400) + 'd ago';
         }
 
+        async function forceReanalyze() {
+            if (!currentRunId) return;
+            
+            if (!confirm('Re-analyze this run? This will overwrite existing analysis.')) {
+                return;
+            }
+            
+            try {
+                const res = await fetch(`${API}/analyze/${currentRunId}/start`, { method: 'POST' });
+                const data = await res.json();
+                
+                if (data.status === 'started' || data.status === 'already_running') {
+                    showToast('Re-analysis started in background');
+                    document.getElementById('resultsSection').classList.remove('show');
+                    document.getElementById('emptyState').style.display = 'block';
+                    checkRunningJobs();
+                    
+                    if (!pollIntervals[currentRunId]) {
+                        pollIntervals[currentRunId] = setInterval(() => pollJobStatus(currentRunId), 5000);
+                    }
+                } else {
+                    showToast(data.message || 'Failed to start');
+                }
+            } catch (e) {
+                showToast('Error: ' + e.message);
+            }
+        }
+
         async function checkRunningJobs() {
             try {
                 const res = await fetch(`${API}/jobs`);
@@ -780,6 +835,22 @@
                 return;
             }
 
+            // First check if already analyzed
+            try {
+                const checkRes = await fetch(`${API}/runs/${runId}/summary`);
+                const checkData = await checkRes.json();
+                
+                if (checkData.status === 'success' && checkData.tests && checkData.tests.length > 0) {
+                    // Already analyzed - just load results
+                    showToast('Run already analyzed. Loading results...');
+                    loadResults(runId);
+                    return;
+                }
+            } catch (e) {
+                // Continue to start analysis
+            }
+
+            // Not analyzed yet - start analysis
             try {
                 const res = await fetch(`${API}/analyze/${runId}/start`, { method: 'POST' });
                 const data = await res.json();
@@ -800,7 +871,7 @@
             }
         }
 
-        async function loadResults(runId) {
+        async function loadResults(runId, forceAnalyze = false) {
             currentRunId = runId;
             document.getElementById('runIdInput').value = runId;
             window.history.pushState({}, '', `?run=${runId}`);
@@ -808,26 +879,38 @@
             document.getElementById('emptyState').style.display = 'none';
             document.getElementById('resultsSection').classList.remove('show');
             document.getElementById('loadingState').classList.add('show');
+            document.getElementById('loadingState').querySelector('p').textContent = 'Loading results...';
             
             try {
+                // First, try to load existing results
                 const res = await fetch(`${API}/runs/${runId}/summary`);
                 const data = await res.json();
                 
-                if (data.status !== 'success' || !data.tests) {
-                    showToast('Run not analyzed yet. Starting analysis...');
-                    startAnalysis();
+                if (data.status === 'success' && data.tests && data.tests.length > 0) {
+                    // Already analyzed - show results directly
+                    displayResults(data.tests);
+                    loadRecentRuns();
                     document.getElementById('loadingState').classList.remove('show');
-                    document.getElementById('emptyState').style.display = 'block';
                     return;
                 }
-
-                displayResults(data.tests);
-                loadRecentRuns();
+                
+                // Not analyzed yet
+                if (forceAnalyze) {
+                    // User explicitly requested analysis
+                    document.getElementById('loadingState').classList.remove('show');
+                    startAnalysis();
+                } else {
+                    // Just show that it's not analyzed
+                    document.getElementById('loadingState').classList.remove('show');
+                    document.getElementById('emptyState').style.display = 'block';
+                    showToast('Run not analyzed yet. Click "Analyze" to start.');
+                }
             } catch (e) {
+                console.error('Load error:', e);
+                document.getElementById('loadingState').classList.remove('show');
+                document.getElementById('emptyState').style.display = 'block';
                 showToast('Error loading: ' + e.message);
             }
-            
-            document.getElementById('loadingState').classList.remove('show');
         }
 
         function displayResults(tests) {
