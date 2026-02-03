@@ -3,7 +3,9 @@ JITA Router for NOVA Backend
 
 API endpoints for JITA test run analysis.
 """
-from fastapi import APIRouter, HTTPException, Query
+import threading
+from datetime import datetime
+from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 
@@ -12,6 +14,9 @@ from ..logging_config import get_logger
 
 router = APIRouter()
 logger = get_logger(__name__)
+
+# Track running analysis jobs
+_analysis_jobs: Dict[str, Dict] = {}  # run_id -> {status, started_at, error}
 
 
 class AnalyzeRequest(BaseModel):
@@ -33,10 +38,102 @@ class AnalyzeResponse(BaseModel):
     error: Optional[str] = None
 
 
+def _run_analysis_background(run_id: str):
+    """Background task to run analysis."""
+    global _analysis_jobs
+    try:
+        logger.info(f"Background: Starting analysis for {run_id}")
+        service = get_jita_service()
+        result = service.analyze_run(run_id)
+        
+        if "error" in result:
+            _analysis_jobs[run_id] = {
+                "status": "failed",
+                "error": result["error"],
+                "completed_at": datetime.now().isoformat()
+            }
+        else:
+            _analysis_jobs[run_id] = {
+                "status": "completed",
+                "tests_analyzed": result.get("tests_analyzed", 0),
+                "completed_at": datetime.now().isoformat()
+            }
+        logger.info(f"Background: Completed analysis for {run_id}")
+        
+    except Exception as e:
+        logger.error(f"Background: Error analyzing {run_id}: {e}")
+        _analysis_jobs[run_id] = {
+            "status": "failed",
+            "error": str(e),
+            "completed_at": datetime.now().isoformat()
+        }
+
+
+@router.post("/analyze/{run_id}/start")
+async def start_analysis(run_id: str):
+    """
+    Start analysis in background. Returns immediately.
+    
+    User can poll /analyze/{run_id}/status to check progress.
+    """
+    global _analysis_jobs
+    
+    # Check if already running
+    if run_id in _analysis_jobs and _analysis_jobs[run_id].get("status") == "running":
+        return {
+            "status": "already_running",
+            "run_id": run_id,
+            "message": "Analysis already in progress"
+        }
+    
+    # Start background thread
+    _analysis_jobs[run_id] = {
+        "status": "running",
+        "started_at": datetime.now().isoformat()
+    }
+    
+    thread = threading.Thread(target=_run_analysis_background, args=(run_id,))
+    thread.daemon = True
+    thread.start()
+    
+    logger.info(f"API: Started background analysis for {run_id}")
+    
+    return {
+        "status": "started",
+        "run_id": run_id,
+        "message": "Analysis started in background"
+    }
+
+
+@router.get("/analyze/{run_id}/status")
+async def get_analysis_status(run_id: str):
+    """Check status of a running analysis."""
+    if run_id not in _analysis_jobs:
+        # Check if already analyzed
+        service = get_jita_service()
+        runs = service.list_analyzed_runs()
+        if run_id in runs:
+            return {"status": "completed", "run_id": run_id}
+        return {"status": "not_found", "run_id": run_id}
+    
+    return {"run_id": run_id, **_analysis_jobs[run_id]}
+
+
+@router.get("/jobs")
+async def list_analysis_jobs():
+    """List all analysis jobs and their status."""
+    return {
+        "jobs": [
+            {"run_id": rid, **info} 
+            for rid, info in _analysis_jobs.items()
+        ]
+    }
+
+
 @router.post("/analyze/{run_id}", response_model=AnalyzeResponse)
 async def analyze_jita_run(run_id: str):
     """
-    Analyze a JITA test run.
+    Analyze a JITA test run (synchronous - waits for completion).
     
     Fetches task details, test results, and logs from JITA API,
     parses them for errors, and stores in SQL tables.
