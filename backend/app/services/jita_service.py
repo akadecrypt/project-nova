@@ -183,7 +183,8 @@ class JitaService:
             message TEXT,
             stack_trace TEXT,
             line_number INTEGER,
-            phase TEXT
+            phase TEXT,
+            priority TEXT
         )
         """
         execute_sql(create_logs_sql)
@@ -570,6 +571,10 @@ class JitaService:
         if exception:
             # Parse the exception to extract error type
             event_type = self._classify_exception(exception_summary or exception)
+            message = exception_summary[:500] if exception_summary else exception[:500]
+            
+            # Main test exception is always P0
+            priority = 'P0'
             
             end_time = result.get('end_time', {}).get('$date', 0)
             timestamp = end_time // 1000 if end_time else int(datetime.now().timestamp())
@@ -581,24 +586,30 @@ class JitaService:
                 'timestamp': timestamp,
                 'severity': 'ERROR',
                 'event_type': event_type,
-                'message': exception_summary[:500] if exception_summary else exception[:500],
+                'message': message,
                 'stack_trace': exception[:2000],
-                'line_number': 0
+                'line_number': 0,
+                'priority': priority
             })
         
         # Check failure_analysis
         failure = result.get('failure_analysis', {})
         if failure.get('message'):
+            message = failure.get('message', '')[:500]
+            event_type = failure.get('category', 'UNKNOWN')
+            priority = self._classify_priority('ERROR', event_type, message)
+            
             events.append({
                 'test_result_id': result_id,
                 'test_name': test_name,
                 'log_source': 'failure_analysis',
                 'timestamp': int(datetime.now().timestamp()),
                 'severity': 'ERROR',
-                'event_type': failure.get('category', 'UNKNOWN'),
-                'message': failure.get('message', '')[:500],
+                'event_type': event_type,
+                'message': message,
                 'stack_trace': None,
-                'line_number': 0
+                'line_number': 0,
+                'priority': priority
             })
         
         return events
@@ -995,6 +1006,9 @@ class JitaService:
                 if context_lines:
                     stack_trace = "--- Context (±10 lines) ---\n" + '\n'.join(context_lines)
             
+            # Classify priority
+            priority = self._classify_priority(severity, event_type, error_line)
+            
             event = {
                 'test_result_id': result_id,
                 'test_name': test_name,
@@ -1004,7 +1018,8 @@ class JitaService:
                 'event_type': event_type,
                 'message': error_line[:500],
                 'stack_trace': stack_trace,
-                'line_number': error_line_num + 1  # 1-based
+                'line_number': error_line_num + 1,  # 1-based
+                'priority': priority
             }
             events.append(event)
         
@@ -1053,6 +1068,89 @@ class JitaService:
                     return event_type
         
         return None
+    
+    def _classify_priority(self, severity: str, event_type: str, message: str) -> str:
+        """
+        Classify error priority based on severity, event type, and message.
+        
+        Priority Levels:
+        - P0 (Critical): Test failures, fatal errors, assertion failures, infrastructure down
+        - P1 (High): Timeouts, connection errors, authentication failures
+        - P2 (Medium): Validation errors, resource issues, config errors
+        - P3 (Low): Warnings, minor issues, cleanup failures
+        """
+        severity = (severity or '').upper()
+        event_type = (event_type or '').upper()
+        message_lower = (message or '').lower()
+        
+        # P0 - Critical: Test blocking issues
+        p0_event_types = ['ASSERTION_ERROR', 'INFRA_ERROR', 'CLUSTER_ERROR', 'FATAL']
+        p0_keywords = [
+            r'test.*failed', r'assertion.*error', r'fatal', r'critical',
+            r'panic', r'crash', r'cluster.*down', r'cvm.*down', r'node.*down',
+            r'prism.*unreachable', r'infrastructure.*fail', r'deployment.*fail',
+            r'imaging.*fail', r'test.*blocked', r'framework.*error'
+        ]
+        
+        if severity == 'FATAL':
+            return 'P0'
+        if event_type in p0_event_types:
+            return 'P0'
+        for pattern in p0_keywords:
+            if re.search(pattern, message_lower):
+                return 'P0'
+        
+        # P1 - High: Significant errors that need attention
+        p1_event_types = ['TIMEOUT', 'CONNECTION_ERROR', 'AUTH_FAIL', 'DATABASE_ERROR', 'HTTP_ERROR']
+        p1_keywords = [
+            r'timeout', r'timed\s*out', r'connection.*refuse', r'connection.*reset',
+            r'authentication.*fail', r'unauthorized', r'forbidden', r'access.*denied',
+            r'socket.*error', r'network.*unreachable', r'ssl.*error', r'certificate.*error',
+            r'service.*unavailable', r'500\s+internal', r'502\s+bad\s+gateway'
+        ]
+        
+        if event_type in p1_event_types:
+            return 'P1'
+        for pattern in p1_keywords:
+            if re.search(pattern, message_lower):
+                return 'P1'
+        
+        # P2 - Medium: Issues that should be investigated
+        p2_event_types = ['VALIDATION_ERROR', 'RESOURCE_ERROR', 'CONFIG_ERROR', 'KEY_ERROR', 
+                         'VALUE_ERROR', 'TYPE_ERROR', 'ATTRIBUTE_ERROR', 'IMPORT_ERROR']
+        p2_keywords = [
+            r'validation.*fail', r'invalid.*param', r'invalid.*value',
+            r'resource.*not.*available', r'quota.*exceed', r'out\s+of\s+memory',
+            r'disk.*full', r'config.*error', r'missing.*config', r'key.*error',
+            r'attribute.*error', r'type.*error', r'import.*error', r'module.*not.*found',
+            r'file.*not.*found', r'permission.*denied', r'not.*found', r'does.*not.*exist'
+        ]
+        
+        if severity == 'ERROR' and event_type in p2_event_types:
+            return 'P2'
+        for pattern in p2_keywords:
+            if re.search(pattern, message_lower):
+                return 'P2'
+        
+        # P3 - Low: Warnings and minor issues
+        p3_keywords = [
+            r'warning', r'deprecat', r'retry', r'retrying', r'cleanup.*fail',
+            r'teardown.*fail', r'skip', r'ignored', r'non.*critical'
+        ]
+        
+        if severity == 'WARN':
+            return 'P3'
+        for pattern in p3_keywords:
+            if re.search(pattern, message_lower):
+                return 'P3'
+        
+        # Default based on severity
+        if severity == 'ERROR':
+            return 'P2'
+        if severity == 'FATAL':
+            return 'P0'
+        
+        return 'P3'
     
     def _extract_timestamp(self, line: str) -> int:
         """Extract timestamp from log line."""
@@ -1151,7 +1249,7 @@ class JitaService:
             sql = f"""
                 INSERT INTO {table}
                 (test_result_id, test_name, log_source, timestamp, severity, 
-                 event_type, message, stack_trace, line_number, phase)
+                 event_type, message, stack_trace, line_number, phase, priority)
                 VALUES (
                     '{escape(event["test_result_id"])}',
                     '{escape(event["test_name"])}',
@@ -1162,7 +1260,8 @@ class JitaService:
                     '{escape(event["message"])}',
                     '{escape(event.get("stack_trace") or "")}',
                     {event.get("line_number", 0)},
-                    '{escape(event.get("phase") or "Unknown")}'
+                    '{escape(event.get("phase") or "Unknown")}',
+                    '{escape(event.get("priority") or "P3")}'
                 )
             """
             execute_sql(sql)

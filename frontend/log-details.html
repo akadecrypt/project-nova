@@ -252,6 +252,20 @@
         .error-severity.fatal { background: #7f1d1d; color: #fecaca; }
         .error-severity.warn { background: #451a03; color: #fcd34d; }
 
+        /* Priority badges */
+        .priority-badge {
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .priority-badge.p0 { background: #7f1d1d; color: #fecaca; }
+        .priority-badge.p1 { background: #713f12; color: #fef08a; }
+        .priority-badge.p2 { background: #1e3a5f; color: #93c5fd; }
+        .priority-badge.p3 { background: #1f2937; color: #9ca3af; }
+
         .error-info { flex: 1; }
 
         .error-type {
@@ -644,6 +658,7 @@
                     message: testData.exception_summary,
                     stack_trace: testData.exception_full,
                     log_source: 'Test Exception',
+                    priority: 'P0',  // Main exception is always P0
                     isMain: true
                 });
             }
@@ -657,14 +672,25 @@
                 return;
             }
 
+            // Sort by priority (P0 first)
+            const priorityOrder = { 'P0': 0, 'P1': 1, 'P2': 2, 'P3': 3 };
+            allErrors.sort((a, b) => {
+                const pa = priorityOrder[a.priority] ?? 3;
+                const pb = priorityOrder[b.priority] ?? 3;
+                return pa - pb;
+            });
+
             container.innerHTML = allErrors.map((err, i) => {
                 const sevClass = (err.severity || 'error').toLowerCase();
                 const errorType = err.event_type || extractErrorType(err.message);
                 const knowledge = ERROR_KNOWLEDGE[errorType] || ERROR_KNOWLEDGE['default'];
+                const priority = err.priority || 'P3';
+                const priorityClass = priority.toLowerCase();
 
                 return `
                     <div class="error-card ${sevClass} ${err.isMain ? 'expanded' : ''}" id="err-${i}">
                         <div class="error-header" onclick="toggleError(${i})">
+                            <span class="priority-badge ${priorityClass}">${priority}</span>
                             <span class="error-severity ${sevClass}">${err.severity || 'ERROR'}</span>
                             <div class="error-info">
                                 <div class="error-type">${errorType}</div>
