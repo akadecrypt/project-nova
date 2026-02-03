@@ -352,19 +352,19 @@
 
         .error-message {
             font-size: 13px;
-            color: #a1a1aa;
+            color: var(--text-secondary);
             font-family: 'JetBrains Mono', monospace;
             word-break: break-word;
         }
 
         .error-source {
             font-size: 11px;
-            color: #52525b;
+            color: var(--text-muted);
             margin-top: 6px;
         }
 
         .error-chevron {
-            color: #52525b;
+            color: var(--text-muted);
             transition: transform 0.2s;
             flex-shrink: 0;
         }
@@ -375,8 +375,8 @@
 
         .error-details {
             display: none;
-            background: #0a0a0f;
-            border-top: 1px solid #27272a;
+            background: var(--bg-primary);
+            border-top: 1px solid var(--border-color);
             padding: 16px 20px;
         }
 
@@ -388,7 +388,7 @@
             font-size: 11px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            color: #71717a;
+            color: var(--text-muted);
             margin-bottom: 8px;
         }
 
@@ -403,7 +403,7 @@
             word-break: break-word;
             max-height: 250px;
             overflow-y: auto;
-            color: #a1a1aa;
+            color: var(--text-secondary);
             margin-bottom: 16px;
         }
 
@@ -457,7 +457,7 @@
             bottom: 20px;
             right: 20px;
             background: #27272a;
-            color: #e4e4e7;
+            color: var(--text-primary);
             padding: 12px 20px;
             border-radius: 8px;
             display: none;
@@ -530,7 +530,7 @@
                 <h2>AI Analysis & Debug Suggestions</h2>
             </div>
             <div class="ai-content" id="aiContent">
-                <div style="color: #71717a;">Analyzing errors...</div>
+                <div style="color: var(--text-muted);">Analyzing errors...</div>
             </div>
         </div>
 
@@ -818,7 +818,7 @@
             document.getElementById('filterCount').textContent = `${filtered.length} of ${allErrorsList.length} items`;
 
             if (filtered.length === 0) {
-                container.innerHTML = '<div style="color: #52525b; padding: 40px; text-align: center;">No errors match your filters</div>';
+                container.innerHTML = '<div style="color: var(--text-muted); padding: 40px; text-align: center;">No errors match your filters</div>';
                 return;
             }
 
