@@ -562,6 +562,72 @@
         .empty-state h3 { font-size: 20px; margin: 0 0 8px 0; }
         .empty-state p { color: var(--text-muted); margin: 0; }
 
+        /* Analyzed Runs Grid */
+        .analyzed-runs-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 16px;
+        }
+
+        .run-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .run-card:hover {
+            border-color: var(--accent-primary);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+        }
+
+        .run-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .run-card-id {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            color: var(--accent-primary);
+        }
+
+        .run-card-delete {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            opacity: 0;
+            transition: all 0.2s;
+        }
+
+        .run-card:hover .run-card-delete { opacity: 1; }
+        .run-card-delete:hover { color: var(--error); background: rgba(239, 68, 68, 0.1); }
+
+        .run-card-stats {
+            display: flex;
+            gap: 16px;
+            margin-top: 12px;
+        }
+
+        .run-card-stat {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .run-card-stat.success { color: var(--success); }
+        .run-card-stat.error { color: var(--error); }
+
         .loading-state {
             text-align: center;
             padding: 80px 40px;
@@ -742,9 +808,13 @@
 
             <!-- Content Area -->
             <div class="content-area">
-                <!-- Empty State -->
+                <!-- Empty State with Analyzed Runs -->
                 <div id="emptyState">
-                    <div class="empty-state">
+                    <div id="analyzedRunsSection" style="display: none;">
+                        <h2 style="font-size: 20px; margin-bottom: 20px;">Previously Analyzed Runs</h2>
+                        <div id="analyzedRunsGrid" class="analyzed-runs-grid"></div>
+                    </div>
+                    <div id="noRunsState" class="empty-state">
                         <div class="empty-icon">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
@@ -759,8 +829,9 @@
                 <div id="loadingState" style="display: none;">
                     <div class="loading-state">
                         <div class="spinner"></div>
-                        <h3>Analyzing Run...</h3>
-                        <p style="color: var(--text-muted);">Fetching test results and parsing logs</p>
+                        <h3 id="loadingTitle">Analyzing Run...</h3>
+                        <p id="loadingDesc" style="color: var(--text-muted);">Fetching test results and parsing logs</p>
+                        <p style="color: var(--text-muted); font-size: 12px; margin-top: 16px;">This may take 1-3 minutes for large runs</p>
                     </div>
                 </div>
 
@@ -1204,14 +1275,20 @@
             try {
                 const response = await fetch(`${API_BASE}/runs`);
                 const data = await response.json();
-                const container = document.getElementById('previousRuns');
+                const sidebarContainer = document.getElementById('previousRuns');
+                const mainGrid = document.getElementById('analyzedRunsGrid');
+                const analyzedSection = document.getElementById('analyzedRunsSection');
+                const noRunsState = document.getElementById('noRunsState');
                 
                 if (!data.runs || data.runs.length === 0) {
-                    container.innerHTML = '<p style="color: var(--text-muted); font-size: 13px; padding: 8px 0;">No analyzed runs yet</p>';
+                    sidebarContainer.innerHTML = '<p style="color: var(--text-muted); font-size: 13px; padding: 8px 0;">No analyzed runs yet</p>';
+                    analyzedSection.style.display = 'none';
+                    noRunsState.style.display = 'block';
                     return;
                 }
 
-                container.innerHTML = data.runs.map(runId => `
+                // Update sidebar
+                sidebarContainer.innerHTML = data.runs.map(runId => `
                     <div class="history-item" onclick="loadRun('${runId}')">
                         <span>${runId.substring(0, 16)}...</span>
                         <button class="history-delete" onclick="event.stopPropagation(); deleteRun('${runId}')">
@@ -1221,6 +1298,62 @@
                         </button>
                     </div>
                 `).join('');
+
+                // Update main content area with run cards
+                analyzedSection.style.display = 'block';
+                noRunsState.style.display = 'none';
+                
+                // Fetch details for each run to show in cards
+                const runDetails = await Promise.all(
+                    data.runs.slice(0, 12).map(async runId => {
+                        try {
+                            const res = await fetch(`${API_BASE}/runs/${runId}/summary`);
+                            const summary = await res.json();
+                            return { runId, ...summary };
+                        } catch {
+                            return { runId, tests: [], error_counts: {} };
+                        }
+                    })
+                );
+
+                mainGrid.innerHTML = runDetails.map(run => {
+                    const tests = run.tests || [];
+                    const passed = tests.filter(t => t.status === 'Succeeded').length;
+                    const failed = tests.filter(t => t.status === 'Failed').length;
+                    
+                    return `
+                        <div class="run-card" onclick="loadRun('${run.runId}')">
+                            <div class="run-card-header">
+                                <span class="run-card-id">${run.runId}</span>
+                                <button class="run-card-delete" onclick="event.stopPropagation(); deleteRun('${run.runId}')">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="run-card-stats">
+                                <span class="run-card-stat">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                    </svg>
+                                    ${tests.length} tests
+                                </span>
+                                <span class="run-card-stat success">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="20 6 9 17 4 12"/>
+                                    </svg>
+                                    ${passed}
+                                </span>
+                                <span class="run-card-stat error">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                                    </svg>
+                                    ${failed}
+                                </span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
             } catch (error) {
                 console.error('Error loading runs:', error);
             }
