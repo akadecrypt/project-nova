@@ -5,6 +5,8 @@ Integrates with JITA (Jita Is a Test Automation) to analyze test runs,
 fetch logs, parse errors, and store results in SQL tables.
 """
 import re
+import os
+import sqlite3
 import requests
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
@@ -12,11 +14,51 @@ from urllib3 import disable_warnings
 from urllib3.exceptions import InsecureRequestWarning
 
 from ..logging_config import get_logger
-from ..tools.sql_tools import execute_sql
 
 disable_warnings(InsecureRequestWarning)
 
 logger = get_logger(__name__)
+
+# Local SQLite database path for JITA data
+JITA_DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "jita_data.db")
+
+
+def execute_sql(sql: str) -> dict:
+    """Execute SQL directly on the local JITA SQLite database."""
+    try:
+        conn = sqlite3.connect(JITA_DB_PATH)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        logger.debug(f"JITA SQL: {sql[:150]}...")
+        cursor.execute(sql)
+        conn.commit()
+        
+        # For SELECT statements, fetch results
+        if sql.strip().upper().startswith('SELECT'):
+            rows = [dict(row) for row in cursor.fetchall()]
+            columns = [desc[0] for desc in cursor.description] if cursor.description else []
+            conn.close()
+            return {
+                "status": "success",
+                "columns": columns,
+                "rows": rows,
+                "row_count": len(rows)
+            }
+        else:
+            affected = cursor.rowcount
+            conn.close()
+            return {
+                "status": "success",
+                "rows_affected": affected
+            }
+            
+    except Exception as e:
+        logger.error(f"JITA SQL error: {e}")
+        return {
+            "status": "error",
+            "error": str(e)
+        }
 
 
 class JitaService:
