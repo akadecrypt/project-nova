@@ -148,8 +148,14 @@ class JitaService:
             logger.warning(f"Error fetching log: {e}")
             return ""
     
-    def create_run_tables(self, run_id: str):
-        """Create SQL tables for storing run analysis."""
+    def create_run_tables(self, run_id: str, clear_existing: bool = True):
+        """
+        Create SQL tables for storing run analysis.
+        
+        Args:
+            run_id: JITA run ID
+            clear_existing: If True, clears existing data before re-analysis
+        """
         # Sanitize run_id for table name (only alphanumeric)
         safe_id = re.sub(r'[^a-zA-Z0-9]', '', run_id)
         
@@ -190,7 +196,13 @@ class JitaService:
         """
         execute_sql(create_summary_sql)
         
-        logger.info(f"Created tables: {logs_table}, {summary_table}")
+        # Clear existing data if re-analyzing (to avoid duplicates)
+        if clear_existing:
+            execute_sql(f"DELETE FROM {logs_table}")
+            execute_sql(f"DELETE FROM {summary_table}")
+            logger.info(f"Cleared existing data from tables: {logs_table}, {summary_table}")
+        
+        logger.info(f"Tables ready: {logs_table}, {summary_table}")
     
     def get_run_summary(self, run_id: str) -> Dict[str, Any]:
         """Get summary of an analyzed run from SQL."""
