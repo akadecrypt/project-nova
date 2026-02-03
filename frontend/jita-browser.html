@@ -460,33 +460,79 @@
         }
 
         .recent-runs-grid {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 12px;
         }
 
-        .recent-run-chip {
-            background: #18181b;
+        .run-card {
+            background: #111116;
             border: 1px solid #27272a;
-            padding: 8px 14px;
-            border-radius: 6px;
-            font-size: 12px;
-            font-family: 'JetBrains Mono', monospace;
-            color: #a1a1aa;
+            border-radius: 10px;
+            padding: 16px;
             cursor: pointer;
             transition: all 0.15s;
         }
 
-        .recent-run-chip:hover {
-            background: #27272a;
+        .run-card:hover {
             border-color: #6366f1;
-            color: #e4e4e7;
+            transform: translateY(-2px);
         }
 
-        .recent-run-chip.active {
-            background: #6366f1;
-            border-color: #6366f1;
-            color: white;
+        .run-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+
+        .run-card-label {
+            font-size: 13px;
+            font-weight: 500;
+            color: #e4e4e7;
+            word-break: break-word;
+        }
+
+        .run-card-id {
+            font-size: 10px;
+            font-family: 'JetBrains Mono', monospace;
+            color: #52525b;
+            margin-top: 4px;
+        }
+
+        .run-card-delete {
+            background: none;
+            border: none;
+            color: #52525b;
+            cursor: pointer;
+            padding: 4px;
+            opacity: 0;
+            transition: all 0.15s;
+        }
+
+        .run-card:hover .run-card-delete { opacity: 1; }
+        .run-card-delete:hover { color: #ef4444; }
+
+        .run-card-stats {
+            display: flex;
+            gap: 16px;
+            font-size: 12px;
+        }
+
+        .run-card-stat {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            color: #71717a;
+        }
+
+        .run-card-stat.failed { color: #ef4444; }
+        .run-card-stat.passed { color: #22c55e; }
+
+        .run-card-time {
+            font-size: 10px;
+            color: #52525b;
+            margin-top: 10px;
         }
     </style>
 </head>
@@ -591,36 +637,88 @@
 
         async function loadRecentRuns() {
             try {
-                const res = await fetch(`${API}/runs`);
+                // Fetch with metadata for rich cards
+                const res = await fetch(`${API}/runs?with_metadata=true`);
                 const data = await res.json();
                 const sidebarList = document.getElementById('recentList');
                 const mainSection = document.getElementById('recentRunsMain');
                 const mainGrid = document.getElementById('recentRunsGrid');
                 
-                if (!data.runs?.length) {
+                const runs = data.runs || [];
+                
+                if (runs.length === 0) {
                     sidebarList.innerHTML = '<div style="color: #52525b; font-size: 12px;">No runs yet</div>';
                     mainSection.style.display = 'none';
                     return;
                 }
 
-                // Update sidebar
-                sidebarList.innerHTML = data.runs.map(id => `
-                    <div class="run-item ${id === currentRunId ? 'active' : ''}" onclick="loadResults('${id}')">
-                        ${id.slice(0,6)}...${id.slice(-4)}
-                        <button class="delete" onclick="event.stopPropagation(); deleteRun('${id}')">×</button>
-                    </div>
-                `).join('');
+                // Update sidebar with simple list
+                sidebarList.innerHTML = runs.map(run => {
+                    const id = run.run_id || run;
+                    const label = run.label || id.slice(0,12);
+                    return `
+                        <div class="run-item ${id === currentRunId ? 'active' : ''}" onclick="loadResults('${id}')">
+                            ${label.slice(0,20)}${label.length > 20 ? '...' : ''}
+                            <button class="delete" onclick="event.stopPropagation(); deleteRun('${id}')">×</button>
+                        </div>
+                    `;
+                }).join('');
 
-                // Update main area (always show, useful when sidebar hidden in iframe)
+                // Update main area with rich cards
                 mainSection.style.display = 'block';
-                mainGrid.innerHTML = data.runs.map(id => `
-                    <div class="recent-run-chip ${id === currentRunId ? 'active' : ''}" onclick="loadResults('${id}')">
-                        ${id}
-                    </div>
-                `).join('');
+                mainGrid.innerHTML = runs.map(run => {
+                    const id = run.run_id || run;
+                    const label = run.label || 'Unknown Run';
+                    const failed = run.failed_tests || 0;
+                    const passed = run.passed_tests || 0;
+                    const total = run.total_tests || 0;
+                    const time = run.analyzed_at ? formatTimeAgo(run.analyzed_at) : '';
+                    
+                    return `
+                        <div class="run-card" onclick="loadResults('${id}')">
+                            <div class="run-card-header">
+                                <div>
+                                    <div class="run-card-label">${escapeHtml(label)}</div>
+                                    <div class="run-card-id">${id}</div>
+                                </div>
+                                <button class="run-card-delete" onclick="event.stopPropagation(); deleteRun('${id}')" title="Delete">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="run-card-stats">
+                                <span class="run-card-stat">${total} tests</span>
+                                <span class="run-card-stat passed">${passed} passed</span>
+                                <span class="run-card-stat failed">${failed} failed</span>
+                            </div>
+                            ${time ? `<div class="run-card-time">${time}</div>` : ''}
+                        </div>
+                    `;
+                }).join('');
             } catch (e) {
                 console.error('Error loading recent runs:', e);
+                // Fallback to simple list
+                try {
+                    const res = await fetch(`${API}/runs`);
+                    const data = await res.json();
+                    const runs = data.runs || [];
+                    document.getElementById('recentList').innerHTML = runs.map(id => `
+                        <div class="run-item" onclick="loadResults('${id}')">${id.slice(0,12)}...</div>
+                    `).join('') || '<div style="color: #52525b;">No runs</div>';
+                } catch (e2) {}
             }
+        }
+
+        function formatTimeAgo(isoString) {
+            const date = new Date(isoString);
+            const now = new Date();
+            const diff = Math.floor((now - date) / 1000);
+            
+            if (diff < 60) return 'Just now';
+            if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+            if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+            return Math.floor(diff / 86400) + 'd ago';
         }
 
         async function checkRunningJobs() {
@@ -798,17 +896,23 @@
                                 <div class="cluster-tag" style="display: inline-block; word-break: break-all;">${test.test_name}</div>
                             </div>
                             
-                            ${test.log_url ? `
-                                <div class="detail-block">
-                                    <a href="${test.log_url}" target="_blank" class="log-link">
+                            <div class="detail-block" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                <a href="log-details.html?run=${currentRunId}&test=${test.test_result_id}" class="log-link" style="background: #6366f1;">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>
+                                    </svg>
+                                    View Error Analysis
+                                </a>
+                                ${test.log_url ? `
+                                    <a href="${test.log_url}" target="_blank" class="log-link" style="background: #27272a;">
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
                                             <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
                                         </svg>
-                                        View Full Logs
+                                        Raw Logs (JITA)
                                     </a>
-                                </div>
-                            ` : ''}
+                                ` : ''}
+                            </div>
                         </div>
                     </div>
                 `;

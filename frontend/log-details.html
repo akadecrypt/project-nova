@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error Analysis - NOVA</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/design-system.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0a0a0f;
+            color: #e4e4e7;
+            min-height: 100vh;
+            padding: 32px;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            margin-bottom: 32px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid #27272a;
+        }
+
+        .header-info h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .header-meta {
+            display: flex;
+            gap: 20px;
+            font-size: 13px;
+            color: #71717a;
+        }
+
+        .header-meta span {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-badge {
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-badge.failed { background: #450a0a; color: #fca5a5; }
+        .status-badge.passed { background: #052e16; color: #86efac; }
+
+        .header-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn {
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.15s;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: #6366f1;
+            color: white;
+        }
+
+        .btn-primary:hover { background: #4f46e5; }
+
+        .btn-secondary {
+            background: #27272a;
+            color: #e4e4e7;
+        }
+
+        .btn-secondary:hover { background: #3f3f46; }
+
+        .btn svg { width: 16px; height: 16px; }
+
+        /* Summary Cards */
+        .summary-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .summary-card {
+            background: #111116;
+            border: 1px solid #27272a;
+            border-radius: 10px;
+            padding: 16px 20px;
+        }
+
+        .summary-card .value {
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .summary-card .label {
+            font-size: 12px;
+            color: #71717a;
+            margin-top: 4px;
+        }
+
+        .summary-card.errors .value { color: #ef4444; }
+        .summary-card.warnings .value { color: #f59e0b; }
+
+        /* AI Analysis Section */
+        .ai-section {
+            background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%);
+            border: 1px solid #3730a3;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 32px;
+        }
+
+        .ai-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .ai-icon {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .ai-icon svg { width: 20px; height: 20px; fill: white; }
+
+        .ai-header h2 {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .ai-content {
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .ai-suggestion {
+            margin-bottom: 16px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .ai-suggestion:last-child {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+
+        .ai-suggestion-title {
+            font-weight: 600;
+            color: #a5b4fc;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .ai-suggestion-text {
+            font-size: 14px;
+            line-height: 1.6;
+            color: #d1d5db;
+        }
+
+        .ai-suggestion-text code {
+            background: rgba(99, 102, 241, 0.2);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+        }
+
+        /* Errors Section */
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .error-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .error-card {
+            background: #111116;
+            border: 1px solid #27272a;
+            border-left: 3px solid #ef4444;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .error-card.warning {
+            border-left-color: #f59e0b;
+        }
+
+        .error-header {
+            padding: 16px 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .error-header:hover {
+            background: #18181b;
+        }
+
+        .error-severity {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            flex-shrink: 0;
+        }
+
+        .error-severity.error { background: #450a0a; color: #fca5a5; }
+        .error-severity.fatal { background: #7f1d1d; color: #fecaca; }
+        .error-severity.warn { background: #451a03; color: #fcd34d; }
+
+        .error-info { flex: 1; }
+
+        .error-type {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .error-message {
+            font-size: 13px;
+            color: #a1a1aa;
+            font-family: 'JetBrains Mono', monospace;
+            word-break: break-word;
+        }
+
+        .error-source {
+            font-size: 11px;
+            color: #52525b;
+            margin-top: 6px;
+        }
+
+        .error-chevron {
+            color: #52525b;
+            transition: transform 0.2s;
+            flex-shrink: 0;
+        }
+
+        .error-card.expanded .error-chevron {
+            transform: rotate(180deg);
+        }
+
+        .error-details {
+            display: none;
+            background: #0a0a0f;
+            border-top: 1px solid #27272a;
+            padding: 16px 20px;
+        }
+
+        .error-card.expanded .error-details {
+            display: block;
+        }
+
+        .detail-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #71717a;
+            margin-bottom: 8px;
+        }
+
+        .stack-trace {
+            background: #050507;
+            border-radius: 6px;
+            padding: 14px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            line-height: 1.7;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 250px;
+            overflow-y: auto;
+            color: #a1a1aa;
+            margin-bottom: 16px;
+        }
+
+        .stack-trace .hl { color: #fca5a5; font-weight: 500; }
+
+        /* Debug Suggestion */
+        .debug-suggestion {
+            background: #0c1222;
+            border: 1px solid #1e3a5f;
+            border-radius: 8px;
+            padding: 14px;
+        }
+
+        .debug-suggestion-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #60a5fa;
+            margin-bottom: 8px;
+        }
+
+        .debug-suggestion-text {
+            font-size: 13px;
+            color: #94a3b8;
+            line-height: 1.5;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 60px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #27272a;
+            border-top-color: #6366f1;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #27272a;
+            color: #e4e4e7;
+            padding: 12px 20px;
+            border-radius: 8px;
+            display: none;
+            z-index: 100;
+        }
+
+        .toast.show { display: block; }
+
+        @media (max-width: 768px) {
+            .summary-row { grid-template-columns: repeat(2, 1fr); }
+            .header { flex-direction: column; gap: 16px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-info">
+                <h1 id="testName">Loading...</h1>
+                <div class="header-meta">
+                    <span id="testStatus"></span>
+                    <span id="testDuration"></span>
+                    <span id="testOps"></span>
+                </div>
+            </div>
+            <div class="header-actions">
+                <a href="#" id="jitaLogLink" target="_blank" class="btn btn-primary">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
+                        <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                    </svg>
+                    View Raw Logs (JITA)
+                </a>
+                <button class="btn btn-secondary" onclick="history.back()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 12H5M12 19l-7-7 7-7"/>
+                    </svg>
+                    Back
+                </button>
+            </div>
+        </div>
+
+        <!-- Summary -->
+        <div class="summary-row">
+            <div class="summary-card errors">
+                <div class="value" id="errorCount">0</div>
+                <div class="label">Errors Found</div>
+            </div>
+            <div class="summary-card warnings">
+                <div class="value" id="warnCount">0</div>
+                <div class="label">Warnings</div>
+            </div>
+            <div class="summary-card">
+                <div class="value" id="logSourceCount">0</div>
+                <div class="label">Log Sources</div>
+            </div>
+            <div class="summary-card">
+                <div class="value" id="totalEvents">0</div>
+                <div class="label">Total Events</div>
+            </div>
+        </div>
+
+        <!-- AI Analysis -->
+        <div class="ai-section" id="aiSection">
+            <div class="ai-header">
+                <div class="ai-icon">
+                    <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                </div>
+                <h2>AI Analysis & Debug Suggestions</h2>
+            </div>
+            <div class="ai-content" id="aiContent">
+                <div style="color: #71717a;">Analyzing errors...</div>
+            </div>
+        </div>
+
+        <!-- Error List -->
+        <div class="section-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+            </svg>
+            Errors & Exceptions
+        </div>
+        <div id="errorList" class="error-list">
+            <div class="loading">
+                <div class="spinner"></div>
+                <div>Loading errors...</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+        const API = `http://${window.location.hostname}:9360/api/jita`;
+        const params = new URLSearchParams(window.location.search);
+        const runId = params.get('run');
+        const testId = params.get('test');
+
+        let testData = null;
+        let logEvents = [];
+
+        // Error Analysis Knowledge Base
+        const ERROR_KNOWLEDGE = {
+            'AssertionError': {
+                category: 'Test Assertion Failed',
+                suggestions: [
+                    'Check the test expectations - the actual value differs from expected',
+                    'Review the test setup and preconditions',
+                    'Verify if the test data is correct and up-to-date'
+                ],
+                debugPoints: [
+                    'Look at the assertion line in the stack trace',
+                    'Check the values being compared in the assertion',
+                    'Review recent code changes that might affect this test'
+                ]
+            },
+            'TimeoutError': {
+                category: 'Operation Timeout',
+                suggestions: [
+                    'Increase timeout values if the operation legitimately takes longer',
+                    'Check for network latency or connectivity issues',
+                    'Verify the target service/cluster is responsive'
+                ],
+                debugPoints: [
+                    'Check cluster health and resource utilization',
+                    'Review network logs for connectivity issues',
+                    'Monitor the operation\'s progress before timeout'
+                ]
+            },
+            'ConnectionError': {
+                category: 'Connection Failed',
+                suggestions: [
+                    'Verify the target host is reachable',
+                    'Check firewall rules and network configuration',
+                    'Ensure the service is running on the target'
+                ],
+                debugPoints: [
+                    'Ping the target IP from the test machine',
+                    'Check if the port is open using netstat/ss',
+                    'Review service logs on the target machine'
+                ]
+            },
+            'KeyError': {
+                category: 'Missing Dictionary Key',
+                suggestions: [
+                    'Check if the API response format has changed',
+                    'Verify the data structure matches expectations',
+                    'Add defensive checks for optional keys'
+                ],
+                debugPoints: [
+                    'Print/log the actual dictionary contents',
+                    'Check API documentation for response format',
+                    'Verify the API version being used'
+                ]
+            },
+            'AttributeError': {
+                category: 'Missing Attribute',
+                suggestions: [
+                    'Check if the object is None when it shouldn\'t be',
+                    'Verify the object type is correct',
+                    'Review initialization of the object'
+                ],
+                debugPoints: [
+                    'Add type checking before accessing attributes',
+                    'Print the object type and value',
+                    'Trace where the object is created/assigned'
+                ]
+            },
+            'ValueError': {
+                category: 'Invalid Value',
+                suggestions: [
+                    'Validate input data before processing',
+                    'Check for empty or malformed values',
+                    'Review data transformation logic'
+                ],
+                debugPoints: [
+                    'Log the actual value that caused the error',
+                    'Check data source for corruption',
+                    'Verify encoding/format of input data'
+                ]
+            },
+            'default': {
+                category: 'General Error',
+                suggestions: [
+                    'Review the full stack trace for context',
+                    'Check recent code changes in the affected area',
+                    'Look for similar issues in past runs'
+                ],
+                debugPoints: [
+                    'Enable verbose logging for the failing component',
+                    'Add breakpoints or debug prints around the failing code',
+                    'Check system resources (memory, disk, CPU)'
+                ]
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!runId || !testId) {
+                document.body.innerHTML = '<div style="padding: 40px; text-align: center;">Missing run or test ID</div>';
+                return;
+            }
+            loadTestDetails();
+        });
+
+        async function loadTestDetails() {
+            try {
+                // Load test summary
+                const summaryRes = await fetch(`${API}/runs/${runId}/summary`);
+                const summaryData = await summaryRes.json();
+                
+                if (summaryData.tests) {
+                    testData = summaryData.tests.find(t => t.test_result_id === testId);
+                    if (testData) {
+                        displayTestInfo(testData);
+                    }
+                }
+
+                // Load log events for this test
+                const logsRes = await fetch(`${API}/runs/${runId}/logs?test_result_id=${testId}&limit=500`);
+                const logsData = await logsRes.json();
+                
+                logEvents = logsData.logs || [];
+                displayErrors(logEvents);
+                generateAIAnalysis();
+
+            } catch (e) {
+                console.error(e);
+                showToast('Error loading data');
+            }
+        }
+
+        function displayTestInfo(test) {
+            const shortName = test.test_name.split('.').slice(-2).join('.');
+            document.getElementById('testName').textContent = shortName;
+            document.title = `${shortName} - Error Analysis`;
+
+            const isFailed = test.status !== 'Succeeded';
+            document.getElementById('testStatus').innerHTML = `<span class="status-badge ${isFailed ? 'failed' : 'passed'}">${test.status}</span>`;
+            
+            document.getElementById('testDuration').textContent = formatDuration(test.duration_seconds);
+            document.getElementById('testOps').textContent = `${test.successful_ops || 0}/${test.total_ops || 0} operations`;
+
+            if (test.log_url) {
+                document.getElementById('jitaLogLink').href = test.log_url;
+            } else {
+                document.getElementById('jitaLogLink').style.display = 'none';
+            }
+        }
+
+        function displayErrors(events) {
+            const errors = events.filter(e => e.severity === 'ERROR' || e.severity === 'FATAL');
+            const warnings = events.filter(e => e.severity === 'WARN');
+            const sources = [...new Set(events.map(e => e.log_source))];
+
+            document.getElementById('errorCount').textContent = errors.length;
+            document.getElementById('warnCount').textContent = warnings.length;
+            document.getElementById('logSourceCount').textContent = sources.length;
+            document.getElementById('totalEvents').textContent = events.length;
+
+            const container = document.getElementById('errorList');
+            
+            // Combine main exception with log errors
+            const allErrors = [];
+            
+            // Add main test exception first
+            if (testData && testData.exception_summary) {
+                allErrors.push({
+                    severity: 'ERROR',
+                    event_type: extractErrorType(testData.exception_summary),
+                    message: testData.exception_summary,
+                    stack_trace: testData.exception_full,
+                    log_source: 'Test Exception',
+                    isMain: true
+                });
+            }
+
+            // Add log events
+            errors.forEach(e => allErrors.push(e));
+            warnings.forEach(e => allErrors.push(e));
+
+            if (allErrors.length === 0) {
+                container.innerHTML = '<div style="color: #52525b; padding: 40px; text-align: center;">No errors found</div>';
+                return;
+            }
+
+            container.innerHTML = allErrors.map((err, i) => {
+                const sevClass = (err.severity || 'error').toLowerCase();
+                const errorType = err.event_type || extractErrorType(err.message);
+                const knowledge = ERROR_KNOWLEDGE[errorType] || ERROR_KNOWLEDGE['default'];
+
+                return `
+                    <div class="error-card ${sevClass} ${err.isMain ? 'expanded' : ''}" id="err-${i}">
+                        <div class="error-header" onclick="toggleError(${i})">
+                            <span class="error-severity ${sevClass}">${err.severity || 'ERROR'}</span>
+                            <div class="error-info">
+                                <div class="error-type">${errorType}</div>
+                                <div class="error-message">${escapeHtml(truncate(err.message, 200))}</div>
+                                <div class="error-source">Source: ${err.log_source || 'Unknown'}</div>
+                            </div>
+                            <svg class="error-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"/>
+                            </svg>
+                        </div>
+                        <div class="error-details">
+                            ${err.stack_trace ? `
+                                <div class="detail-label">Stack Trace</div>
+                                <div class="stack-trace">${formatTrace(err.stack_trace)}</div>
+                            ` : ''}
+                            
+                            <div class="debug-suggestion">
+                                <div class="debug-suggestion-header">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>
+                                    </svg>
+                                    Debug Suggestion
+                                </div>
+                                <div class="debug-suggestion-text">
+                                    <strong>${knowledge.category}:</strong> ${knowledge.debugPoints[0]}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function generateAIAnalysis() {
+            const container = document.getElementById('aiContent');
+            const suggestions = [];
+
+            // Analyze main exception
+            if (testData && testData.exception_summary) {
+                const errorType = extractErrorType(testData.exception_summary);
+                const knowledge = ERROR_KNOWLEDGE[errorType] || ERROR_KNOWLEDGE['default'];
+                
+                suggestions.push({
+                    title: `${knowledge.category} Detected`,
+                    points: knowledge.suggestions
+                });
+            }
+
+            // Analyze patterns in log errors
+            const errorTypes = {};
+            logEvents.filter(e => e.severity === 'ERROR').forEach(e => {
+                const type = e.event_type || 'UNKNOWN';
+                errorTypes[type] = (errorTypes[type] || 0) + 1;
+            });
+
+            if (Object.keys(errorTypes).length > 0) {
+                const topErrors = Object.entries(errorTypes)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 3);
+
+                suggestions.push({
+                    title: 'Error Pattern Analysis',
+                    points: topErrors.map(([type, count]) => 
+                        `<code>${type}</code> occurred ${count} time(s) - ${getQuickFix(type)}`
+                    )
+                });
+            }
+
+            // Add general recommendations
+            suggestions.push({
+                title: 'Recommended Next Steps',
+                points: [
+                    'Review the stack trace to identify the exact failure point',
+                    'Check cluster health and resource availability',
+                    'Compare with recent successful runs for differences',
+                    'Click "View Raw Logs" to examine detailed log files'
+                ]
+            });
+
+            container.innerHTML = suggestions.map(s => `
+                <div class="ai-suggestion">
+                    <div class="ai-suggestion-title">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                            <polyline points="22 4 12 14.01 9 11.01"/>
+                        </svg>
+                        ${s.title}
+                    </div>
+                    <div class="ai-suggestion-text">
+                        <ul style="margin: 0; padding-left: 20px;">
+                            ${s.points.map(p => `<li style="margin-bottom: 6px;">${p}</li>`).join('')}
+                        </ul>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function getQuickFix(errorType) {
+            const fixes = {
+                'TIMEOUT': 'Check service responsiveness and increase timeout if needed',
+                'CONNECTION_ERROR': 'Verify network connectivity and service availability',
+                'AUTH_FAIL': 'Check credentials and authentication configuration',
+                'NOT_FOUND': 'Verify resource exists and path is correct',
+                'ASSERTION_ERROR': 'Review test expectations vs actual values',
+                'RESOURCE_ERROR': 'Check resource allocation and availability'
+            };
+            return fixes[errorType] || 'Review the error context and logs';
+        }
+
+        function toggleError(i) {
+            document.getElementById(`err-${i}`).classList.toggle('expanded');
+        }
+
+        function extractErrorType(msg) {
+            if (!msg) return 'Error';
+            const match = msg.match(/(\w+Error|\w+Exception)/);
+            return match ? match[1] : 'Error';
+        }
+
+        function formatDuration(s) {
+            if (!s) return '-';
+            if (s < 60) return s + 's';
+            if (s < 3600) return Math.floor(s/60) + 'm ' + (s%60) + 's';
+            return Math.floor(s/3600) + 'h ' + Math.floor((s%3600)/60) + 'm';
+        }
+
+        function formatTrace(trace) {
+            if (!trace) return '';
+            return escapeHtml(trace).split('\n').map(line => {
+                if (/Error|Exception|raise|assert|Failed/i.test(line)) {
+                    return `<span class="hl">${line}</span>`;
+                }
+                return line;
+            }).join('\n');
+        }
+
+        function truncate(str, len) {
+            if (!str) return '';
+            return str.length > len ? str.slice(0, len) + '...' : str;
+        }
+
+        function escapeHtml(s) {
+            if (!s) return '';
+            return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 3000);
+        }
+    </script>
+</body>
+</html>

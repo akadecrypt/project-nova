@@ -175,21 +175,30 @@ async def analyze_jita_run(run_id: str):
 
 
 @router.get("/runs")
-async def list_analyzed_runs():
+async def list_analyzed_runs(with_metadata: bool = Query(False, description="Include run metadata")):
     """
     List all analyzed JITA runs.
     
     Returns list of run IDs that have been analyzed and stored in SQL.
+    Use with_metadata=true to get full details for each run.
     """
     try:
         service = get_jita_service()
-        runs = service.list_analyzed_runs()
         
-        return {
-            "status": "success",
-            "runs": runs,
-            "count": len(runs)
-        }
+        if with_metadata:
+            runs = service.get_runs_with_metadata()
+            return {
+                "status": "success",
+                "runs": runs,
+                "count": len(runs)
+            }
+        else:
+            runs = service.list_analyzed_runs()
+            return {
+                "status": "success",
+                "runs": runs,
+                "count": len(runs)
+            }
         
     except Exception as e:
         logger.error(f"Error listing runs: {e}")

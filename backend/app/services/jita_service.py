@@ -100,7 +100,11 @@ class JitaService:
         self._insert_summaries(run_id, test_summaries)
         self._insert_log_events(run_id, all_log_events)
         
-        # 6. Return analysis summary
+        # 6. Save run metadata for quick listing
+        test_counts = task.get('test_result_count', {})
+        self.save_run_metadata(run_id, task, test_counts)
+        
+        # 7. Return analysis summary
         return self._build_analysis_response(run_id, task, test_summaries, all_log_events)
     
     def get_task_details(self, task_id: str) -> Optional[Dict]:
@@ -196,6 +200,21 @@ class JitaService:
         """
         execute_sql(create_summary_sql)
         
+        # Create global runs metadata table (if not exists)
+        execute_sql("""
+            CREATE TABLE IF NOT EXISTS jita_runs_metadata (
+                run_id TEXT PRIMARY KEY,
+                label TEXT,
+                service TEXT,
+                created_by TEXT,
+                task_status TEXT,
+                total_tests INTEGER,
+                passed_tests INTEGER,
+                failed_tests INTEGER,
+                analyzed_at TEXT
+            )
+        """)
+        
         # Clear existing data if re-analyzing (to avoid duplicates)
         if clear_existing:
             execute_sql(f"DELETE FROM {logs_table}")
@@ -203,6 +222,46 @@ class JitaService:
             logger.info(f"Cleared existing data from tables: {logs_table}, {summary_table}")
         
         logger.info(f"Tables ready: {logs_table}, {summary_table}")
+    
+    def save_run_metadata(self, run_id: str, task: Dict, test_counts: Dict):
+        """Save run metadata for quick listing."""
+        from datetime import datetime
+        
+        def escape(val):
+            if isinstance(val, str):
+                return val.replace("'", "''")
+            return val or ''
+        
+        sql = f"""
+            INSERT OR REPLACE INTO jita_runs_metadata 
+            (run_id, label, service, created_by, task_status, total_tests, passed_tests, failed_tests, analyzed_at)
+            VALUES (
+                '{run_id}',
+                '{escape(task.get("label", ""))}',
+                '{escape(task.get("service", ""))}',
+                '{escape(task.get("created_by", ""))}',
+                '{escape(task.get("status", ""))}',
+                {test_counts.get("Total", 0)},
+                {test_counts.get("Succeeded", 0)},
+                {test_counts.get("Failed", 0)},
+                '{datetime.now().isoformat()}'
+            )
+        """
+        execute_sql(sql)
+    
+    def get_runs_with_metadata(self) -> List[Dict]:
+        """Get all analyzed runs with their metadata."""
+        result = execute_sql("""
+            SELECT run_id, label, service, created_by, task_status, 
+                   total_tests, passed_tests, failed_tests, analyzed_at
+            FROM jita_runs_metadata
+            ORDER BY analyzed_at DESC
+        """)
+        
+        if result.get("status") == "error":
+            return []
+        
+        return result.get("rows", [])
     
     def get_run_summary(self, run_id: str) -> Dict[str, Any]:
         """Get summary of an analyzed run from SQL."""
