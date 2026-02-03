@@ -402,12 +402,12 @@
                     </svg>
                     View Raw Logs (JITA)
                 </a>
-                <button class="btn btn-secondary" onclick="history.back()">
+                <a href="#" id="backLink" class="btn btn-secondary">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M19 12H5M12 19l-7-7 7-7"/>
                     </svg>
-                    Back
-                </button>
+                    Back to Results
+                </a>
             </div>
         </div>
 
@@ -616,6 +616,9 @@
             } else {
                 document.getElementById('jitaLogLink').style.display = 'none';
             }
+            
+            // Set back link to jita-browser with run ID
+            document.getElementById('backLink').href = `jita-browser.html?run=${runId}`;
         }
 
         function displayErrors(events) {

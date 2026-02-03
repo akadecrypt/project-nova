@@ -736,9 +736,10 @@ class JitaService:
         result_id: str, 
         test_name: str
     ) -> List[Dict]:
-        """Parse log content and extract error events."""
+        """Parse log content and extract error events with context."""
         events = []
         lines = content.split('\n')
+        total_lines = len(lines)
         
         # Patterns for severity detection
         severity_patterns = {
@@ -747,57 +748,63 @@ class JitaService:
             'WARN': [r'\bWARN\b', r'\bWARNING\b'],
         }
         
-        current_event = None
-        stack_lines = []
-        
-        for line_num, line in enumerate(lines, 1):
-            line = line.strip()
-            if not line:
-                continue
-            
-            # Detect severity
-            severity = None
+        # First pass: identify error line numbers
+        error_lines = []
+        for line_num, line in enumerate(lines):
             for sev, patterns in severity_patterns.items():
-                for pattern in patterns:
-                    if re.search(pattern, line, re.IGNORECASE):
-                        severity = sev
-                        break
-                if severity:
+                if sev in ['ERROR', 'FATAL']:
+                    for pattern in patterns:
+                        if re.search(pattern, line, re.IGNORECASE):
+                            error_lines.append((line_num, sev, line.strip()))
+                            break
+        
+        # Second pass: extract events with context
+        for error_line_num, severity, error_line in error_lines:
+            timestamp = self._extract_timestamp(error_line)
+            event_type = self._classify_log_line(error_line)
+            
+            # Collect stack trace lines following the error
+            stack_lines = []
+            for i in range(error_line_num + 1, min(error_line_num + 50, total_lines)):
+                check_line = lines[i].strip()
+                if not check_line:
+                    continue
+                if self._is_stack_trace_line(check_line):
+                    stack_lines.append(check_line)
+                elif any(re.search(p, check_line, re.IGNORECASE) for patterns in severity_patterns.values() for p in patterns):
+                    # Hit another log entry, stop
                     break
             
-            # Only capture ERROR and FATAL
-            if severity in ['ERROR', 'FATAL']:
-                # Save previous event
-                if current_event:
-                    if stack_lines:
-                        current_event['stack_trace'] = '\n'.join(stack_lines)[:2000]
-                    events.append(current_event)
-                
-                # Start new event
-                timestamp = self._extract_timestamp(line)
-                event_type = self._classify_log_line(line)
-                
-                current_event = {
-                    'test_result_id': result_id,
-                    'test_name': test_name,
-                    'log_source': source,
-                    'timestamp': timestamp,
-                    'severity': severity,
-                    'event_type': event_type,
-                    'message': line[:500],
-                    'stack_trace': None,
-                    'line_number': line_num
-                }
-                stack_lines = []
-            
-            elif current_event and self._is_stack_trace_line(line):
-                stack_lines.append(line)
-        
-        # Don't forget the last event
-        if current_event:
+            # If no stack trace found, capture context (+/- 10 lines)
+            stack_trace = None
             if stack_lines:
-                current_event['stack_trace'] = '\n'.join(stack_lines)[:2000]
-            events.append(current_event)
+                stack_trace = '\n'.join(stack_lines)[:2000]
+            else:
+                # Capture context: 10 lines before and 10 lines after
+                context_start = max(0, error_line_num - 10)
+                context_end = min(total_lines, error_line_num + 11)
+                context_lines = []
+                
+                for i in range(context_start, context_end):
+                    prefix = ">>> " if i == error_line_num else "    "
+                    line_content = lines[i].rstrip()[:200]  # Limit line length
+                    context_lines.append(f"{prefix}[{i+1}] {line_content}")
+                
+                if context_lines:
+                    stack_trace = "--- Context (±10 lines) ---\n" + '\n'.join(context_lines)
+            
+            event = {
+                'test_result_id': result_id,
+                'test_name': test_name,
+                'log_source': source,
+                'timestamp': timestamp,
+                'severity': severity,
+                'event_type': event_type,
+                'message': error_line[:500],
+                'stack_trace': stack_trace,
+                'line_number': error_line_num + 1  # 1-based
+            }
+            events.append(event)
         
         return events
     
