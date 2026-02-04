@@ -473,6 +473,89 @@ class JitaService:
             "total_logs": total_logs
         }
     
+    def get_error_stats(
+        self,
+        run_id: str,
+        test_result_id: str = None
+    ) -> Dict[str, Any]:
+        """
+        Get aggregated error statistics from the database.
+        
+        Returns counts by severity, event_type, log_source, priority - 
+        all computed from DB, not requiring full data load.
+        """
+        safe_id = re.sub(r'[^a-zA-Z0-9]', '', run_id)
+        logs_table = f"jita_{safe_id}_logs"
+        
+        where_clause = f"test_result_id = '{test_result_id}'" if test_result_id else "1=1"
+        
+        # Total counts by severity
+        severity_sql = f"""
+            SELECT severity, COUNT(*) as count
+            FROM {logs_table}
+            WHERE {where_clause}
+            GROUP BY severity
+        """
+        severity_result = execute_sql(severity_sql)
+        severity_counts = {r['severity']: r['count'] for r in severity_result.get('rows', [])}
+        
+        # Counts by event_type
+        event_type_sql = f"""
+            SELECT event_type, COUNT(*) as count
+            FROM {logs_table}
+            WHERE {where_clause} AND event_type IS NOT NULL AND event_type != ''
+            GROUP BY event_type
+            ORDER BY count DESC
+        """
+        event_type_result = execute_sql(event_type_sql)
+        event_types = event_type_result.get('rows', [])
+        
+        # Counts by log_source
+        source_sql = f"""
+            SELECT log_source, COUNT(*) as count
+            FROM {logs_table}
+            WHERE {where_clause}
+            GROUP BY log_source
+            ORDER BY count DESC
+        """
+        source_result = execute_sql(source_sql)
+        sources = source_result.get('rows', [])
+        
+        # Counts by priority
+        priority_sql = f"""
+            SELECT priority, COUNT(*) as count
+            FROM {logs_table}
+            WHERE {where_clause}
+            GROUP BY priority
+            ORDER BY priority
+        """
+        priority_result = execute_sql(priority_sql)
+        priorities = {r['priority']: r['count'] for r in priority_result.get('rows', [])}
+        
+        # Total counts
+        total_sql = f"""
+            SELECT 
+                COUNT(*) as total,
+                SUM(CASE WHEN severity IN ('ERROR', 'FATAL') THEN 1 ELSE 0 END) as error_count,
+                SUM(CASE WHEN severity = 'WARN' THEN 1 ELSE 0 END) as warn_count
+            FROM {logs_table}
+            WHERE {where_clause}
+        """
+        total_result = execute_sql(total_sql)
+        totals = total_result.get('rows', [{}])[0] if total_result.get('rows') else {}
+        
+        return {
+            "run_id": run_id,
+            "test_result_id": test_result_id,
+            "total_events": totals.get('total', 0),
+            "error_count": totals.get('error_count', 0),
+            "warn_count": totals.get('warn_count', 0),
+            "severity_counts": severity_counts,
+            "event_types": event_types,
+            "sources": sources,
+            "priorities": priorities
+        }
+    
     def get_paginated_logs(
         self, 
         run_id: str, 
@@ -1703,17 +1786,50 @@ class JitaService:
     def _classify_exception(self, exception_text: str) -> str:
         """Classify exception type from exception text."""
         patterns = {
+            # Python Errors
             'ASSERTION_ERROR': [r'AssertionError', r'assert.*fail'],
-            'TIMEOUT': [r'TimeoutError', r'timeout', r'timed\s+out'],
-            'CONNECTION_ERROR': [r'ConnectionError', r'connection.*fail', r'refused'],
-            'INFRA_ERROR': [r'InfraError', r'infra.*fail', r'resource.*fail'],
-            'ATTRIBUTE_ERROR': [r'AttributeError'],
             'KEY_ERROR': [r'KeyError'],
             'VALUE_ERROR': [r'ValueError'],
             'TYPE_ERROR': [r'TypeError'],
+            'ATTRIBUTE_ERROR': [r'AttributeError'],
+            'INDEX_ERROR': [r'IndexError'],
+            'NAME_ERROR': [r'NameError'],
             'IMPORT_ERROR': [r'ImportError', r'ModuleNotFoundError'],
-            'IO_ERROR': [r'IOError', r'FileNotFoundError'],
             'RUNTIME_ERROR': [r'RuntimeError'],
+            
+            # Network/Connection
+            'TIMEOUT': [r'TimeoutError', r'timeout', r'timed\s+out', r'deadline'],
+            'CONNECTION_ERROR': [r'ConnectionError', r'connection.*fail', r'refused', r'reset', r'ECONNREFUSED'],
+            'SOCKET_ERROR': [r'socket\.error', r'socket.*error', r'broken pipe'],
+            'SSL_ERROR': [r'SSLError', r'ssl.*error', r'certificate'],
+            
+            # HTTP
+            'HTTP_ERROR': [r'HTTPError', r'HTTP\s*\d{3}', r'status.*[45]\d{2}'],
+            'AUTH_ERROR': [r'Unauthorized', r'401', r'403', r'Forbidden', r'authentication.*fail'],
+            
+            # File/IO
+            'FILE_NOT_FOUND': [r'FileNotFoundError', r'No such file', r'file not found'],
+            'IO_ERROR': [r'IOError', r'I/O error', r'PermissionError'],
+            'MEMORY_ERROR': [r'MemoryError', r'out of memory', r'OOM'],
+            
+            # Infrastructure
+            'INFRA_ERROR': [r'InfraError', r'infra.*fail', r'infrastructure'],
+            'CLUSTER_ERROR': [r'ClusterError', r'cluster.*fail', r'cvm.*error'],
+            'WORKFLOW_ERROR': [r'WorkflowError', r'workflow.*fail'],
+            'TASK_FAILED': [r'TASK_FAILED', r'task.*failed'],
+            'SSH_ERROR': [r'SSHError', r'ssh.*fail', r'NuTestSSH'],
+            
+            # Database
+            'DATABASE_ERROR': [r'DatabaseError', r'SQL.*error', r'IntegrityError'],
+            
+            # Validation
+            'VALIDATION_ERROR': [r'ValidationError', r'validation.*fail', r'invalid'],
+            'PARSING_ERROR': [r'ParseError', r'JSON.*error', r'parse.*fail'],
+            
+            # Test Framework
+            'SETUP_ERROR': [r'SetupError', r'setup.*fail'],
+            'TEARDOWN_ERROR': [r'TeardownError', r'teardown.*fail'],
+            'TEST_FAILED': [r'TestFailed', r'test.*failed'],
         }
         
         for event_type, regexes in patterns.items():
@@ -1726,14 +1842,38 @@ class JitaService:
     def _classify_log_line(self, line: str) -> Optional[str]:
         """Classify error type from log line."""
         patterns = {
-            'CONNECTION_ERROR': [r'connection.*fail', r'refused', r'reset'],
-            'TIMEOUT': [r'timeout', r'timed\s+out', r'deadline'],
-            'AUTH_FAIL': [r'auth.*fail', r'unauthorized', r'forbidden'],
-            'NOT_FOUND': [r'not\s+found', r'does\s+not\s+exist', r'missing'],
-            'PERMISSION_ERROR': [r'permission\s+denied', r'access\s+denied'],
-            'CONFIG_ERROR': [r'config.*error', r'invalid.*config'],
-            'RESOURCE_ERROR': [r'resource.*fail', r'allocation.*fail'],
-            'VALIDATION_ERROR': [r'validation.*fail', r'invalid.*param'],
+            # Network
+            'CONNECTION_ERROR': [r'connection.*fail', r'refused', r'reset', r'ECONNREFUSED', r'network.*unreachable'],
+            'TIMEOUT': [r'timeout', r'timed\s+out', r'deadline', r'socket.*timeout'],
+            'SSL_ERROR': [r'ssl.*error', r'certificate.*error', r'ssl.*handshake'],
+            
+            # Auth
+            'AUTH_ERROR': [r'auth.*fail', r'unauthorized', r'forbidden', r'access.*denied', r'401', r'403'],
+            'PERMISSION_ERROR': [r'permission\s+denied', r'not\s+permitted', r'EACCES'],
+            
+            # Resource
+            'FILE_NOT_FOUND': [r'file.*not\s+found', r'no such file', r'FileNotFoundError'],
+            'NOT_FOUND': [r'not\s+found', r'does\s+not\s+exist', r'missing', r'404'],
+            'DISK_FULL': [r'disk.*full', r'no space', r'ENOSPC', r'quota.*exceeded'],
+            'MEMORY_ERROR': [r'out of memory', r'OOM', r'MemoryError', r'cannot allocate'],
+            'RESOURCE_ERROR': [r'resource.*fail', r'allocation.*fail', r'resource.*unavailable'],
+            
+            # Config
+            'CONFIG_ERROR': [r'config.*error', r'invalid.*config', r'configuration.*fail'],
+            'VALIDATION_ERROR': [r'validation.*fail', r'invalid.*param', r'invalid.*value'],
+            
+            # Infrastructure
+            'CLUSTER_ERROR': [r'cluster.*error', r'cluster.*fail', r'cvm.*error', r'prism.*error'],
+            'TASK_FAILED': [r'task.*fail', r'operation.*fail', r'TASK_FAILED'],
+            'SSH_ERROR': [r'ssh.*fail', r'ssh.*error', r'paramiko'],
+            
+            # Database
+            'DATABASE_ERROR': [r'database.*error', r'sql.*error', r'query.*fail'],
+            
+            # HTTP
+            'HTTP_500': [r'500.*error', r'internal server error'],
+            'HTTP_502': [r'502.*gateway', r'bad gateway'],
+            'HTTP_503': [r'503.*unavailable', r'service unavailable'],
         }
         
         line_lower = line.lower()

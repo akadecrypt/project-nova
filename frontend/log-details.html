@@ -461,6 +461,31 @@
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
         }
+        .load-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 16px;
+            flex-wrap: wrap;
+        }
+        .load-actions .load-more-btn {
+            flex: none;
+            width: auto;
+            margin-top: 0;
+        }
+        .load-more-btn.secondary {
+            background: var(--bg-secondary);
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+        }
+        .load-more-btn.warning {
+            background: var(--warning-bg);
+            border-color: var(--warning);
+            color: var(--warning);
+        }
+        .load-more-btn.warning:hover {
+            background: var(--warning);
+            color: var(--bg-primary);
+        }
 
         /* Toast */
         .toast {
@@ -578,12 +603,20 @@
                 <div>Loading errors...</div>
             </div>
         </div>
-        <button class="load-more-btn" id="loadMoreBtn" style="display: none;" onclick="loadMoreErrors()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="6 9 12 15 18 9"/>
-            </svg>
-            <span id="loadMoreText">Load More Errors</span>
-        </button>
+        <div class="load-actions" id="loadActions" style="display: none;">
+            <button class="load-more-btn" id="loadMoreBtn" onclick="loadMoreErrors(100)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"/>
+                </svg>
+                <span id="loadMoreText">Load 100 More</span>
+            </button>
+            <button class="load-more-btn secondary" id="load500Btn" onclick="loadMoreErrors(500)">
+                Load 500 More
+            </button>
+            <button class="load-more-btn warning" id="loadAllBtn" onclick="loadAllErrors()">
+                Load All (<span id="remainingCount">0</span>)
+            </button>
+        </div>
     </div>
 
     <div id="toast" class="toast"></div>
@@ -615,6 +648,9 @@
 
         let testData = null;
         let logEvents = [];
+        
+        // Stats from DB (aggregated totals, not dependent on loaded data)
+        let dbStats = null;
 
         // Error Analysis Knowledge Base
         const ERROR_KNOWLEDGE = {
@@ -721,9 +757,17 @@
 
         async function loadTestDetails() {
             try {
-                // Load test summary
-                const summaryRes = await fetch(`${API}/runs/${runId}/summary`);
+                // Load test summary and stats in parallel
+                const [summaryRes, statsRes] = await Promise.all([
+                    fetch(`${API}/runs/${runId}/summary`),
+                    fetch(`${API}/runs/${runId}/stats?test_result_id=${testId}`)
+                ]);
+                
                 const summaryData = await summaryRes.json();
+                const statsData = await statsRes.json();
+                
+                // Store DB stats for filters and totals
+                dbStats = statsData;
                 
                 if (summaryData.tests) {
                     testData = summaryData.tests.find(t => t.test_result_id === testId);
@@ -731,6 +775,9 @@
                         displayTestInfo(testData);
                     }
                 }
+                
+                // Display stats from DB (real totals, not loaded counts)
+                displayStatsFromDB(dbStats);
 
                 // Load initial log events for this test (errors/warnings only)
                 const logsRes = await fetch(`${API}/runs/${runId}/logs?test_result_id=${testId}&severity=ERROR&limit=${LOGS_PER_PAGE}&offset=0`);
@@ -751,15 +798,51 @@
             }
         }
         
-        async function loadMoreErrors() {
+        function displayStatsFromDB(stats) {
+            if (!stats) return;
+            
+            // Show real totals from DB
+            document.getElementById('errorCount').textContent = (stats.error_count || 0).toLocaleString();
+            document.getElementById('warnCount').textContent = (stats.warn_count || 0).toLocaleString();
+            document.getElementById('totalEvents').textContent = (stats.total_events || 0).toLocaleString();
+            document.getElementById('logSourceCount').textContent = (stats.sources || []).length;
+            
+            // Populate source filter from DB
+            const sourceFilter = document.getElementById('sourceFilter');
+            const sources = stats.sources || [];
+            sourceFilter.innerHTML = '<option value="all">All Sources (' + sources.length + ')</option>' + 
+                sources.map(s => `<option value="${escapeHtml(s.log_source)}">${escapeHtml(s.log_source)} (${s.count})</option>`).join('');
+            
+            // Populate event type filter from DB  
+            const eventTypes = stats.event_types || [];
+            if (eventTypes.length > 0) {
+                // Add event type filter if there are types
+                const priorityFilter = document.getElementById('priorityFilter');
+                const eventTypeSelect = document.createElement('select');
+                eventTypeSelect.className = 'filter-select-sm';
+                eventTypeSelect.id = 'eventTypeFilter';
+                eventTypeSelect.onchange = filterErrors;
+                eventTypeSelect.innerHTML = '<option value="all">All Types (' + eventTypes.length + ')</option>' +
+                    eventTypes.map(e => `<option value="${escapeHtml(e.event_type)}">${escapeHtml(e.event_type)} (${e.count})</option>`).join('');
+                
+                // Insert after priority filter if not exists
+                if (!document.getElementById('eventTypeFilter')) {
+                    priorityFilter.parentNode.insertBefore(eventTypeSelect, priorityFilter.nextSibling);
+                }
+            }
+        }
+        
+        async function loadMoreErrors(count = 100) {
             const btn = document.getElementById('loadMoreBtn');
             const textEl = document.getElementById('loadMoreText');
+            const actionsDiv = document.getElementById('loadActions');
             
-            btn.disabled = true;
+            // Disable all buttons
+            actionsDiv.querySelectorAll('button').forEach(b => b.disabled = true);
             textEl.innerHTML = '<div class="spinner-sm"></div> Loading...';
             
             try {
-                const logsRes = await fetch(`${API}/runs/${runId}/logs?test_result_id=${testId}&severity=ERROR&limit=${LOGS_PER_PAGE}&offset=${logsOffset}`);
+                const logsRes = await fetch(`${API}/runs/${runId}/logs?test_result_id=${testId}&severity=ERROR&limit=${count}&offset=${logsOffset}`);
                 const logsData = await logsRes.json();
                 
                 const newLogs = logsData.logs || [];
@@ -775,21 +858,78 @@
                 console.error(e);
                 showToast('Error loading more logs');
                 textEl.textContent = 'Failed - Click to retry';
-                btn.disabled = false;
+                actionsDiv.querySelectorAll('button').forEach(b => b.disabled = false);
+            }
+        }
+        
+        async function loadAllErrors() {
+            const remaining = totalLogs - logsOffset;
+            
+            // Warn if loading a lot
+            if (remaining > 5000) {
+                if (!confirm(`This will load ${remaining.toLocaleString()} errors which may take a while and use significant memory. Continue?`)) {
+                    return;
+                }
+            }
+            
+            const actionsDiv = document.getElementById('loadActions');
+            const loadAllBtn = document.getElementById('loadAllBtn');
+            
+            actionsDiv.querySelectorAll('button').forEach(b => b.disabled = true);
+            loadAllBtn.innerHTML = '<div class="spinner-sm"></div> Loading all...';
+            
+            try {
+                // Load in chunks to avoid timeout
+                const chunkSize = 1000;
+                let loaded = 0;
+                
+                while (logsOffset < totalLogs) {
+                    const logsRes = await fetch(`${API}/runs/${runId}/logs?test_result_id=${testId}&severity=ERROR&limit=${chunkSize}&offset=${logsOffset}`);
+                    const logsData = await logsRes.json();
+                    
+                    const newLogs = logsData.logs || [];
+                    if (newLogs.length === 0) break;
+                    
+                    logEvents = logEvents.concat(newLogs);
+                    hasMoreLogs = logsData.has_more || false;
+                    logsOffset += newLogs.length;
+                    loaded += newLogs.length;
+                    
+                    // Update progress
+                    loadAllBtn.innerHTML = `<div class="spinner-sm"></div> Loaded ${logsOffset.toLocaleString()}/${totalLogs.toLocaleString()}...`;
+                    
+                    // Small delay to prevent overwhelming the server
+                    await new Promise(r => setTimeout(r, 100));
+                }
+                
+                displayErrors(logEvents);
+                updateLoadMoreButton();
+                showToast(`Loaded ${loaded.toLocaleString()} errors`);
+                
+            } catch (e) {
+                console.error(e);
+                showToast('Error loading all logs');
+                actionsDiv.querySelectorAll('button').forEach(b => b.disabled = false);
             }
         }
         
         function updateLoadMoreButton() {
-            const btn = document.getElementById('loadMoreBtn');
+            const actionsDiv = document.getElementById('loadActions');
             const textEl = document.getElementById('loadMoreText');
+            const remainingEl = document.getElementById('remainingCount');
             
             if (hasMoreLogs) {
                 const remaining = totalLogs - logsOffset;
-                btn.style.display = 'flex';
-                textEl.textContent = `Load More Errors (${remaining.toLocaleString()} remaining)`;
-                btn.disabled = false;
+                actionsDiv.style.display = 'flex';
+                textEl.textContent = `Load 100 More`;
+                remainingEl.textContent = remaining.toLocaleString();
+                actionsDiv.querySelectorAll('button').forEach(b => b.disabled = false);
+                
+                // Hide load 500 if less than 500 remaining
+                document.getElementById('load500Btn').style.display = remaining > 100 ? 'flex' : 'none';
+                document.getElementById('loadAllBtn').style.display = remaining > 100 ? 'flex' : 'none';
             } else {
-                btn.style.display = 'none';
+                actionsDiv.style.display = 'none';
             }
         }
 
@@ -820,21 +960,13 @@
         function displayErrors(events) {
             const errors = events.filter(e => e.severity === 'ERROR' || e.severity === 'FATAL');
             const warnings = events.filter(e => e.severity === 'WARN');
-            const sources = [...new Set(events.map(e => e.log_source))];
-
-            // Show loaded count and total if available
-            const loadedCount = errors.length;
-            const totalCount = totalLogs || loadedCount;
-            document.getElementById('errorCount').textContent = totalCount > loadedCount ? 
-                `${loadedCount.toLocaleString()} / ${totalCount.toLocaleString()}` : loadedCount.toLocaleString();
-            document.getElementById('warnCount').textContent = warnings.length;
-            document.getElementById('logSourceCount').textContent = sources.length;
-            document.getElementById('totalEvents').textContent = events.length;
-
-            // Populate source filter dropdown
-            const sourceFilter = document.getElementById('sourceFilter');
-            sourceFilter.innerHTML = '<option value="all">All Sources</option>' + 
-                sources.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+            
+            // Note: We don't update summary cards here anymore - they use DB stats
+            // Just update the filter count to show loaded vs total
+            const loadedInfo = document.querySelector('.filter-count');
+            if (loadedInfo && dbStats) {
+                loadedInfo.textContent = `Loaded: ${logEvents.length.toLocaleString()} / ${totalLogs.toLocaleString()} errors`;
+            }
             
             // Build combined error list
             allErrorsList = [];
@@ -872,6 +1004,7 @@
             const priorityFilter = document.getElementById('priorityFilter')?.value || 'all';
             const severityFilter = document.getElementById('severityFilter')?.value || 'all';
             const sourceFilter = document.getElementById('sourceFilter')?.value || 'all';
+            const eventTypeFilter = document.getElementById('eventTypeFilter')?.value || 'all';
             const container = document.getElementById('errorList');
 
             // Apply filters
@@ -884,12 +1017,14 @@
                 const matchesPriority = priorityFilter === 'all' || err.priority === priorityFilter;
                 const matchesSeverity = severityFilter === 'all' || err.severity === severityFilter;
                 const matchesSource = sourceFilter === 'all' || err.log_source === sourceFilter;
+                const matchesEventType = eventTypeFilter === 'all' || err.event_type === eventTypeFilter;
                 
-                return matchesSearch && matchesPriority && matchesSeverity && matchesSource;
+                return matchesSearch && matchesPriority && matchesSeverity && matchesSource && matchesEventType;
             });
 
-            // Update count
-            document.getElementById('filterCount').textContent = `${filtered.length} of ${allErrorsList.length} items`;
+            // Update count - show filtered of loaded, and total in DB
+            const totalInDB = dbStats?.error_count || totalLogs;
+            document.getElementById('filterCount').textContent = `Showing ${filtered.length} of ${allErrorsList.length} loaded (${totalInDB.toLocaleString()} total in DB)`;
 
             if (filtered.length === 0) {
                 container.innerHTML = '<div style="color: var(--text-muted); padding: 40px; text-align: center;">No errors match your filters</div>';

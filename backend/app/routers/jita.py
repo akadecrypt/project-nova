@@ -320,6 +320,31 @@ async def get_run_timeline(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/runs/{run_id}/stats")
+async def get_run_error_stats(
+    run_id: str,
+    test_result_id: Optional[str] = Query(None, description="Filter by specific test result")
+):
+    """
+    Get aggregated error statistics for a run.
+    
+    Returns total counts by severity, event_type, log_source, and priority -
+    all computed from DB without loading full data.
+    """
+    try:
+        service = get_jita_service()
+        result = service.get_error_stats(run_id, test_result_id)
+        
+        return {
+            "status": "success",
+            **result
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting stats for run {run_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/runs/{run_id}/logs")
 async def get_run_logs(
     run_id: str,

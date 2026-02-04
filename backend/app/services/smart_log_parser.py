@@ -106,12 +106,44 @@ class SmartLogParser:
     
     # Exception class names that indicate real errors
     EXCEPTION_CLASSES = [
+        # Python built-in
         'AssertionError', 'RuntimeError', 'ValueError', 'TypeError', 'KeyError',
         'AttributeError', 'IndexError', 'ImportError', 'IOError', 'OSError',
         'FileNotFoundError', 'PermissionError', 'ConnectionError', 'TimeoutError',
-        'HTTPError', 'RequestException', 'AuthenticationError', 'DatabaseError',
+        'MemoryError', 'OverflowError', 'ZeroDivisionError', 'UnicodeError',
+        'UnicodeDecodeError', 'UnicodeEncodeError', 'SyntaxError', 'IndentationError',
+        'NameError', 'UnboundLocalError', 'StopIteration', 'GeneratorExit',
+        'RecursionError', 'NotImplementedError', 'SystemError', 'SystemExit',
+        'KeyboardInterrupt', 'BrokenPipeError', 'ConnectionRefusedError',
+        'ConnectionResetError', 'ConnectionAbortedError', 'InterruptedError',
+        'ChildProcessError', 'ProcessLookupError', 'BlockingIOError',
+        
+        # HTTP/Network
+        'HTTPError', 'URLError', 'RequestException', 'ConnectionException',
+        'SSLError', 'ProxyError', 'InvalidURL', 'ChunkedEncodingError',
+        'ContentDecodingError', 'TooManyRedirects', 'MissingSchema',
+        'InvalidSchema', 'InvalidHeader', 'StreamConsumedError',
+        
+        # Auth
+        'AuthenticationError', 'AuthorizationError', 'CredentialsError',
+        'TokenError', 'InvalidTokenError', 'ExpiredTokenError',
+        
+        # Database
+        'DatabaseError', 'IntegrityError', 'OperationalError', 'ProgrammingError',
+        'InterfaceError', 'InternalError', 'DataError', 'NotSupportedError',
+        
+        # Validation
+        'ValidationError', 'SchemaError', 'ParseError', 'SerializationError',
+        
+        # Nutanix/Test Framework
         'NuTestError', 'InfraError', 'ClusterError', 'WorkflowError', 'SetupError',
         'NuTestInterfaceTransportError', 'NuTestSSHTimeoutError', 'NuTestSSHError',
+        'NuTestTimeoutError', 'NuTestResourceError', 'TestError', 'TestFailure',
+        'ConfigurationError', 'DeploymentError', 'ProvisioningError',
+        
+        # API/Service
+        'APIError', 'ServiceError', 'EndpointError', 'RateLimitError',
+        'QuotaExceededError', 'ResourceNotFoundError', 'ConflictError',
     ]
     
     # False positive patterns - skip these even if they contain "ERROR"
@@ -129,19 +161,82 @@ class SmartLogParser:
         re.compile(r'Successfully', re.IGNORECASE),  # Success messages
     ]
     
-    # Event type classification (only for actual errors)
+    # Event type classification (comprehensive patterns for actual errors)
     ERROR_TYPES = {
-        'ASSERTION_ERROR': [r'AssertionError', r'assert\s+False', r'ASSERTION FAILED'],
-        'TIMEOUT': [r'TimeoutError', r'Timeout', r'timed\s+out', r'deadline\s+exceeded'],
-        'CONNECTION': [r'ConnectionError', r'ConnectionRefused', r'connection\s+reset'],
-        'AUTHENTICATION': [r'AuthenticationError', r'Unauthorized', r'access\s+denied'],
-        'RESOURCE': [r'ResourceError', r'out\s+of\s+memory', r'disk.*full', r'quota.*exceeded'],
-        'HTTP_ERROR': [r'HTTPError', r'status\s+code.*[45]\d{2}', r'HTTP\s+[45]\d{2}'],
-        'IO_ERROR': [r'IOError', r'FileNotFoundError', r'PermissionError'],
-        'INFRA_ERROR': [r'InfraError', r'INFRA_ERROR', r'cluster.*unavailable'],
-        'TASK_FAILED': [r'TASK_FAILED', r'task.*failed', r'operation.*failed'],
-        'SSH_ERROR': [r'SSHError', r'SSH.*failed', r'NuTestSSH'],
-        'TRANSPORT_ERROR': [r'TransportError', r'InterfaceTransportError'],
+        # Python/Framework Errors
+        'ASSERTION_ERROR': [r'AssertionError', r'assert\s+False', r'ASSERTION FAILED', r'assertion.*failed'],
+        'KEY_ERROR': [r'KeyError', r'KeyError:', r"KeyError:.*'[^']+'"],
+        'VALUE_ERROR': [r'ValueError', r'ValueError:', r'invalid.*value', r'value.*invalid'],
+        'TYPE_ERROR': [r'TypeError', r'TypeError:', r'type.*error', r'wrong.*type'],
+        'ATTRIBUTE_ERROR': [r'AttributeError', r'AttributeError:', r'has no attribute'],
+        'INDEX_ERROR': [r'IndexError', r'IndexError:', r'index out of', r'list index out'],
+        'RUNTIME_ERROR': [r'RuntimeError', r'RuntimeError:'],
+        'IMPORT_ERROR': [r'ImportError', r'ModuleNotFoundError', r'No module named'],
+        'NAME_ERROR': [r'NameError', r'NameError:', r'name.*is not defined'],
+        
+        # Network/Connection Errors
+        'TIMEOUT': [r'TimeoutError', r'Timeout', r'timed\s+out', r'deadline\s+exceeded', r'connection.*timed', r'socket.*timeout', r'read.*timeout', r'request.*timeout'],
+        'CONNECTION_ERROR': [r'ConnectionError', r'ConnectionRefused', r'connection\s+reset', r'Connection refused', r'Connection reset', r'ECONNREFUSED', r'ECONNRESET', r'network.*unreachable', r'host.*unreachable', r'no route to host'],
+        'SOCKET_ERROR': [r'SocketError', r'socket\.error', r'socket\.timeout', r'broken pipe', r'EPIPE'],
+        'SSL_ERROR': [r'SSLError', r'SSL.*error', r'certificate.*error', r'ssl.*handshake', r'CERTIFICATE_VERIFY_FAILED'],
+        'DNS_ERROR': [r'DNSError', r'getaddrinfo', r'Name or service not known', r'DNS.*failed', r'resolution.*failed'],
+        
+        # HTTP Errors
+        'HTTP_400': [r'HTTP.*400', r'Bad Request', r'status.*400'],
+        'HTTP_401': [r'HTTP.*401', r'Unauthorized', r'status.*401'],
+        'HTTP_403': [r'HTTP.*403', r'Forbidden', r'status.*403', r'access.*denied'],
+        'HTTP_404': [r'HTTP.*404', r'Not Found', r'status.*404', r'resource.*not found'],
+        'HTTP_500': [r'HTTP.*500', r'Internal Server Error', r'status.*500'],
+        'HTTP_502': [r'HTTP.*502', r'Bad Gateway', r'status.*502'],
+        'HTTP_503': [r'HTTP.*503', r'Service Unavailable', r'status.*503'],
+        'HTTP_ERROR': [r'HTTPError', r'status\s+code.*[45]\d{2}', r'HTTP\s+[45]\d{2}', r'requests\.exceptions\.HTTPError'],
+        
+        # Authentication/Authorization
+        'AUTH_ERROR': [r'AuthenticationError', r'AuthError', r'authentication.*failed', r'invalid.*credentials', r'login.*failed'],
+        'PERMISSION_ERROR': [r'PermissionError', r'Permission denied', r'access.*denied', r'not authorized', r'forbidden'],
+        
+        # File/IO Errors
+        'FILE_NOT_FOUND': [r'FileNotFoundError', r'No such file', r'file not found', r'path.*does not exist'],
+        'IO_ERROR': [r'IOError', r'I/O error', r'read.*failed', r'write.*failed', r'disk.*error'],
+        'DISK_FULL': [r'No space left', r'disk.*full', r'ENOSPC', r'quota.*exceeded'],
+        
+        # Resource/Memory Errors
+        'MEMORY_ERROR': [r'MemoryError', r'out of memory', r'OOM', r'cannot allocate', r'malloc.*failed'],
+        'RESOURCE_ERROR': [r'ResourceError', r'resource.*unavailable', r'resource.*exhausted', r'too many open files'],
+        
+        # Database Errors
+        'DATABASE_ERROR': [r'DatabaseError', r'DBError', r'SQL.*error', r'query.*failed', r'database.*error', r'connection.*database'],
+        'CONSTRAINT_ERROR': [r'IntegrityError', r'constraint.*violation', r'duplicate.*key', r'foreign key'],
+        
+        # Nutanix/Infrastructure Specific
+        'INFRA_ERROR': [r'InfraError', r'INFRA_ERROR', r'cluster.*unavailable', r'infrastructure.*error'],
+        'CLUSTER_ERROR': [r'ClusterError', r'cluster.*error', r'cluster.*failed', r'cvm.*error', r'prism.*error'],
+        'WORKFLOW_ERROR': [r'WorkflowError', r'workflow.*failed', r'workflow.*error'],
+        'TASK_FAILED': [r'TASK_FAILED', r'task.*failed', r'operation.*failed', r'task.*error'],
+        'API_ERROR': [r'APIError', r'API.*error', r'api.*failed', r'REST.*error'],
+        
+        # SSH/Remote Errors  
+        'SSH_ERROR': [r'SSHError', r'SSH.*failed', r'NuTestSSH', r'ssh.*error', r'paramiko.*error', r'connection.*ssh'],
+        'TRANSPORT_ERROR': [r'TransportError', r'InterfaceTransportError', r'transport.*failed'],
+        
+        # Test Framework Errors
+        'SETUP_ERROR': [r'SetupError', r'setup.*failed', r'setUp.*error', r'initialization.*failed'],
+        'TEARDOWN_ERROR': [r'TeardownError', r'teardown.*failed', r'cleanup.*failed'],
+        'TEST_FAILED': [r'TestFailed', r'test.*failed', r'FAILED', r'test.*error'],
+        'SKIP_ERROR': [r'SkipTest', r'test.*skipped', r'skip.*reason'],
+        
+        # Validation/Data Errors
+        'VALIDATION_ERROR': [r'ValidationError', r'validation.*failed', r'invalid.*data', r'schema.*error'],
+        'PARSING_ERROR': [r'ParseError', r'JSON.*error', r'XML.*error', r'parse.*failed', r'syntax.*error'],
+        'ENCODING_ERROR': [r'UnicodeError', r'encoding.*error', r'decode.*error', r'utf-8.*error'],
+        
+        # Configuration Errors
+        'CONFIG_ERROR': [r'ConfigError', r'configuration.*error', r'config.*invalid', r'missing.*config'],
+        
+        # Concurrency Errors
+        'DEADLOCK': [r'Deadlock', r'deadlock.*detected', r'circular.*wait'],
+        'RACE_CONDITION': [r'race.*condition', r'concurrent.*modification'],
+        'LOCK_ERROR': [r'LockError', r'lock.*timeout', r'unable to acquire'],
     }
     
     def __init__(self, context_window: int = 10):
