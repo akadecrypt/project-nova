@@ -14,7 +14,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-NOVA_HOME="${NOVA_HOME:-/opt/nova}"
+NOVA_HOME="${NOVA_HOME:-$HOME/nova}"
 NOVA_USER="${NOVA_USER:-$USER}"
 NOVA_GROUP="${NOVA_GROUP:-$USER}"
 INSTALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -75,14 +75,25 @@ check_dependencies() {
 create_directories() {
     log_info "Creating NOVA directories..."
     
-    sudo mkdir -p "$NOVA_HOME"
-    sudo mkdir -p "$NOVA_HOME/backend"
-    sudo mkdir -p "$NOVA_HOME/frontend"
-    sudo mkdir -p "$NOVA_HOME/logs"
-    sudo mkdir -p "$NOVA_HOME/data"
-    sudo mkdir -p "$NOVA_HOME/bin"
-    
-    sudo chown -R "$NOVA_USER:$NOVA_GROUP" "$NOVA_HOME"
+    # Check if we need sudo (for system directories like /opt)
+    if [[ "$NOVA_HOME" == /opt/* ]] || [[ "$NOVA_HOME" == /usr/* ]]; then
+        sudo mkdir -p "$NOVA_HOME"
+        sudo mkdir -p "$NOVA_HOME/backend"
+        sudo mkdir -p "$NOVA_HOME/frontend"
+        sudo mkdir -p "$NOVA_HOME/logs"
+        sudo mkdir -p "$NOVA_HOME/data"
+        sudo mkdir -p "$NOVA_HOME/bin"
+        sudo mkdir -p "$NOVA_HOME/run"
+        sudo chown -R "$NOVA_USER:$NOVA_GROUP" "$NOVA_HOME"
+    else
+        mkdir -p "$NOVA_HOME"
+        mkdir -p "$NOVA_HOME/backend"
+        mkdir -p "$NOVA_HOME/frontend"
+        mkdir -p "$NOVA_HOME/logs"
+        mkdir -p "$NOVA_HOME/data"
+        mkdir -p "$NOVA_HOME/bin"
+        mkdir -p "$NOVA_HOME/run"
+    fi
     
     log_info "Directories created at $NOVA_HOME"
 }
@@ -135,7 +146,7 @@ create_cli_tool() {
 # NOVA CLI - Command Line Interface for NOVA
 #
 
-NOVA_HOME="${NOVA_HOME:-/opt/nova}"
+NOVA_HOME="${NOVA_HOME:-$HOME/nova}"
 NOVA_PID_DIR="$NOVA_HOME/run"
 NOVA_LOG_DIR="$NOVA_HOME/logs"
 
@@ -447,15 +458,41 @@ NOVA_CLI
 }
 
 create_symlink() {
-    log_info "Creating system symlink..."
+    log_info "Setting up nova command..."
     
-    # Create symlink in /usr/local/bin
+    # Try to create symlink in /usr/local/bin
     if [ -w /usr/local/bin ]; then
         ln -sf "$NOVA_HOME/bin/nova" /usr/local/bin/nova
-        log_info "Symlink created: /usr/local/bin/nova -> $NOVA_HOME/bin/nova"
-    else
+        log_info "Symlink created: /usr/local/bin/nova"
+    elif sudo -n true 2>/dev/null; then
+        # We have passwordless sudo
         sudo ln -sf "$NOVA_HOME/bin/nova" /usr/local/bin/nova
         log_info "Symlink created (with sudo): /usr/local/bin/nova"
+    else
+        # Add to PATH via shell profile instead
+        log_warn "Cannot write to /usr/local/bin, adding to PATH instead"
+        
+        # Detect shell and profile file
+        local shell_profile=""
+        if [ -n "$ZSH_VERSION" ] || [ "$SHELL" = "/bin/zsh" ]; then
+            shell_profile="$HOME/.zshrc"
+        elif [ -n "$BASH_VERSION" ] || [ "$SHELL" = "/bin/bash" ]; then
+            shell_profile="$HOME/.bashrc"
+        else
+            shell_profile="$HOME/.profile"
+        fi
+        
+        # Add to PATH if not already there
+        local path_line="export PATH=\"\$PATH:$NOVA_HOME/bin\""
+        if ! grep -q "$NOVA_HOME/bin" "$shell_profile" 2>/dev/null; then
+            echo "" >> "$shell_profile"
+            echo "# NOVA CLI" >> "$shell_profile"
+            echo "$path_line" >> "$shell_profile"
+            log_info "Added $NOVA_HOME/bin to PATH in $shell_profile"
+            log_warn "Run 'source $shell_profile' or restart your terminal to use 'nova' command"
+        else
+            log_info "PATH already configured in $shell_profile"
+        fi
     fi
 }
 
