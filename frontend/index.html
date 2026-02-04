@@ -1170,6 +1170,16 @@
                     </svg>
                     <span>JITA</span>
                 </a>
+                <a href="#" class="nav-item" data-view="tasks" onclick="switchView('tasks'); return false;">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                        <path d="M9 16l2 2 4-4"></path>
+                    </svg>
+                    <span>Tasks</span>
+                </a>
                 <a href="#" class="nav-item" data-view="settings" onclick="switchView('settings'); return false;">
                     <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="3"></circle>
@@ -1265,6 +1275,11 @@
                 <iframe src="jita-browser.html" style="width: 100%; height: 100%; border: none;"></iframe>
             </div>
             
+            <!-- Tasks View -->
+            <div class="view-container" id="tasksView" style="display: none; flex: 1;">
+                <iframe src="task-manager.html" style="width: 100%; height: 100%; border: none;"></iframe>
+            </div>
+            
             <!-- Settings View -->
             <div class="view-container" id="settingsView" style="display: none; flex: 1;">
                 <iframe src="settings.html" style="width: 100%; height: 100%; border: none;"></iframe>
@@ -1322,6 +1337,7 @@
                 'database': 'Database Browser',
                 'logs': 'Log Browser',
                 'jita': 'JITA Browser',
+                'tasks': 'Task Manager',
                 'settings': 'Settings'
             };
             document.title = `NOVA - ${titles[viewName] || 'Nutanix Objects Virtual Assistant'}`;
