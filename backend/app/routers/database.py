@@ -352,3 +352,40 @@ async def get_jita_table_schema(table_name: str):
         "columns": [],
         "error": f"Table {table_name} not found"
     }
+
+
+@router.post("/jita/query")
+async def run_jita_query(request: QueryRequest):
+    """Execute a SQL query on JITA database"""
+    sql = request.sql.strip()
+    
+    # Only allow SELECT queries for safety
+    if not sql.upper().startswith("SELECT"):
+        return {
+            "success": False,
+            "columns": [],
+            "rows": [],
+            "error": "Only SELECT queries are allowed"
+        }
+    
+    # Add LIMIT if not present
+    if "LIMIT" not in sql.upper():
+        sql = f"{sql} LIMIT {request.limit}"
+    
+    result = execute_jita_sql(sql)
+    
+    if result.get("status") == "error":
+        return {
+            "success": False,
+            "columns": [],
+            "rows": [],
+            "error": result.get("error")
+        }
+    
+    rows = result.get("rows", [])
+    return {
+        "success": True,
+        "columns": result.get("columns", []),
+        "rows": rows,
+        "row_count": len(rows)
+    }

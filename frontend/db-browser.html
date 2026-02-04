@@ -1496,7 +1496,12 @@ ORDER BY status, source_bucket`
             container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
             
             try {
-                const response = await fetch(`${API_BASE}/api/database/query`, {
+                // Detect if query is for JITA table
+                const queryUpper = query.toUpperCase();
+                const isJitaQuery = queryUpper.includes('JITA_') || currentSource === 'jita';
+                const endpoint = isJitaQuery ? `${API_BASE}/api/database/jita/query` : `${API_BASE}/api/database/query`;
+                
+                const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ sql: query, limit: 500 })
@@ -1562,8 +1567,8 @@ ORDER BY status, source_bucket`
                 }
                 
                 container.innerHTML = allTables.map(table => `
-                    <div class="table-item" onclick="selectTable('${table.name}')" data-table="${table.name}">
-                        <div class="table-icon">
+                    <div class="table-item" onclick="selectTable('${table.name}', '${table.source || 'nova'}')" data-table="${table.name}" data-source="${table.source || 'nova'}">
+                        <div class="table-icon" style="${table.source === 'jita' ? 'color: #f59e0b;' : ''}">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                                 <line x1="3" y1="9" x2="21" y2="9"></line>
@@ -1572,7 +1577,7 @@ ORDER BY status, source_bucket`
                         </div>
                         <div class="table-info">
                             <div class="table-name">${table.name}</div>
-                            <div class="table-rows">${table.row_count.toLocaleString()} rows</div>
+                            <div class="table-rows">${table.row_count.toLocaleString()} rows ${table.source === 'jita' ? '<span style="color: #f59e0b; font-size: 10px;">(JITA)</span>' : ''}</div>
                         </div>
                     </div>
                 `).join('');
