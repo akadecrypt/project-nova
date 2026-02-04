@@ -256,54 +256,6 @@ async def get_run_analysis(run_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/runs/{run_id}/logs")
-async def get_run_logs(
-    run_id: str,
-    severity: Optional[str] = Query(None, description="Filter by severity (ERROR, FATAL, WARN)"),
-    event_type: Optional[str] = Query(None, description="Filter by event type"),
-    test_result_id: Optional[str] = Query(None, description="Filter by test result ID"),
-    limit: int = Query(100, ge=1, le=1000, description="Max number of logs to return")
-):
-    """
-    Get log events for a specific run with optional filters.
-    
-    Args:
-        run_id: JITA run ID
-        severity: Filter by severity level
-        event_type: Filter by classified event type
-        test_result_id: Filter by specific test result
-        limit: Maximum number of logs to return
-        
-    Returns:
-        List of log events matching filters
-    """
-    try:
-        service = get_jita_service()
-        result = service.get_run_logs(
-            run_id=run_id,
-            severity=severity,
-            event_type=event_type,
-            test_result_id=test_result_id,
-            limit=limit
-        )
-        
-        if result.get("status") == "error":
-            raise HTTPException(status_code=404, detail=result.get("error", "Run not found"))
-        
-        return {
-            "status": "success",
-            "run_id": run_id,
-            "logs": result.get("rows", []),
-            "count": result.get("row_count", 0)
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error getting logs for run {run_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @router.get("/runs/{run_id}/summary")
 async def get_run_test_summary(run_id: str):
     """
@@ -365,6 +317,43 @@ async def get_run_timeline(
         
     except Exception as e:
         logger.error(f"Error getting timeline for run {run_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/runs/{run_id}/logs")
+async def get_run_logs(
+    run_id: str,
+    test_result_id: Optional[str] = Query(None, description="Filter by specific test result"),
+    phase: Optional[str] = Query(None, description="Filter by phase name"),
+    severity: Optional[str] = Query(None, description="Filter by severity (ERROR, WARN, FATAL)"),
+    operation: Optional[str] = Query(None, description="Filter by operation name"),
+    limit: int = Query(50, description="Number of logs to return"),
+    offset: int = Query(0, description="Offset for pagination")
+):
+    """
+    Get paginated logs for a run with filters.
+    
+    Supports infinite scroll / load more functionality.
+    """
+    try:
+        service = get_jita_service()
+        result = service.get_paginated_logs(
+            run_id, 
+            test_result_id=test_result_id,
+            phase=phase,
+            severity=severity,
+            operation=operation,
+            limit=limit,
+            offset=offset
+        )
+        
+        return {
+            "status": "success",
+            **result
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting logs for run {run_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

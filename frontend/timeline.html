@@ -278,6 +278,41 @@
 
         .view-log-link:hover { text-decoration: underline; }
 
+        /* Load More Button */
+        .load-more-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+            padding: 12px;
+            margin-top: 12px;
+            background: var(--bg-tertiary);
+            border: 1px dashed var(--border-color);
+            border-radius: 8px;
+            color: var(--text-secondary);
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .load-more-btn:hover {
+            background: var(--bg-hover);
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+        }
+        .load-more-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .load-more-btn .spinner {
+            width: 14px;
+            height: 14px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--accent-primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
         /* Toast */
         .toast {
             position: fixed;
@@ -468,6 +503,10 @@
         let cachedOperations = null;
         let cachedTestInfo = null;
         let currentView = 'phases';
+        
+        // Pagination state for each phase/operation
+        const logsOffset = {};  // phase_name -> offset
+        const opsLogsOffset = {};  // op_name -> offset
 
         document.addEventListener('DOMContentLoaded', () => {
             if (!runId) {
@@ -582,8 +621,18 @@
                                 </div>
                             </div>
                             <div class="phase-body">
-                                ${logs.length > 0 ? logs.map((log, j) => renderLog(log, i, j)).join('') : 
-                                    '<div class="empty-logs">No log events in this phase</div>'}
+                                <div class="phase-logs" id="phase-logs-${i}">
+                                    ${logs.length > 0 ? logs.map((log, j) => renderLog(log, i, j)).join('') : 
+                                        '<div class="empty-logs">No log events in this phase</div>'}
+                                </div>
+                                ${(phase.error_count + phase.warn_count) > logs.length ? `
+                                    <button class="load-more-btn" onclick="loadMoreLogs('${phase.phase_name}', ${i})" id="load-more-${i}">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <polyline points="6 9 12 15 18 9"/>
+                                        </svg>
+                                        Load More (${(phase.error_count + phase.warn_count) - logs.length} remaining)
+                                    </button>
+                                ` : ''}
                                 ${phase.log_url ? `
                                     <a href="${resolveLogUrl(phase.log_url)}" target="_blank" class="view-log-link">
                                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -664,23 +713,31 @@
                             </div>
                         </div>
                         <div class="op-body">
-                            <div class="op-error-list">
+                            <div class="op-error-list" id="op-errors-${i}">
                                 ${op.fatal.length > 0 ? `
-                                    <div style="font-size: 11px; color: var(--error); font-weight: 600; margin-bottom: 6px;">FATAL ERRORS</div>
+                                    <div style="font-size: 11px; color: var(--error); font-weight: 600; margin-bottom: 6px;">FATAL ERRORS (${op.fatal_count})</div>
                                     ${op.fatal.map(e => renderOpError(e, 'fatal')).join('')}
                                 ` : ''}
                                 ${op.errors.length > 0 ? `
-                                    <div style="font-size: 11px; color: var(--error); font-weight: 600; margin-bottom: 6px; margin-top: 12px;">ERRORS</div>
+                                    <div style="font-size: 11px; color: var(--error); font-weight: 600; margin-bottom: 6px; margin-top: 12px;">ERRORS (${op.error_count})</div>
                                     ${op.errors.map(e => renderOpError(e, 'error')).join('')}
                                 ` : ''}
                                 ${op.warnings.length > 0 ? `
-                                    <div style="font-size: 11px; color: var(--warning); font-weight: 600; margin-bottom: 6px; margin-top: 12px;">WARNINGS</div>
+                                    <div style="font-size: 11px; color: var(--warning); font-weight: 600; margin-bottom: 6px; margin-top: 12px;">WARNINGS (${op.warn_count})</div>
                                     ${op.warnings.map(e => renderOpError(e, 'warn')).join('')}
                                 ` : ''}
                                 ${totalIssues === 0 ? `
                                     <div style="color: var(--text-muted); font-size: 13px;">This operation completed without errors.</div>
                                 ` : ''}
                             </div>
+                            ${(op.error_count + op.fatal_count + op.warn_count) > (op.errors.length + op.fatal.length + op.warnings.length) ? `
+                                <button class="load-more-btn" onclick="loadMoreOpLogs('${op.name}', ${i})" id="op-load-more-${i}">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="6 9 12 15 18 9"/>
+                                    </svg>
+                                    Load More Logs
+                                </button>
+                            ` : ''}
                         </div>
                     </div>
                 `;
@@ -707,6 +764,65 @@
 
         function toggleOp(i) {
             document.getElementById(`op-${i}`).classList.toggle('expanded');
+        }
+
+        async function loadMoreOpLogs(opName, opIdx) {
+            const btn = document.getElementById(`op-load-more-${opIdx}`);
+            const container = document.getElementById(`op-errors-${opIdx}`);
+            
+            if (!btn || !container) return;
+            
+            // Initialize offset
+            if (!opsLogsOffset[opName]) {
+                const op = cachedOperations?.operations?.[opIdx];
+                opsLogsOffset[opName] = (op?.errors?.length || 0) + (op?.fatal?.length || 0) + (op?.warnings?.length || 0);
+            }
+            
+            btn.disabled = true;
+            btn.innerHTML = '<div class="spinner"></div> Loading...';
+            
+            try {
+                let url = `${API}/runs/${runId}/logs?operation=${encodeURIComponent(opName)}&severity=ERROR&limit=50&offset=${opsLogsOffset[opName]}`;
+                if (testId) url += `&test_result_id=${testId}`;
+                
+                const res = await fetch(url);
+                const data = await res.json();
+                
+                if (data.status === 'success' && data.logs?.length > 0) {
+                    // Append new error entries
+                    const newHtml = data.logs.map(log => {
+                        const severity = (log.severity || 'error').toLowerCase();
+                        return renderOpError({
+                            message: log.message,
+                            event_type: log.event_type,
+                            priority: log.priority,
+                            timestamp: log.timestamp
+                        }, severity === 'fatal' ? 'fatal' : severity === 'warn' ? 'warn' : 'error');
+                    }).join('');
+                    container.insertAdjacentHTML('beforeend', newHtml);
+                    
+                    opsLogsOffset[opName] += data.logs.length;
+                    
+                    if (data.has_more) {
+                        const remaining = data.total - opsLogsOffset[opName];
+                        btn.innerHTML = `
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"/>
+                            </svg>
+                            Load More (${remaining} remaining)
+                        `;
+                        btn.disabled = false;
+                    } else {
+                        btn.style.display = 'none';
+                    }
+                } else {
+                    btn.style.display = 'none';
+                }
+            } catch (e) {
+                console.error('Failed to load more op logs:', e);
+                btn.innerHTML = 'Failed - Click to retry';
+                btn.disabled = false;
+            }
         }
 
         function renderLog(log, phaseIdx, logIdx) {
@@ -740,6 +856,61 @@
 
         function togglePhase(i) {
             document.getElementById(`phase-${i}`).classList.toggle('expanded');
+        }
+
+        async function loadMoreLogs(phaseName, phaseIdx) {
+            const btn = document.getElementById(`load-more-${phaseIdx}`);
+            const logsContainer = document.getElementById(`phase-logs-${phaseIdx}`);
+            
+            if (!btn || !logsContainer) return;
+            
+            // Initialize offset if not set
+            if (!logsOffset[phaseName]) {
+                logsOffset[phaseName] = cachedPhases?.phases?.[phaseIdx]?.logs?.length || 20;
+            }
+            
+            // Show loading state
+            btn.disabled = true;
+            btn.innerHTML = '<div class="spinner"></div> Loading...';
+            
+            try {
+                let url = `${API}/runs/${runId}/logs?phase=${encodeURIComponent(phaseName)}&severity=ERROR&limit=50&offset=${logsOffset[phaseName]}`;
+                if (testId) url += `&test_result_id=${testId}`;
+                
+                const res = await fetch(url);
+                const data = await res.json();
+                
+                if (data.status === 'success' && data.logs?.length > 0) {
+                    // Append new logs
+                    const newLogsHtml = data.logs.map((log, j) => 
+                        renderLog(log, phaseIdx, logsOffset[phaseName] + j)
+                    ).join('');
+                    logsContainer.insertAdjacentHTML('beforeend', newLogsHtml);
+                    
+                    // Update offset
+                    logsOffset[phaseName] += data.logs.length;
+                    
+                    // Update or hide button
+                    if (data.has_more) {
+                        const remaining = data.total - logsOffset[phaseName];
+                        btn.innerHTML = `
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"/>
+                            </svg>
+                            Load More (${remaining} remaining)
+                        `;
+                        btn.disabled = false;
+                    } else {
+                        btn.style.display = 'none';
+                    }
+                } else {
+                    btn.style.display = 'none';
+                }
+            } catch (e) {
+                console.error('Failed to load more logs:', e);
+                btn.innerHTML = 'Failed to load - Click to retry';
+                btn.disabled = false;
+            }
         }
 
         function toggleLog(p, l) {

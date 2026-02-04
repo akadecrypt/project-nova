@@ -473,6 +473,65 @@ class JitaService:
             "total_logs": total_logs
         }
     
+    def get_paginated_logs(
+        self, 
+        run_id: str, 
+        test_result_id: str = None,
+        phase: str = None,
+        severity: str = None,
+        operation: str = None,
+        limit: int = 50,
+        offset: int = 0
+    ) -> Dict[str, Any]:
+        """Get paginated logs with filters for infinite scroll."""
+        safe_id = re.sub(r'[^a-zA-Z0-9]', '', run_id)
+        logs_table = f"jita_{safe_id}_logs"
+        
+        # Build WHERE clause
+        conditions = []
+        if test_result_id:
+            conditions.append(f"test_result_id = '{test_result_id}'")
+        if phase:
+            conditions.append(f"phase = '{phase}'")
+        if severity:
+            if severity.upper() == 'ERROR':
+                conditions.append("severity IN ('ERROR', 'FATAL')")
+            else:
+                conditions.append(f"severity = '{severity.upper()}'")
+        if operation:
+            conditions.append(f"log_source LIKE 'op:{operation}%'")
+        
+        where_clause = " AND ".join(conditions) if conditions else "1=1"
+        
+        # Get total count
+        count_sql = f"SELECT COUNT(*) as cnt FROM {logs_table} WHERE {where_clause}"
+        count_result = execute_sql(count_sql)
+        logger.info(f"Count result: {count_result}")
+        rows = count_result.get("rows", [])
+        total = rows[0].get("cnt", 0) if rows and len(rows) > 0 else 0
+        logger.info(f"Total count: {total}")
+        
+        # Get paginated logs
+        logs_sql = f"""
+            SELECT * FROM {logs_table}
+            WHERE {where_clause}
+            ORDER BY 
+                CASE severity WHEN 'FATAL' THEN 1 WHEN 'ERROR' THEN 2 WHEN 'WARN' THEN 3 ELSE 4 END,
+                timestamp DESC
+            LIMIT {limit} OFFSET {offset}
+        """
+        logs_result = execute_sql(logs_sql)
+        logs = logs_result.get("rows", [])
+        
+        return {
+            "run_id": run_id,
+            "logs": logs,
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+            "has_more": offset + len(logs) < total
+        }
+    
     def get_operations_timeline(self, run_id: str, test_result_id: str = None) -> Dict[str, Any]:
         """Get operations timeline with errors grouped by operation in execution order (optimized)."""
         safe_id = re.sub(r'[^a-zA-Z0-9]', '', run_id)
