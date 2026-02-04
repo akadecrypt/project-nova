@@ -47,8 +47,8 @@
             transition: all 0.15s;
             text-decoration: none;
         }
-        .btn-primary { background: #6366f1; color: white; }
-        .btn-primary:hover { background: #4f46e5; }
+        .btn-primary { background: var(--accent-primary); color: var(--text-inverse, white); }
+        .btn-primary:hover { background: var(--accent-secondary); }
         .btn-secondary { background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-color); }
         .btn-secondary:hover { background: var(--border-hover); }
 
@@ -65,7 +65,7 @@
             top: 0;
             bottom: 0;
             width: 2px;
-            background: linear-gradient(to bottom, #6366f1, var(--border-color));
+            background: linear-gradient(to bottom, var(--accent-primary), var(--border-color));
         }
 
         .phase {
@@ -88,9 +88,9 @@
             font-weight: 600;
         }
 
-        .phase.succeeded .phase-marker { border-color: #22c55e; color: #22c55e; }
-        .phase.failed .phase-marker { border-color: #ef4444; color: #ef4444; }
-        .phase.running .phase-marker { border-color: #f59e0b; color: #f59e0b; animation: pulse 2s infinite; }
+        .phase.succeeded .phase-marker { border-color: var(--success); color: var(--success); }
+        .phase.failed .phase-marker { border-color: var(--error); color: var(--error); }
+        .phase.running .phase-marker { border-color: var(--warning); color: var(--warning); animation: pulse 2s infinite; }
 
         @keyframes pulse {
             0%, 100% { opacity: 1; }
@@ -104,8 +104,8 @@
             overflow: hidden;
         }
 
-        .phase.has-errors .phase-content { border-left: 3px solid #ef4444; }
-        .phase.has-warnings .phase-content { border-left: 3px solid #f59e0b; }
+        .phase.has-errors .phase-content { border-left: 3px solid var(--error); }
+        .phase.has-warnings .phase-content { border-left: 3px solid var(--warning); }
 
         .phase-header {
             padding: 14px 18px;
@@ -134,9 +134,9 @@
         }
 
         .stat { display: flex; align-items: center; gap: 4px; }
-        .stat.errors { color: #ef4444; }
-        .stat.warnings { color: #f59e0b; }
-        .stat.logs { color: #6366f1; }
+        .stat.errors { color: var(--error); }
+        .stat.warnings { color: var(--warning); }
+        .stat.logs { color: var(--accent-primary); }
 
         .phase-chevron {
             color: var(--text-muted);
@@ -163,8 +163,8 @@
             overflow: hidden;
         }
 
-        .log-entry.error { border-left: 3px solid #ef4444; }
-        .log-entry.warn { border-left: 3px solid #f59e0b; }
+        .log-entry.error { border-left: 3px solid var(--error); }
+        .log-entry.warn { border-left: 3px solid var(--warning); }
 
         .log-header {
             padding: 10px 14px;
@@ -185,8 +185,8 @@
             flex-shrink: 0;
         }
 
-        .log-severity.error { background: #450a0a; color: #fca5a5; }
-        .log-severity.warn { background: #451a03; color: #fcd34d; }
+        .log-severity.error { background: var(--error-bg); color: var(--error); }
+        .log-severity.warn { background: var(--warning-bg); color: var(--warning); }
 
         /* Priority badges */
         .priority-badge {
@@ -197,10 +197,10 @@
             flex-shrink: 0;
         }
 
-        .priority-badge.p0 { background: #7f1d1d; color: #fecaca; }
-        .priority-badge.p1 { background: #713f12; color: #fef08a; }
-        .priority-badge.p2 { background: #1e3a5f; color: #93c5fd; }
-        .priority-badge.p3 { background: #1f2937; color: #9ca3af; }
+        .priority-badge.p0 { background: var(--error-bg); color: var(--error); }
+        .priority-badge.p1 { background: var(--warning-bg); color: var(--warning); }
+        .priority-badge.p2 { background: var(--info-bg); color: var(--info); }
+        .priority-badge.p3 { background: var(--bg-tertiary); color: var(--text-muted); }
 
         .log-info { flex: 1; min-width: 0; }
         .log-message {
@@ -221,8 +221,8 @@
         .log-details {
             display: none;
             padding: 12px 14px;
-            border-top: 1px solid #1f1f23;
-            background: #050507;
+            border-top: 1px solid var(--border-color);
+            background: var(--bg-primary);
         }
 
         .log-entry.expanded .log-details { display: block; }
@@ -237,7 +237,7 @@
             overflow-y: auto;
         }
 
-        .stack-trace .hl { color: #fca5a5; }
+        .stack-trace .hl { color: var(--error); }
 
         /* Empty State */
         .empty-logs {
@@ -256,8 +256,8 @@
         .spinner {
             width: 32px;
             height: 32px;
-            border: 3px solid #27272a;
-            border-top-color: #6366f1;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent-primary);
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
             margin: 0 auto 12px;
@@ -271,7 +271,7 @@
             align-items: center;
             gap: 4px;
             font-size: 11px;
-            color: #6366f1;
+            color: var(--accent-primary);
             text-decoration: none;
             margin-top: 8px;
         }
@@ -283,7 +283,7 @@
             position: fixed;
             bottom: 20px;
             right: 20px;
-            background: #27272a;
+            background: var(--bg-tertiary);
             color: var(--text-primary);
             padding: 10px 18px;
             border-radius: 8px;
@@ -362,8 +362,8 @@
                 border-radius: 10px;
                 overflow: hidden;
             }
-            .op-card.has-failure { border-left: 3px solid #ef4444; }
-            .op-card.has-warnings { border-left: 3px solid #f59e0b; }
+            .op-card.has-failure { border-left: 3px solid var(--error); }
+            .op-card.has-warnings { border-left: 3px solid var(--warning); }
             .op-header {
                 padding: 14px 18px;
                 display: flex;
@@ -386,15 +386,15 @@
                 color: var(--text-muted);
                 margin-right: 12px;
             }
-            .op-card.has-failure .op-number { background: #450a0a; color: #fca5a5; }
+            .op-card.has-failure .op-number { background: var(--error-bg); color: var(--error); }
             .op-title { display: flex; align-items: center; flex: 1; }
             .op-name { font-weight: 600; font-size: 14px; }
             .op-id { font-size: 11px; color: var(--text-muted); margin-left: 12px; font-family: 'JetBrains Mono', monospace; }
             .op-stats { display: flex; gap: 16px; font-size: 12px; }
             .op-stat { display: flex; align-items: center; gap: 4px; }
-            .op-stat.errors { color: #ef4444; }
-            .op-stat.warnings { color: #f59e0b; }
-            .op-stat.fatal { color: #dc2626; font-weight: 600; }
+            .op-stat.errors { color: var(--error); }
+            .op-stat.warnings { color: var(--warning); }
+            .op-stat.fatal { color: var(--error); font-weight: 600; }
             .op-chevron { color: var(--text-muted); transition: transform 0.2s; }
             .op-card.expanded .op-chevron { transform: rotate(180deg); }
             .op-body {
@@ -412,9 +412,9 @@
                 border-radius: 6px;
                 font-size: 12px;
             }
-            .op-error.fatal { border-left: 3px solid #dc2626; }
-            .op-error.error { border-left: 3px solid #ef4444; }
-            .op-error.warn { border-left: 3px solid #f59e0b; }
+            .op-error.fatal { border-left: 3px solid var(--error); }
+            .op-error.error { border-left: 3px solid var(--error); }
+            .op-error.warn { border-left: 3px solid var(--warning); }
             .op-error-type { font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; }
             .op-error-msg { color: var(--text-muted); word-break: break-word; }
             .ops-summary {
@@ -429,9 +429,9 @@
             .summary-stat { text-align: center; }
             .summary-stat .value { font-size: 24px; font-weight: 700; }
             .summary-stat .label { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
-            .summary-stat.errors .value { color: #ef4444; }
-            .summary-stat.warnings .value { color: #f59e0b; }
-            .summary-stat.failed .value { color: #dc2626; }
+            .summary-stat.errors .value { color: var(--error); }
+            .summary-stat.warnings .value { color: var(--warning); }
+            .summary-stat.failed .value { color: var(--error); }
         </style>
 
         <div id="loading" class="loading">
@@ -657,7 +657,7 @@
                                 ${op.fatal_count > 0 ? `<span class="op-stat fatal">${op.fatal_count} fatal</span>` : ''}
                                 ${op.error_count > 0 ? `<span class="op-stat errors">${op.error_count} errors</span>` : ''}
                                 ${op.warn_count > 0 ? `<span class="op-stat warnings">${op.warn_count} warnings</span>` : ''}
-                                ${totalIssues === 0 ? `<span class="op-stat" style="color: #22c55e;">✓ OK</span>` : ''}
+                                ${totalIssues === 0 ? `<span class="op-stat" style="color: var(--success);">✓ OK</span>` : ''}
                                 <svg class="op-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <polyline points="6 9 12 15 18 9"/>
                                 </svg>
@@ -666,15 +666,15 @@
                         <div class="op-body">
                             <div class="op-error-list">
                                 ${op.fatal.length > 0 ? `
-                                    <div style="font-size: 11px; color: #dc2626; font-weight: 600; margin-bottom: 6px;">FATAL ERRORS</div>
+                                    <div style="font-size: 11px; color: var(--error); font-weight: 600; margin-bottom: 6px;">FATAL ERRORS</div>
                                     ${op.fatal.map(e => renderOpError(e, 'fatal')).join('')}
                                 ` : ''}
                                 ${op.errors.length > 0 ? `
-                                    <div style="font-size: 11px; color: #ef4444; font-weight: 600; margin-bottom: 6px; margin-top: 12px;">ERRORS</div>
+                                    <div style="font-size: 11px; color: var(--error); font-weight: 600; margin-bottom: 6px; margin-top: 12px;">ERRORS</div>
                                     ${op.errors.map(e => renderOpError(e, 'error')).join('')}
                                 ` : ''}
                                 ${op.warnings.length > 0 ? `
-                                    <div style="font-size: 11px; color: #f59e0b; font-weight: 600; margin-bottom: 6px; margin-top: 12px;">WARNINGS</div>
+                                    <div style="font-size: 11px; color: var(--warning); font-weight: 600; margin-bottom: 6px; margin-top: 12px;">WARNINGS</div>
                                     ${op.warnings.map(e => renderOpError(e, 'warn')).join('')}
                                 ` : ''}
                                 ${totalIssues === 0 ? `

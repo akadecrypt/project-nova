@@ -58,8 +58,8 @@
             font-weight: 600;
         }
 
-        .status-badge.failed { background: #450a0a; color: #fca5a5; }
-        .status-badge.passed { background: #052e16; color: #86efac; }
+        .status-badge.failed { background: var(--error-bg); color: var(--error); }
+        .status-badge.passed { background: var(--success-bg); color: var(--success); }
 
         .header-actions {
             display: flex;
@@ -81,11 +81,11 @@
         }
 
         .btn-primary {
-            background: #6366f1;
-            color: white;
+            background: var(--accent-primary);
+            color: var(--text-inverse, white);
         }
 
-        .btn-primary:hover { background: #4f46e5; }
+        .btn-primary:hover { background: var(--accent-secondary); }
 
         .btn-secondary {
             background: var(--bg-tertiary);
@@ -123,13 +123,13 @@
             margin-top: 4px;
         }
 
-        .summary-card.errors .value { color: #ef4444; }
-        .summary-card.warnings .value { color: #f59e0b; }
+        .summary-card.errors .value { color: var(--error); }
+        .summary-card.warnings .value { color: var(--warning); }
 
         /* AI Analysis Section */
         .ai-section {
-            background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%);
-            border: 1px solid #3730a3;
+            background: linear-gradient(135deg, var(--bg-tertiary) 0%, var(--bg-secondary) 100%);
+            border: 1px solid var(--accent-primary);
             border-radius: 12px;
             padding: 24px;
             margin-bottom: 32px;
@@ -145,7 +145,7 @@
         .ai-icon {
             width: 36px;
             height: 36px;
-            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            background: var(--accent-gradient, linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)));
             border-radius: 10px;
             display: flex;
             align-items: center;
@@ -160,7 +160,7 @@
         }
 
         .ai-content {
-            background: rgba(0,0,0,0.3);
+            background: var(--bg-primary);
             border-radius: 8px;
             padding: 16px;
         }
@@ -168,7 +168,7 @@
         .ai-suggestion {
             margin-bottom: 16px;
             padding-bottom: 16px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
+            border-bottom: 1px solid var(--border-color);
         }
 
         .ai-suggestion:last-child {
@@ -179,7 +179,7 @@
 
         .ai-suggestion-title {
             font-weight: 600;
-            color: #a5b4fc;
+            color: var(--accent-tertiary, var(--accent-primary));
             margin-bottom: 8px;
             display: flex;
             align-items: center;
@@ -189,11 +189,11 @@
         .ai-suggestion-text {
             font-size: 14px;
             line-height: 1.6;
-            color: #d1d5db;
+            color: var(--text-secondary);
         }
 
         .ai-suggestion-text code {
-            background: rgba(99, 102, 241, 0.2);
+            background: var(--bg-hover);
             padding: 2px 6px;
             border-radius: 4px;
             font-family: 'JetBrains Mono', monospace;
@@ -245,7 +245,7 @@
 
         .filter-select-sm:focus {
             outline: none;
-            border-color: #6366f1;
+            border-color: var(--accent-primary);
         }
 
         .filter-input-sm {
@@ -271,13 +271,13 @@
         .error-card {
             background: var(--bg-secondary);
             border: 1px solid var(--border-color);
-            border-left: 3px solid #ef4444;
+            border-left: 3px solid var(--error);
             border-radius: 10px;
             overflow: hidden;
         }
 
         .error-card.warning {
-            border-left-color: #f59e0b;
+            border-left-color: var(--warning);
         }
 
         .error-header {
@@ -301,9 +301,9 @@
             flex-shrink: 0;
         }
 
-        .error-severity.error { background: #450a0a; color: #fca5a5; }
-        .error-severity.fatal { background: #7f1d1d; color: #fecaca; }
-        .error-severity.warn { background: #451a03; color: #fcd34d; }
+        .error-severity.error { background: var(--error-bg); color: var(--error); }
+        .error-severity.fatal { background: var(--error-bg); color: var(--error); }
+        .error-severity.warn { background: var(--warning-bg); color: var(--warning); }
 
         /* Priority badges */
         .priority-badge {
@@ -314,10 +314,10 @@
             flex-shrink: 0;
         }
 
-        .priority-badge.p0 { background: #7f1d1d; color: #fecaca; }
-        .priority-badge.p1 { background: #713f12; color: #fef08a; }
-        .priority-badge.p2 { background: #1e3a5f; color: #93c5fd; }
-        .priority-badge.p3 { background: #1f2937; color: #9ca3af; }
+        .priority-badge.p0 { background: var(--error-bg); color: var(--error); }
+        .priority-badge.p1 { background: var(--warning-bg); color: var(--warning); }
+        .priority-badge.p2 { background: var(--info-bg); color: var(--info); }
+        .priority-badge.p3 { background: var(--bg-tertiary); color: var(--text-muted); }
 
         .error-info { flex: 1; }
 
@@ -370,7 +370,7 @@
         }
 
         .stack-trace {
-            background: #050507;
+            background: var(--bg-primary);
             border-radius: 6px;
             padding: 14px;
             font-family: 'JetBrains Mono', monospace;
@@ -384,12 +384,12 @@
             margin-bottom: 16px;
         }
 
-        .stack-trace .hl { color: #fca5a5; font-weight: 500; }
+        .stack-trace .hl { color: var(--error); font-weight: 500; }
 
         /* Debug Suggestion */
         .debug-suggestion {
-            background: #0c1222;
-            border: 1px solid #1e3a5f;
+            background: var(--bg-secondary);
+            border: 1px solid var(--info-bg);
             border-radius: 8px;
             padding: 14px;
         }
@@ -400,13 +400,13 @@
             gap: 8px;
             font-size: 12px;
             font-weight: 600;
-            color: #60a5fa;
+            color: var(--info);
             margin-bottom: 8px;
         }
 
         .debug-suggestion-text {
             font-size: 13px;
-            color: #94a3b8;
+            color: var(--text-secondary);
             line-height: 1.5;
         }
 
@@ -419,8 +419,8 @@
         .spinner {
             width: 40px;
             height: 40px;
-            border: 3px solid #27272a;
-            border-top-color: #6366f1;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent-primary);
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
             margin: 0 auto 16px;
@@ -433,7 +433,7 @@
             position: fixed;
             bottom: 20px;
             right: 20px;
-            background: #27272a;
+            background: var(--bg-tertiary);
             color: var(--text-primary);
             padding: 12px 20px;
             border-radius: 8px;
@@ -513,7 +513,7 @@
 
         <!-- Error List -->
         <div class="section-title">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--error);">
                 <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
             </svg>
             Errors & Exceptions

@@ -44,7 +44,7 @@
         .logo-box {
             width: 32px;
             height: 32px;
-            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            background: var(--accent-gradient, linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)));
             border-radius: 8px;
             display: flex;
             align-items: center;
@@ -79,13 +79,13 @@
         }
 
         .run-item:hover { background: var(--bg-tertiary); }
-        .run-item.active { background: var(--accent-primary); color: white; }
-        .run-item.analyzing { color: #fbbf24; }
+        .run-item.active { background: var(--accent-primary); color: var(--text-inverse, white); }
+        .run-item.analyzing { color: var(--warning); }
         .run-item.analyzing::before {
             content: '';
             width: 8px;
             height: 8px;
-            background: #fbbf24;
+            background: var(--warning);
             border-radius: 50%;
             margin-right: 8px;
             animation: pulse 1s infinite;
@@ -158,7 +158,7 @@
 
         .input-field:focus {
             outline: none;
-            border-color: #6366f1;
+            border-color: var(--accent-primary);
         }
 
         .btn {
@@ -172,11 +172,11 @@
         }
 
         .btn-primary {
-            background: #6366f1;
-            color: white;
+            background: var(--accent-primary);
+            color: var(--text-inverse, white);
         }
 
-        .btn-primary:hover { background: #4f46e5; }
+        .btn-primary:hover { background: var(--accent-secondary); }
         .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
         .input-hint {
@@ -210,8 +210,8 @@
             color: var(--text-secondary);
         }
 
-        .results-meta .failed { color: #ef4444; font-weight: 600; }
-        .results-meta .passed { color: #22c55e; font-weight: 600; }
+        .results-meta .failed { color: var(--error); font-weight: 600; }
+        .results-meta .passed { color: var(--success); font-weight: 600; }
 
         .btn-reanalyze {
             background: transparent;
@@ -243,11 +243,11 @@
         }
 
         .test-case.failed {
-            border-left: 3px solid #ef4444;
+            border-left: 3px solid var(--error);
         }
 
         .test-case.passed {
-            border-left: 3px solid #22c55e;
+            border-left: 3px solid var(--success);
         }
 
         .test-case-header {
@@ -271,8 +271,8 @@
             flex-shrink: 0;
         }
 
-        .test-status.failed { background: #450a0a; color: #fca5a5; }
-        .test-status.passed { background: #052e16; color: #86efac; }
+        .test-status.failed { background: var(--error-bg); color: var(--error); }
+        .test-status.passed { background: var(--success-bg); color: var(--success); }
 
         .test-case-info { flex: 1; }
 
@@ -289,7 +289,7 @@
         }
 
         .test-case-chevron {
-            color: #52525b;
+            color: var(--text-muted);
             transition: transform 0.2s;
         }
 
@@ -300,8 +300,8 @@
         /* Test Case Details */
         .test-case-details {
             display: none;
-            border-top: 1px solid #27272a;
-            background: #0d0d12;
+            border-top: 1px solid var(--border-color);
+            background: var(--bg-primary);
         }
 
         .test-case.expanded .test-case-details {
@@ -329,7 +329,7 @@
         }
 
         .detail-label button {
-            background: #27272a;
+            background: var(--bg-tertiary);
             border: none;
             color: var(--text-secondary);
             padding: 4px 10px;
@@ -339,13 +339,13 @@
         }
 
         .detail-label button:hover {
-            background: #3f3f46;
+            background: var(--bg-hover);
         }
 
         /* Error Box */
         .error-box {
-            background: #1c1917;
-            border: 1px solid #44403c;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
             border-radius: 6px;
             padding: 12px 14px;
             margin-bottom: 8px;
@@ -354,20 +354,20 @@
         .error-type {
             font-size: 13px;
             font-weight: 600;
-            color: #fca5a5;
+            color: var(--error);
             margin-bottom: 4px;
         }
 
         .error-message {
             font-size: 13px;
             font-family: 'JetBrains Mono', monospace;
-            color: #e7e5e4;
+            color: var(--text-secondary);
             word-break: break-word;
         }
 
         /* Stack Trace */
         .stack-trace {
-            background: #0a0a0a;
+            background: var(--bg-primary);
             border-radius: 6px;
             padding: 14px;
             font-family: 'JetBrains Mono', monospace;
@@ -381,7 +381,7 @@
         }
 
         .stack-trace .highlight {
-            color: #fca5a5;
+            color: var(--error);
             font-weight: 500;
         }
 
@@ -393,7 +393,7 @@
         }
 
         .cluster-tag {
-            background: #27272a;
+            background: var(--bg-tertiary);
             padding: 6px 10px;
             border-radius: 4px;
             font-size: 12px;
@@ -405,8 +405,8 @@
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            background: #6366f1;
-            color: white;
+            background: var(--accent-primary);
+            color: var(--text-inverse, white);
             padding: 8px 14px;
             border-radius: 6px;
             text-decoration: none;
@@ -415,7 +415,7 @@
             margin-top: 12px;
         }
 
-        .log-link:hover { background: #4f46e5; }
+        .log-link:hover { background: var(--accent-secondary); }
         .log-link svg { width: 14px; height: 14px; }
 
         /* Empty State */
@@ -442,8 +442,8 @@
         .spinner {
             width: 32px;
             height: 32px;
-            border: 2px solid #27272a;
-            border-top-color: #6366f1;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--accent-primary);
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
             margin: 0 auto 12px;
@@ -456,7 +456,7 @@
             position: fixed;
             bottom: 20px;
             right: 20px;
-            background: #27272a;
+            background: var(--bg-tertiary);
             color: var(--text-primary);
             padding: 12px 20px;
             border-radius: 8px;
@@ -508,7 +508,7 @@
 
         .filter-select:focus {
             outline: none;
-            border-color: #6366f1;
+            border-color: var(--accent-primary);
         }
 
         .filter-input {
@@ -522,7 +522,7 @@
         }
 
         .filter-input::placeholder {
-            color: #52525b;
+            color: var(--text-muted);
         }
 
         .recent-runs-grid {
@@ -541,7 +541,7 @@
         }
 
         .run-card:hover {
-            border-color: #6366f1;
+            border-color: var(--accent-primary);
             transform: translateY(-2px);
         }
 
@@ -562,14 +562,14 @@
         .run-card-id {
             font-size: 10px;
             font-family: 'JetBrains Mono', monospace;
-            color: #52525b;
+            color: var(--text-muted);
             margin-top: 4px;
         }
 
         .run-card-delete {
             background: none;
             border: none;
-            color: #52525b;
+            color: var(--text-muted);
             cursor: pointer;
             padding: 4px;
             opacity: 0;
@@ -577,7 +577,7 @@
         }
 
         .run-card:hover .run-card-delete { opacity: 1; }
-        .run-card-delete:hover { color: #ef4444; }
+        .run-card-delete:hover { color: var(--error); }
 
         .run-card-stats {
             display: flex;
@@ -592,12 +592,12 @@
             color: var(--text-muted);
         }
 
-        .run-card-stat.failed { color: #ef4444; }
-        .run-card-stat.passed { color: #22c55e; }
+        .run-card-stat.failed { color: var(--error); }
+        .run-card-stat.passed { color: var(--success); }
 
         .run-card-time {
             font-size: 10px;
-            color: #52525b;
+            color: var(--text-muted);
             margin-top: 10px;
         }
     </style>
@@ -618,7 +618,7 @@
 
             <div class="sidebar-label">Recently Analyzed</div>
             <div id="recentList" class="run-list">
-                <div style="color: #52525b; font-size: 12px;">Loading...</div>
+                <div style="color: var(--text-muted); font-size: 12px;">Loading...</div>
             </div>
         </aside>
 
@@ -737,7 +737,7 @@
                 allRuns = data.runs || [];
                 
                 if (allRuns.length === 0) {
-                    sidebarList.innerHTML = '<div style="color: #52525b; font-size: 12px;">No runs yet</div>';
+                    sidebarList.innerHTML = '<div style="color: var(--text-muted); font-size: 12px;">No runs yet</div>';
                     mainSection.style.display = 'none';
                     return;
                 }
@@ -766,7 +766,7 @@
                     allRuns = (data.runs || []).map(id => ({ run_id: id }));
                     document.getElementById('recentList').innerHTML = allRuns.map(run => `
                         <div class="run-item" onclick="loadResults('${run.run_id}')">${run.run_id.slice(0,12)}...</div>
-                    `).join('') || '<div style="color: #52525b;">No runs</div>';
+                    `).join('') || '<div style="color: var(--text-muted);">No runs</div>';
                 } catch (e2) {}
             }
         }
@@ -809,7 +809,7 @@
 
             // Render filtered cards
             if (filteredRuns.length === 0) {
-                mainGrid.innerHTML = '<div style="color: #52525b; padding: 40px; text-align: center; grid-column: 1/-1;">No runs match your filters</div>';
+                mainGrid.innerHTML = '<div style="color: var(--text-muted); padding: 40px; text-align: center; grid-column: 1/-1;">No runs match your filters</div>';
                 return;
             }
 
@@ -893,7 +893,7 @@
                 const running = data.jobs?.filter(j => j.status === 'running') || [];
                 
                 if (!running.length) {
-                    list.innerHTML = '<div style="color: #52525b; font-size: 12px;">None</div>';
+                    list.innerHTML = '<div style="color: var(--text-muted); font-size: 12px;">None</div>';
                     return;
                 }
 
@@ -1088,20 +1088,20 @@
                             </div>
                             
                             <div class="detail-block" style="display: flex; gap: 10px; flex-wrap: wrap;">
-                                <a href="timeline.html?run=${currentRunId}&test=${test.test_result_id}&theme=${document.documentElement.getAttribute('data-theme') || 'dark'}" class="log-link" style="background: #6366f1;">
+                                <a href="timeline.html?run=${currentRunId}&test=${test.test_result_id}&theme=${document.documentElement.getAttribute('data-theme') || 'dark'}" class="log-link" style="background: var(--accent-primary);">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <circle cx="12" cy="12" r="3"/><path d="M12 3v3m0 12v3M3 12h3m12 0h3"/>
                                     </svg>
                                     View Timeline
                                 </a>
-                                <a href="log-details.html?run=${currentRunId}&test=${test.test_result_id}&theme=${document.documentElement.getAttribute('data-theme') || 'dark'}" class="log-link" style="background: #3f3f46;">
+                                <a href="log-details.html?run=${currentRunId}&test=${test.test_result_id}&theme=${document.documentElement.getAttribute('data-theme') || 'dark'}" class="log-link" style="background: var(--bg-tertiary);">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>
                                     </svg>
                                     Error Analysis
                                 </a>
                                 ${test.log_url ? `
-                                    <a href="${test.log_url}" target="_blank" class="log-link" style="background: #27272a;">
+                                    <a href="${test.log_url}" target="_blank" class="log-link" style="background: var(--bg-secondary);">
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
                                             <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
