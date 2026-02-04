@@ -354,21 +354,32 @@
             </div>
         </div>
 
-        <!-- Tab Navigation -->
-        <div class="tabs" style="display: flex; gap: 8px; margin-bottom: 24px;">
-            <button class="tab-btn active" data-tab="phases" onclick="switchView('phases')">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="3"/><path d="M12 3v3m0 12v3M3 12h3m12 0h3"/>
+        <!-- Tab Navigation and Search -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px;">
+            <div class="tabs" style="display: flex; gap: 8px;">
+                <button class="tab-btn active" data-tab="phases" onclick="switchView('phases')">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"/><path d="M12 3v3m0 12v3M3 12h3m12 0h3"/>
+                    </svg>
+                    Phases
+                </button>
+                <button class="tab-btn" data-tab="operations" onclick="switchView('operations')">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/>
+                        <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+                    </svg>
+                    Operations (<span id="opsCount">0</span>)
+                </button>
+            </div>
+            <div class="search-box" style="position: relative;">
+                <svg style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted);" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
                 </svg>
-                Phases
-            </button>
-            <button class="tab-btn" data-tab="operations" onclick="switchView('operations')">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/>
-                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
-                </svg>
-                Operations (<span id="opsCount">0</span>)
-            </button>
+                <input type="text" id="logSearch" placeholder="Search logs..." 
+                    style="padding: 10px 12px 10px 38px; width: 280px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary); font-size: 13px;"
+                    oninput="searchLogs(this.value)">
+                <span id="searchResults" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--text-muted);"></span>
+            </div>
         </div>
 
         <style>
@@ -911,6 +922,77 @@
                 btn.innerHTML = 'Failed to load - Click to retry';
                 btn.disabled = false;
             }
+        }
+
+        let searchTimeout = null;
+        async function searchLogs(query) {
+            const resultsEl = document.getElementById('searchResults');
+            
+            // Debounce
+            clearTimeout(searchTimeout);
+            if (!query || query.length < 2) {
+                resultsEl.textContent = '';
+                // Remove highlights
+                document.querySelectorAll('.log-entry.search-match').forEach(el => el.classList.remove('search-match'));
+                return;
+            }
+            
+            searchTimeout = setTimeout(async () => {
+                resultsEl.textContent = 'Searching...';
+                
+                try {
+                    // Search in API
+                    let url = `${API}/runs/${runId}/logs?limit=100&offset=0`;
+                    if (testId) url += `&test_result_id=${testId}`;
+                    
+                    const res = await fetch(url);
+                    const data = await res.json();
+                    
+                    if (data.status === 'success') {
+                        const queryLower = query.toLowerCase();
+                        const matches = (data.logs || []).filter(log => 
+                            (log.message || '').toLowerCase().includes(queryLower) ||
+                            (log.event_type || '').toLowerCase().includes(queryLower) ||
+                            (log.log_source || '').toLowerCase().includes(queryLower)
+                        );
+                        
+                        resultsEl.textContent = `${matches.length} matches`;
+                        
+                        // Highlight matches in current view
+                        document.querySelectorAll('.log-entry').forEach(el => {
+                            const text = el.textContent.toLowerCase();
+                            if (text.includes(queryLower)) {
+                                el.classList.add('search-match');
+                                el.style.border = '1px solid var(--accent-primary)';
+                            } else {
+                                el.classList.remove('search-match');
+                                el.style.border = '';
+                            }
+                        });
+                        
+                        // Also search in operations view
+                        document.querySelectorAll('.op-error').forEach(el => {
+                            const text = el.textContent.toLowerCase();
+                            if (text.includes(queryLower)) {
+                                el.style.border = '1px solid var(--accent-primary)';
+                                el.style.background = 'var(--bg-hover)';
+                            } else {
+                                el.style.border = '';
+                                el.style.background = '';
+                            }
+                        });
+                        
+                        // Scroll to first match
+                        const firstMatch = document.querySelector('.log-entry.search-match, .op-error[style*="accent-primary"]');
+                        if (firstMatch) {
+                            firstMatch.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                    }
+                } catch (e) {
+                    console.error('Search failed:', e);
+                    resultsEl.textContent = 'Search failed';
+                }
+            }, 300);
         }
 
         function toggleLog(p, l) {
