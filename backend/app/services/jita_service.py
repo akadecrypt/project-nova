@@ -558,7 +558,7 @@ class JitaService:
         
         # Only fetch actual error/fatal/warn logs for operations with issues (limited)
         logs_sql = f"""
-            SELECT log_source, severity, event_type, message, timestamp, priority
+            SELECT log_source, severity, event_type, message, timestamp, priority, stack_trace, line_number
             FROM {logs_table}
             WHERE {where_clause}
               AND log_source LIKE 'op:%'
@@ -604,7 +604,9 @@ class JitaService:
                 'timestamp': log.get('timestamp', 0),
                 'event_type': log.get('event_type', ''),
                 'priority': log.get('priority', 'P3'),
-                'source': source
+                'log_source': source,
+                'stack_trace': log.get('stack_trace', ''),
+                'line_number': log.get('line_number', 0)
             }
             
             # Limit entries per category

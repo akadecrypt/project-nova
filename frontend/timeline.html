@@ -452,17 +452,56 @@
             .op-card.expanded .op-body { display: block; }
             .op-error-list { display: flex; flex-direction: column; gap: 8px; }
             .op-error {
-                padding: 10px 14px;
                 background: var(--bg-secondary);
                 border: 1px solid var(--border-color);
                 border-radius: 6px;
                 font-size: 12px;
+                overflow: hidden;
             }
             .op-error.fatal { border-left: 3px solid var(--error); }
             .op-error.error { border-left: 3px solid var(--error); }
             .op-error.warn { border-left: 3px solid var(--warning); }
-            .op-error-type { font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; }
+            .op-error-header {
+                padding: 10px 14px;
+                cursor: pointer;
+                display: flex;
+                align-items: flex-start;
+                gap: 10px;
+            }
+            .op-error-header:hover { background: var(--bg-hover); }
+            .op-error-info { flex: 1; min-width: 0; }
+            .op-error-type { font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
             .op-error-msg { color: var(--text-muted); word-break: break-word; }
+            .op-error-meta { font-size: 11px; color: var(--text-muted); margin-top: 6px; display: flex; gap: 12px; }
+            .op-error-chevron { 
+                color: var(--text-muted); 
+                transition: transform 0.2s;
+                flex-shrink: 0;
+                margin-top: 2px;
+            }
+            .op-error.expanded .op-error-chevron { transform: rotate(180deg); }
+            .op-error-details {
+                display: none;
+                padding: 12px 14px;
+                background: var(--bg-primary);
+                border-top: 1px solid var(--border-color);
+            }
+            .op-error.expanded .op-error-details { display: block; }
+            .op-error-stack {
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 11px;
+                line-height: 1.6;
+                white-space: pre-wrap;
+                word-break: break-word;
+                color: var(--text-secondary);
+                background: var(--bg-tertiary);
+                padding: 12px;
+                border-radius: 6px;
+                max-height: 300px;
+                overflow-y: auto;
+            }
+            .op-error-stack .line-error { color: var(--error); font-weight: 500; }
+            .op-error-stack .line-highlight { background: rgba(255, 100, 100, 0.1); }
             .ops-summary {
                 background: var(--bg-secondary);
                 border: 1px solid var(--border-color);
@@ -764,13 +803,45 @@
             }
         }
 
+        let opErrorIdx = 0;
         function renderOpError(err, severity) {
+            const idx = opErrorIdx++;
+            const hasStack = err.stack_trace && err.stack_trace.length > 10;
+            const priority = err.priority || 'P3';
+            const priorityClass = priority.toLowerCase();
+            
             return `
-                <div class="op-error ${severity}">
-                    <div class="op-error-type">${err.event_type || 'Error'} ${err.priority ? `<span style="opacity: 0.6;">(${err.priority})</span>` : ''}</div>
-                    <div class="op-error-msg">${escapeHtml(truncate(err.message, 300))}</div>
+                <div class="op-error ${severity}" id="op-err-${idx}">
+                    <div class="op-error-header" onclick="toggleOpError(${idx})">
+                        <div class="op-error-info">
+                            <div class="op-error-type">
+                                <span class="priority-badge ${priorityClass}" style="font-size: 10px; padding: 2px 6px;">${priority}</span>
+                                ${err.event_type || 'Error'}
+                            </div>
+                            <div class="op-error-msg">${escapeHtml(truncate(err.message, 200))}</div>
+                            <div class="op-error-meta">
+                                ${err.log_source ? `<span>Source: ${err.log_source}</span>` : ''}
+                                ${err.timestamp ? `<span>${formatTime(err.timestamp)}</span>` : ''}
+                                ${err.line_number ? `<span>Line: ${err.line_number}</span>` : ''}
+                            </div>
+                        </div>
+                        ${hasStack ? `
+                            <svg class="op-error-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"/>
+                            </svg>
+                        ` : ''}
+                    </div>
+                    ${hasStack ? `
+                        <div class="op-error-details">
+                            <div class="op-error-stack">${formatStack(err.stack_trace)}</div>
+                        </div>
+                    ` : ''}
                 </div>
             `;
+        }
+        
+        function toggleOpError(idx) {
+            document.getElementById(`op-err-${idx}`).classList.toggle('expanded');
         }
 
         function toggleOp(i) {
@@ -800,14 +871,17 @@
                 const data = await res.json();
                 
                 if (data.status === 'success' && data.logs?.length > 0) {
-                    // Append new error entries
+                    // Append new error entries with full details
                     const newHtml = data.logs.map(log => {
                         const severity = (log.severity || 'error').toLowerCase();
                         return renderOpError({
                             message: log.message,
                             event_type: log.event_type,
                             priority: log.priority,
-                            timestamp: log.timestamp
+                            timestamp: log.timestamp,
+                            stack_trace: log.stack_trace,
+                            log_source: log.log_source,
+                            line_number: log.line_number
                         }, severity === 'fatal' ? 'fatal' : severity === 'warn' ? 'warn' : 'error');
                     }).join('');
                     container.insertAdjacentHTML('beforeend', newHtml);
