@@ -1594,148 +1594,109 @@ class JitaService:
         result_id: str, 
         test_name: str
     ) -> List[Dict]:
-        """Parse log content and extract error events with context."""
+        """
+        Parse log content using the smart parser for reduced false positives.
+        
+        Uses evidence-based error detection:
+        - Requires actual severity field in log format
+        - Requires stack trace or exception class for high confidence
+        - Deduplicates similar errors
+        """
+        try:
+            from .smart_log_parser import get_smart_log_parser
+            parser = get_smart_log_parser()
+            
+            # Use smart parser with minimum confidence threshold
+            smart_events = parser.parse_log_content(
+                content=content,
+                log_source=source,
+                test_result_id=result_id,
+                test_name=test_name,
+                min_confidence=0.4  # Require at least 40% confidence
+            )
+            
+            # Convert SmartLogEvent to dict format
+            events = []
+            for evt in smart_events:
+                events.append({
+                    'test_result_id': evt.test_result_id,
+                    'test_name': evt.test_name,
+                    'log_source': evt.log_source,
+                    'timestamp': evt.timestamp,
+                    'severity': evt.severity,
+                    'event_type': evt.event_type,
+                    'message': evt.message,
+                    'stack_trace': evt.stack_trace,
+                    'line_number': evt.line_number,
+                    'priority': evt.priority
+                })
+            
+            return events
+            
+        except Exception as e:
+            logger.warning(f"Smart parser failed, falling back to basic: {e}")
+            return self._parse_log_content_basic(content, source, result_id, test_name)
+    
+    def _parse_log_content_basic(
+        self, 
+        content: str, 
+        source: str, 
+        result_id: str, 
+        test_name: str
+    ) -> List[Dict]:
+        """Basic fallback parser using regex patterns."""
         events = []
         lines = content.split('\n')
         total_lines = len(lines)
-        
-        # Track seen messages to deduplicate
         seen_messages = set()
         
-        # Patterns for severity detection
-        severity_patterns = {
-            'FATAL': [r'\bFATAL\b', r'\bCRITICAL\b', r'\bPANIC\b'],
-            'ERROR': [r'\bERROR\b', r'\bERR\s', r'\bFAILED\b', r'\bFAILURE\b'],
-            'WARN': [r'\bWARN\b', r'\bWARNING\b'],
-        }
+        # Only match actual ERROR/FATAL at start of log format
+        log_format_pattern = re.compile(
+            r'^(?:\d{4}-\d{2}-\d{2}[\sT]\d{2}:\d{2}:\d{2}[^\s]*\s+)?'
+            r'(ERROR|FATAL|CRITICAL)\s+',
+            re.IGNORECASE
+        )
         
-        # Patterns for JSON failures (higher priority)
-        json_fail_patterns = [
-            (r'"status"\s*:\s*"FAILED"', 'TASK_FAILED'),
-            (r'"error_detail"\s*:\s*"([^"]+)"', 'API_ERROR'),
-            (r'"error_code"\s*:\s*"?(\d+)"?', 'ERROR_CODE'),
-        ]
-        
-        # Low-value error patterns to deprioritize or skip
-        low_value_patterns = [
-            r'Operation is none, returning',
-            r'ExceptionVerification',
-            r'expected_errors',
-            r'error_patterns',
-        ]
-        
-        # First pass: identify error line numbers
-        error_lines = []
         for line_num, line in enumerate(lines):
-            # Skip low-value patterns
-            if any(re.search(p, line) for p in low_value_patterns):
+            match = log_format_pattern.match(line)
+            if not match:
                 continue
             
-            # Check for JSON failures first (higher priority)
-            json_found = False
-            for pattern, json_type in json_fail_patterns:
-                match = re.search(pattern, line)
-                if match:
-                    # Extract error detail if present
-                    error_detail_match = re.search(r'"error_detail"\s*:\s*"([^"]{1,500})"', line)
-                    detail_msg = error_detail_match.group(1) if error_detail_match else ''
-                    
-                    # Create a unique key for deduplication
-                    msg_key = f"{json_type}:{detail_msg[:100]}"
-                    if msg_key not in seen_messages:
-                        seen_messages.add(msg_key)
-                        error_lines.append((line_num, 'ERROR', line.strip(), json_type, detail_msg))
-                        json_found = True
-                    break
+            severity = match.group(1).upper()
+            if severity == 'CRITICAL':
+                severity = 'FATAL'
             
-            if json_found:
+            # Dedup
+            msg_key = line[:100]
+            if msg_key in seen_messages:
                 continue
+            seen_messages.add(msg_key)
             
-            # Check for standard severity patterns
-            for sev, patterns in severity_patterns.items():
-                matched = False
-                for pattern in patterns:
-                    if re.search(pattern, line, re.IGNORECASE):
-                        # Create dedup key from first 80 chars of message after timestamp
-                        msg_part = re.sub(r'^\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}[^Z]*Z?\s*', '', line)[:80]
-                        msg_key = f"{sev}:{msg_part}"
-                        
-                        if msg_key not in seen_messages:
-                            seen_messages.add(msg_key)
-                            error_lines.append((line_num, sev, line.strip(), None, None))
-                        matched = True
-                        break
-                if matched:
-                    break
-        
-        # Second pass: extract events with context
-        for error_entry in error_lines:
-            if len(error_entry) == 5:
-                error_line_num, severity, error_line, json_type, detail_msg = error_entry
-            else:
-                error_line_num, severity, error_line = error_entry
-                json_type, detail_msg = None, None
+            timestamp = self._extract_timestamp(line)
+            event_type = self._classify_log_line(line)
             
-            timestamp = self._extract_timestamp(error_line)
+            # Get context
+            context_start = max(0, line_num - 10)
+            context_end = min(total_lines, line_num + 11)
+            context_lines = []
+            for i in range(context_start, context_end):
+                prefix = ">>> " if i == line_num else "    "
+                context_lines.append(f"{prefix}[{i+1}] {lines[i].rstrip()[:200]}")
             
-            # Use json_type if detected, otherwise classify
-            if json_type:
-                event_type = json_type
-                # Use detail_msg as the primary message if available
-                message = detail_msg if detail_msg else error_line[:500]
-            else:
-                event_type = self._classify_log_line(error_line)
-                message = error_line[:500]
+            stack_trace = "--- Context (±10 lines) ---\n" + '\n'.join(context_lines) if context_lines else None
             
-            # Collect stack trace lines following the error
-            stack_lines = []
-            for i in range(error_line_num + 1, min(error_line_num + 50, total_lines)):
-                check_line = lines[i].strip()
-                if not check_line:
-                    continue
-                if self._is_stack_trace_line(check_line):
-                    stack_lines.append(check_line)
-                elif any(re.search(p, check_line, re.IGNORECASE) for patterns in severity_patterns.values() for p in patterns):
-                    # Hit another log entry, stop
-                    break
-            
-            # If no stack trace found, capture context (+/- 10 lines)
-            stack_trace = None
-            if stack_lines:
-                stack_trace = '\n'.join(stack_lines)[:2000]
-            else:
-                # Capture context: 10 lines before and 10 lines after
-                context_start = max(0, error_line_num - 10)
-                context_end = min(total_lines, error_line_num + 11)
-                context_lines = []
-                
-                for i in range(context_start, context_end):
-                    prefix = ">>> " if i == error_line_num else "    "
-                    line_content = lines[i].rstrip()[:200]  # Limit line length
-                    context_lines.append(f"{prefix}[{i+1}] {line_content}")
-                
-                if context_lines:
-                    stack_trace = "--- Context (±10 lines) ---\n" + '\n'.join(context_lines)
-            
-            # Classify priority - JSON failures are typically important
-            if json_type in ['TASK_FAILED', 'API_ERROR']:
-                priority = 'P1'  # Task/API failures are important
-            else:
-                priority = self._classify_priority(severity, event_type, error_line)
-            
-            event = {
+            events.append({
                 'test_result_id': result_id,
                 'test_name': test_name,
                 'log_source': source,
                 'timestamp': timestamp,
                 'severity': severity,
                 'event_type': event_type,
-                'message': message,
+                'message': line[:500],
                 'stack_trace': stack_trace,
-                'line_number': error_line_num + 1,  # 1-based
-                'priority': priority
-            }
-            events.append(event)
+                'line_number': line_num + 1,
+                'priority': self._classify_priority(severity, event_type, line)
+            })
         
         return events
     
