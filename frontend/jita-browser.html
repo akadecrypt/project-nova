@@ -193,6 +193,39 @@
             text-align: center;
             padding: 20px;
         }
+        
+        .right-sidebar-filters {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        
+        .sidebar-filter-input {
+            padding: 8px 10px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 12px;
+            width: 100%;
+        }
+        
+        .sidebar-filter-input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+        }
+        
+        .sidebar-filter-select {
+            padding: 8px 10px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 12px;
+            width: 100%;
+            cursor: pointer;
+        }
 
         /* Header */
         .page-header {
@@ -567,140 +600,6 @@
         }
 
         .toast.show { display: block; }
-
-        /* Recent Runs in Main Area */
-        .recent-runs-main {
-            margin-bottom: 24px;
-        }
-
-        .recent-runs-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 16px;
-        }
-
-        .recent-runs-title {
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--text-secondary);
-        }
-
-        .filter-bar {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
-
-        .filter-bar label {
-            font-size: 12px;
-            color: var(--text-muted);
-        }
-
-        .filter-select {
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            padding: 6px 12px;
-            color: var(--text-primary);
-            font-size: 12px;
-            cursor: pointer;
-        }
-
-        .filter-select:focus {
-            outline: none;
-            border-color: var(--accent-primary);
-        }
-
-        .filter-input {
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            padding: 6px 12px;
-            color: var(--text-primary);
-            font-size: 12px;
-            width: 180px;
-        }
-
-        .filter-input::placeholder {
-            color: var(--text-muted);
-        }
-
-        .recent-runs-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 12px;
-        }
-
-        .run-card {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 10px;
-            padding: 16px;
-            cursor: pointer;
-            transition: all 0.15s;
-        }
-
-        .run-card:hover {
-            border-color: var(--accent-primary);
-            transform: translateY(-2px);
-        }
-
-        .run-card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 10px;
-        }
-
-        .run-card-label {
-            font-size: 13px;
-            font-weight: 500;
-            color: var(--text-primary);
-            word-break: break-word;
-        }
-
-        .run-card-id {
-            font-size: 10px;
-            font-family: 'JetBrains Mono', monospace;
-            color: var(--text-muted);
-            margin-top: 4px;
-        }
-
-        .run-card-delete {
-            background: none;
-            border: none;
-            color: var(--text-muted);
-            cursor: pointer;
-            padding: 4px;
-            opacity: 0;
-            transition: all 0.15s;
-        }
-
-        .run-card:hover .run-card-delete { opacity: 1; }
-        .run-card-delete:hover { color: var(--error); }
-
-        .run-card-stats {
-            display: flex;
-            gap: 16px;
-            font-size: 12px;
-        }
-
-        .run-card-stat {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            color: var(--text-muted);
-        }
-
-        .run-card-stat.failed { color: var(--error); }
-        .run-card-stat.passed { color: var(--success); }
-
-        .run-card-time {
-            font-size: 10px;
-            color: var(--text-muted);
-            margin-top: 10px;
-        }
     </style>
 </head>
 <body>
@@ -752,27 +651,6 @@
                 </div>
             </div>
 
-            <!-- Recent Runs (shown in main area, especially for iframe) -->
-            <div id="recentRunsMain" class="recent-runs-main" style="display: none;">
-                <div class="recent-runs-header">
-                    <div class="recent-runs-title">Recently Analyzed</div>
-                    <div class="filter-bar">
-                        <input type="text" class="filter-input" id="searchFilter" placeholder="Search by label or ID..." oninput="filterRecentRuns()">
-                        <select class="filter-select" id="statusFilter" onchange="filterRecentRuns()">
-                            <option value="all">All Status</option>
-                            <option value="failed">Has Failures</option>
-                            <option value="passed">All Passed</option>
-                        </select>
-                        <select class="filter-select" id="sortFilter" onchange="filterRecentRuns()">
-                            <option value="recent">Most Recent</option>
-                            <option value="tests">Most Tests</option>
-                            <option value="failed">Most Failures</option>
-                        </select>
-                    </div>
-                </div>
-                <div id="recentRunsGrid" class="recent-runs-grid"></div>
-            </div>
-
             <!-- Loading State -->
             <div id="loadingState" class="loading">
                 <div class="spinner"></div>
@@ -812,8 +690,19 @@
                     <circle cx="12" cy="12" r="10"/>
                     <polyline points="12 6 12 12 16 14"/>
                 </svg>
-                Recent Analyzed Runs
+                Recent Runs
             </h3>
+            
+            <!-- Filters -->
+            <div class="right-sidebar-filters">
+                <input type="text" class="sidebar-filter-input" id="sidebarSearch" placeholder="Search..." oninput="filterRightSidebar()">
+                <select class="sidebar-filter-select" id="sidebarStatusFilter" onchange="filterRightSidebar()">
+                    <option value="all">All</option>
+                    <option value="failed">Failed</option>
+                    <option value="passed">Passed</option>
+                </select>
+            </div>
+            
             <div id="recentRunsList">
                 <div class="recent-empty">No analyzed runs yet</div>
             </div>
@@ -855,17 +744,16 @@
                 const res = await fetch(`${API}/runs?with_metadata=true`);
                 const data = await res.json();
                 const sidebarList = document.getElementById('recentList');
-                const mainSection = document.getElementById('recentRunsMain');
                 
                 allRuns = data.runs || [];
                 
                 if (allRuns.length === 0) {
                     sidebarList.innerHTML = '<div style="color: var(--text-muted); font-size: 12px;">No runs yet</div>';
-                    mainSection.style.display = 'none';
+                    updateRightSidebar([]);
                     return;
                 }
 
-                // Update sidebar with simple list
+                // Update left sidebar with simple list
                 sidebarList.innerHTML = allRuns.map(run => {
                     const id = run.run_id || run;
                     const label = run.label || id.slice(0,12);
@@ -877,12 +765,8 @@
                     `;
                 }).join('');
 
-                // Update main area with rich cards
-                mainSection.style.display = 'block';
-                filterRecentRuns();
-                
-                // Also populate right sidebar with recent runs
-                updateRightSidebar(allRuns.slice(0, 10));
+                // Populate right sidebar with recent runs
+                updateRightSidebar(allRuns.slice(0, 15));
             } catch (e) {
                 console.error('Error loading recent runs:', e);
                 // Fallback to simple list
@@ -904,48 +788,47 @@
                 return;
             }
             
-            container.innerHTML = runs.map(run => {
-                const id = run.run_id || '';
-                const label = run.label || id.slice(0, 16) + '...';
-                const total = run.total_tests || 0;
-                const failed = run.failed_tests || 0;
-                const passed = total - failed;
-                const date = run.analyzed_at ? new Date(run.analyzed_at).toLocaleDateString() : '';
-                
-                return `
-                    <div class="recent-run" onclick="loadResults('${id}')">
-                        <div class="recent-run-id">${id.slice(0, 20)}...</div>
-                        <div class="recent-run-info">
-                            ${label !== id.slice(0, 16) + '...' ? `<div style="margin-bottom: 4px;">${label.slice(0, 25)}${label.length > 25 ? '...' : ''}</div>` : ''}
-                            <div class="recent-run-stat">
-                                <span>Tests:</span>
-                                <span>${total}</span>
-                            </div>
-                            ${failed > 0 ? `
-                                <div class="recent-run-stat failed">
-                                    <span>Failed:</span>
-                                    <span>${failed}</span>
-                                </div>
-                            ` : `
-                                <div class="recent-run-stat passed">
-                                    <span>All Passed</span>
-                                    <span>✓</span>
-                                </div>
-                            `}
-                            ${date ? `<div class="recent-run-stat"><span>Analyzed:</span><span>${date}</span></div>` : ''}
-                        </div>
-                    </div>
-                `;
-            }).join('');
+            container.innerHTML = runs.map(run => renderRecentRunCard(run)).join('');
         }
-
-        function filterRecentRuns() {
-            const searchTerm = (document.getElementById('searchFilter')?.value || '').toLowerCase();
-            const statusFilter = document.getElementById('statusFilter')?.value || 'all';
-            const sortFilter = document.getElementById('sortFilter')?.value || 'recent';
-            const mainGrid = document.getElementById('recentRunsGrid');
-
-            // Filter runs
+        
+        function renderRecentRunCard(run) {
+            const id = run.run_id || '';
+            const label = run.label || id.slice(0, 16) + '...';
+            const total = run.total_tests || 0;
+            const failed = run.failed_tests || 0;
+            const date = run.analyzed_at ? new Date(run.analyzed_at).toLocaleDateString() : '';
+            
+            return `
+                <div class="recent-run" onclick="loadResults('${id}')">
+                    <div class="recent-run-id">${id.slice(0, 20)}...</div>
+                    <div class="recent-run-info">
+                        ${label !== id.slice(0, 16) + '...' ? `<div style="margin-bottom: 4px;">${label.slice(0, 25)}${label.length > 25 ? '...' : ''}</div>` : ''}
+                        <div class="recent-run-stat">
+                            <span>Tests:</span>
+                            <span>${total}</span>
+                        </div>
+                        ${failed > 0 ? `
+                            <div class="recent-run-stat failed">
+                                <span>Failed:</span>
+                                <span>${failed}</span>
+                            </div>
+                        ` : `
+                            <div class="recent-run-stat passed">
+                                <span>All Passed</span>
+                                <span>✓</span>
+                            </div>
+                        `}
+                        ${date ? `<div class="recent-run-stat"><span>Analyzed:</span><span>${date}</span></div>` : ''}
+                    </div>
+                </div>
+            `;
+        }
+        
+        function filterRightSidebar() {
+            const searchTerm = (document.getElementById('sidebarSearch')?.value || '').toLowerCase();
+            const statusFilter = document.getElementById('sidebarStatusFilter')?.value || 'all';
+            const container = document.getElementById('recentRunsList');
+            
             let filteredRuns = allRuns.filter(run => {
                 const id = run.run_id || '';
                 const label = run.label || '';
@@ -960,57 +843,18 @@
                 
                 return matchesSearch && matchesStatus;
             });
-
-            // Sort runs
-            if (sortFilter === 'tests') {
-                filteredRuns.sort((a, b) => (b.total_tests || 0) - (a.total_tests || 0));
-            } else if (sortFilter === 'failed') {
-                filteredRuns.sort((a, b) => (b.failed_tests || 0) - (a.failed_tests || 0));
-            } else {
-                // recent - sort by analyzed_at descending
-                filteredRuns.sort((a, b) => {
-                    const dateA = a.analyzed_at ? new Date(a.analyzed_at) : new Date(0);
-                    const dateB = b.analyzed_at ? new Date(b.analyzed_at) : new Date(0);
-                    return dateB - dateA;
-                });
-            }
-
-            // Render filtered cards
+            
             if (filteredRuns.length === 0) {
-                mainGrid.innerHTML = '<div style="color: var(--text-muted); padding: 40px; text-align: center; grid-column: 1/-1;">No runs match your filters</div>';
+                container.innerHTML = '<div class="recent-empty">No matching runs</div>';
                 return;
             }
+            
+            container.innerHTML = filteredRuns.slice(0, 15).map(run => renderRecentRunCard(run)).join('');
+        }
 
-            mainGrid.innerHTML = filteredRuns.map(run => {
-                const id = run.run_id || run;
-                const label = run.label || 'Unknown Run';
-                const failed = run.failed_tests || 0;
-                const passed = run.passed_tests || 0;
-                const total = run.total_tests || 0;
-                const time = run.analyzed_at ? formatTimeAgo(run.analyzed_at) : '';
-                
-                return `
-                    <div class="run-card" onclick="loadResults('${id}')">
-                        <div class="run-card-header">
-                            <div>
-                                <div class="run-card-label">${escapeHtml(label)}</div>
-                                <div class="run-card-id">${id}</div>
-                            </div>
-                            <button class="run-card-delete" onclick="event.stopPropagation(); deleteRun('${id}')" title="Delete">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-                                </svg>
-                            </button>
-                        </div>
-                        <div class="run-card-stats">
-                            <span class="run-card-stat">${total} tests</span>
-                            <span class="run-card-stat passed">${passed} passed</span>
-                            <span class="run-card-stat failed">${failed} failed</span>
-                        </div>
-                        ${time ? `<div class="run-card-time">${time}</div>` : ''}
-                    </div>
-                `;
-            }).join('');
+        // Legacy function - now handled by filterRightSidebar
+        function filterRecentRuns() {
+            filterRightSidebar();
         }
 
         function formatTimeAgo(isoString) {
@@ -1190,9 +1034,6 @@
         }
 
         function displayResults(tests) {
-            // Hide recent runs section when showing results
-            document.getElementById('recentRunsMain').style.display = 'none';
-            
             const failed = tests.filter(t => t.status !== 'Succeeded');
             const passed = tests.filter(t => t.status === 'Succeeded');
             
