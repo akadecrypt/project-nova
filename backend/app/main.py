@@ -28,7 +28,8 @@ from .routers import (
     objects_router,
     database_router,
     logs_router,
-    jita
+    jita,
+    tasks
 )
 
 # Initialize logging
@@ -140,6 +141,7 @@ app.include_router(objects_router)
 app.include_router(database_router)
 app.include_router(logs_router)
 app.include_router(jita.router, prefix="/api/jita", tags=["jita"])
+app.include_router(tasks.router, prefix="/api/tasks", tags=["tasks"])
 
 
 # Root endpoints

@@ -10,13 +10,11 @@ from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 
 from ..services.jita_service import get_jita_service
+from ..task_manager import get_task_manager, TaskType, TaskStatus
 from ..logging_config import get_logger
 
 router = APIRouter()
 logger = get_logger(__name__)
-
-# Track running analysis jobs
-_analysis_jobs: Dict[str, Dict] = {}  # run_id -> {status, started_at, error}
 
 
 class AnalyzeRequest(BaseModel):
@@ -40,33 +38,34 @@ class AnalyzeResponse(BaseModel):
 
 def _run_analysis_background(run_id: str):
     """Background task to run analysis."""
-    global _analysis_jobs
+    task_manager = get_task_manager()
+    task = task_manager.get_task(f"jita_{run_id}")
+    
     try:
         logger.info(f"Background: Starting analysis for {run_id}")
+        if task:
+            task.start()
+            task.update_progress(10, "Fetching task details from JITA...")
+        
         service = get_jita_service()
         result = service.analyze_run(run_id)
         
         if "error" in result:
-            _analysis_jobs[run_id] = {
-                "status": "failed",
-                "error": result["error"],
-                "completed_at": datetime.now().isoformat()
-            }
+            if task:
+                task.fail(result["error"])
+            logger.error(f"Background: Analysis failed for {run_id}: {result['error']}")
         else:
-            _analysis_jobs[run_id] = {
-                "status": "completed",
-                "tests_analyzed": result.get("tests_analyzed", 0),
-                "completed_at": datetime.now().isoformat()
-            }
-        logger.info(f"Background: Completed analysis for {run_id}")
+            if task:
+                task.complete({
+                    "tests_analyzed": result.get("tests_analyzed", 0),
+                    "log_events_found": result.get("log_events_found", 0)
+                })
+            logger.info(f"Background: Completed analysis for {run_id}")
         
     except Exception as e:
         logger.error(f"Background: Error analyzing {run_id}: {e}")
-        _analysis_jobs[run_id] = {
-            "status": "failed",
-            "error": str(e),
-            "completed_at": datetime.now().isoformat()
-        }
+        if task:
+            task.fail(str(e))
 
 
 @router.post("/analyze/{run_id}/start")
@@ -76,22 +75,29 @@ async def start_analysis(run_id: str):
     
     User can poll /analyze/{run_id}/status to check progress.
     """
-    global _analysis_jobs
+    task_manager = get_task_manager()
+    task_id = f"jita_{run_id}"
     
     # Check if already running
-    if run_id in _analysis_jobs and _analysis_jobs[run_id].get("status") == "running":
+    existing_task = task_manager.get_task(task_id)
+    if existing_task and existing_task.status == TaskStatus.RUNNING:
         return {
             "status": "already_running",
             "run_id": run_id,
+            "task_id": task_id,
             "message": "Analysis already in progress"
         }
     
-    # Start background thread
-    _analysis_jobs[run_id] = {
-        "status": "running",
-        "started_at": datetime.now().isoformat()
-    }
+    # Create task in task manager
+    task = task_manager.create_task(
+        task_id=task_id,
+        task_type=TaskType.JITA_ANALYSIS,
+        name=f"JITA Analysis: {run_id[:12]}...",
+        description=f"Analyzing JITA test run {run_id}",
+        metadata={"run_id": run_id}
+    )
     
+    # Start background thread
     thread = threading.Thread(target=_run_analysis_background, args=(run_id,))
     thread.daemon = True
     thread.start()
@@ -101,6 +107,7 @@ async def start_analysis(run_id: str):
     return {
         "status": "started",
         "run_id": run_id,
+        "task_id": task_id,
         "message": "Analysis started in background"
     }
 
@@ -108,7 +115,11 @@ async def start_analysis(run_id: str):
 @router.get("/analyze/{run_id}/status")
 async def get_analysis_status(run_id: str):
     """Check status of a running analysis."""
-    if run_id not in _analysis_jobs:
+    task_manager = get_task_manager()
+    task_id = f"jita_{run_id}"
+    task = task_manager.get_task(task_id)
+    
+    if not task:
         # Check if already analyzed
         service = get_jita_service()
         runs = service.list_analyzed_runs()
@@ -116,17 +127,27 @@ async def get_analysis_status(run_id: str):
             return {"status": "completed", "run_id": run_id}
         return {"status": "not_found", "run_id": run_id}
     
-    return {"run_id": run_id, **_analysis_jobs[run_id]}
+    return {
+        "run_id": run_id,
+        "task_id": task_id,
+        "status": task.status.value,
+        "progress": task.progress,
+        "progress_message": task.progress_message,
+        "started_at": task.started_at.isoformat() if task.started_at else None,
+        "completed_at": task.completed_at.isoformat() if task.completed_at else None,
+        "duration_seconds": task.duration_seconds,
+        "error": task.error
+    }
 
 
 @router.get("/jobs")
 async def list_analysis_jobs():
-    """List all analysis jobs and their status."""
+    """List all JITA analysis jobs and their status."""
+    task_manager = get_task_manager()
+    tasks = task_manager.list_tasks(task_type=TaskType.JITA_ANALYSIS)
+    
     return {
-        "jobs": [
-            {"run_id": rid, **info} 
-            for rid, info in _analysis_jobs.items()
-        ]
+        "jobs": [t.to_dict() for t in tasks]
     }
 
 
