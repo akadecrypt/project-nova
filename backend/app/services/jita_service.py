@@ -408,117 +408,155 @@ class JitaService:
         return result
     
     def get_timeline(self, run_id: str, test_result_id: str = None) -> Dict[str, Any]:
-        """Get timeline data for a run or specific test."""
+        """Get timeline data for a run or specific test (optimized)."""
         safe_id = re.sub(r'[^a-zA-Z0-9]', '', run_id)
         timeline_table = f"jita_{safe_id}_timeline"
         logs_table = f"jita_{safe_id}_logs"
         
-        # Build query
+        # Build timeline query
         if test_result_id:
             timeline_sql = f"""
                 SELECT * FROM {timeline_table}
                 WHERE test_result_id = '{test_result_id}'
                 ORDER BY phase_order
             """
-            logs_sql = f"""
-                SELECT * FROM {logs_table}
-                WHERE test_result_id = '{test_result_id}'
-                ORDER BY timestamp
-            """
+            where_clause = f"test_result_id = '{test_result_id}'"
         else:
             timeline_sql = f"SELECT * FROM {timeline_table} ORDER BY test_result_id, phase_order"
-            logs_sql = f"SELECT * FROM {logs_table} ORDER BY timestamp LIMIT 500"
+            where_clause = "1=1"
         
         timeline_result = execute_sql(timeline_sql)
-        logs_result = execute_sql(logs_sql)
-        
-        # Group logs by phase
         phases = timeline_result.get("rows", [])
+        
+        # Get aggregated counts per phase using SQL (much faster)
+        counts_sql = f"""
+            SELECT 
+                phase,
+                SUM(CASE WHEN severity IN ('ERROR', 'FATAL') THEN 1 ELSE 0 END) as error_count,
+                SUM(CASE WHEN severity = 'WARN' THEN 1 ELSE 0 END) as warn_count,
+                COUNT(*) as total_count
+            FROM {logs_table}
+            WHERE {where_clause}
+            GROUP BY phase
+        """
+        counts_result = execute_sql(counts_sql)
+        counts_by_phase = {r.get('phase', ''): r for r in counts_result.get("rows", [])}
+        
+        # Only fetch ERROR/FATAL/WARN logs for display (limit per phase)
+        logs_sql = f"""
+            SELECT * FROM {logs_table}
+            WHERE {where_clause}
+              AND severity IN ('ERROR', 'FATAL', 'WARN')
+            ORDER BY 
+                CASE severity WHEN 'FATAL' THEN 1 WHEN 'ERROR' THEN 2 ELSE 3 END,
+                timestamp DESC
+            LIMIT 200
+        """
+        logs_result = execute_sql(logs_sql)
         logs = logs_result.get("rows", [])
         
-        # Enrich phases with log counts
+        # Enrich phases with counts and limited logs
+        total_logs = 0
         for phase in phases:
-            phase_name = phase.get('phase_name')
-            phase['error_count'] = sum(1 for l in logs if l.get('phase') == phase_name and l.get('severity') in ['ERROR', 'FATAL'])
-            phase['warn_count'] = sum(1 for l in logs if l.get('phase') == phase_name and l.get('severity') == 'WARN')
-            phase['logs'] = [l for l in logs if l.get('phase') == phase_name]
+            phase_name = phase.get('phase_name', '')
+            counts = counts_by_phase.get(phase_name, {})
+            phase['error_count'] = counts.get('error_count', 0)
+            phase['warn_count'] = counts.get('warn_count', 0)
+            total_logs += counts.get('total_count', 0)
+            # Only include top 20 logs per phase
+            phase['logs'] = [l for l in logs if l.get('phase') == phase_name][:20]
         
         return {
             "run_id": run_id,
             "test_result_id": test_result_id,
             "phases": phases,
-            "total_logs": len(logs)
+            "total_logs": total_logs
         }
     
     def get_operations_timeline(self, run_id: str, test_result_id: str = None) -> Dict[str, Any]:
-        """Get operations timeline with errors grouped by operation in execution order."""
+        """Get operations timeline with errors grouped by operation in execution order (optimized)."""
         safe_id = re.sub(r'[^a-zA-Z0-9]', '', run_id)
         logs_table = f"jita_{safe_id}_logs"
         
-        # Build query to get all operation logs
+        # First get aggregated counts per operation (fast)
         if test_result_id:
-            sql = f"""
-                SELECT log_source, severity, event_type, message, timestamp, priority
-                FROM {logs_table}
-                WHERE test_result_id = '{test_result_id}'
-                  AND log_source LIKE 'op:%'
-                ORDER BY log_source, timestamp
-            """
+            where_clause = f"test_result_id = '{test_result_id}'"
         else:
-            sql = f"""
-                SELECT log_source, severity, event_type, message, timestamp, priority, test_result_id
-                FROM {logs_table}
-                WHERE log_source LIKE 'op:%'
-                ORDER BY log_source, timestamp
-            """
+            where_clause = "1=1"
         
-        result = execute_sql(sql)
+        counts_sql = f"""
+            SELECT 
+                REPLACE(REPLACE(log_source, 'op:', ''), '/failed_tasks', '') as op_name,
+                SUM(CASE WHEN severity = 'FATAL' THEN 1 ELSE 0 END) as fatal_count,
+                SUM(CASE WHEN severity = 'ERROR' THEN 1 ELSE 0 END) as error_count,
+                SUM(CASE WHEN severity = 'WARN' THEN 1 ELSE 0 END) as warn_count,
+                MAX(CASE WHEN event_type = 'TASK_FAILED' THEN 1 ELSE 0 END) as has_task_failure
+            FROM {logs_table}
+            WHERE {where_clause}
+              AND log_source LIKE 'op:%'
+            GROUP BY REPLACE(REPLACE(log_source, 'op:', ''), '/failed_tasks', '')
+        """
+        counts_result = execute_sql(counts_sql)
+        op_counts = {r.get('op_name', ''): r for r in counts_result.get("rows", [])}
+        
+        # Only fetch actual error/fatal/warn logs for operations with issues (limited)
+        logs_sql = f"""
+            SELECT log_source, severity, event_type, message, timestamp, priority
+            FROM {logs_table}
+            WHERE {where_clause}
+              AND log_source LIKE 'op:%'
+              AND severity IN ('ERROR', 'FATAL', 'WARN')
+            ORDER BY 
+                CASE severity WHEN 'FATAL' THEN 1 WHEN 'ERROR' THEN 2 ELSE 3 END,
+                timestamp DESC
+            LIMIT 500
+        """
+        result = execute_sql(logs_sql)
         logs = result.get("rows", [])
         
-        # Group logs by operation
+        # Build operations from aggregated counts first
         operations = {}
+        for op_name, counts in op_counts.items():
+            if not op_name:
+                continue
+            operations[op_name] = {
+                'name': op_name,
+                'display_name': self._format_op_name(op_name),
+                'errors': [],
+                'warnings': [],
+                'fatal': [],
+                'error_count': counts.get('error_count', 0),
+                'warn_count': counts.get('warn_count', 0),
+                'fatal_count': counts.get('fatal_count', 0),
+                'has_task_failure': bool(counts.get('has_task_failure', 0))
+            }
+        
+        # Add log entries to operations (already limited by SQL)
         for log in logs:
             source = log.get('log_source', '')
-            # Remove 'op:' prefix and '/failed_tasks' suffix for grouping
             op_name = source.replace('op:', '').replace('/failed_tasks', '')
             
             if op_name not in operations:
-                operations[op_name] = {
-                    'name': op_name,
-                    'display_name': self._format_op_name(op_name),
-                    'errors': [],
-                    'warnings': [],
-                    'fatal': [],
-                    'error_count': 0,
-                    'warn_count': 0,
-                    'fatal_count': 0,
-                    'has_task_failure': False
-                }
+                continue
             
             op = operations[op_name]
             severity = log.get('severity', '')
-            event_type = log.get('event_type', '')
             
             log_entry = {
                 'message': log.get('message', '')[:500],
                 'timestamp': log.get('timestamp', 0),
-                'event_type': event_type,
+                'event_type': log.get('event_type', ''),
                 'priority': log.get('priority', 'P3'),
                 'source': source
             }
             
-            if severity == 'FATAL':
+            # Limit entries per category
+            if severity == 'FATAL' and len(op['fatal']) < 10:
                 op['fatal'].append(log_entry)
-                op['fatal_count'] += 1
-            elif severity == 'ERROR':
+            elif severity == 'ERROR' and len(op['errors']) < 20:
                 op['errors'].append(log_entry)
-                op['error_count'] += 1
-            elif severity == 'WARN':
+            elif severity == 'WARN' and len(op['warnings']) < 10:
                 op['warnings'].append(log_entry)
-                op['warn_count'] += 1
-            
-            if event_type == 'TASK_FAILED':
-                op['has_task_failure'] = True
         
         # Sort operations by numeric prefix (execution order)
         def sort_key(op_name):
