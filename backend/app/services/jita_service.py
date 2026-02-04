@@ -506,10 +506,8 @@ class JitaService:
         # Get total count
         count_sql = f"SELECT COUNT(*) as cnt FROM {logs_table} WHERE {where_clause}"
         count_result = execute_sql(count_sql)
-        logger.info(f"Count result: {count_result}")
         rows = count_result.get("rows", [])
         total = rows[0].get("cnt", 0) if rows and len(rows) > 0 else 0
-        logger.info(f"Total count: {total}")
         
         # Get paginated logs
         logs_sql = f"""
