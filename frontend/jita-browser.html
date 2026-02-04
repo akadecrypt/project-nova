@@ -406,17 +406,39 @@
             align-items: center;
             gap: 6px;
             background: var(--accent-primary);
-            color: var(--text-inverse, white);
+            color: #fff;
             padding: 8px 14px;
             border-radius: 6px;
             text-decoration: none;
             font-size: 13px;
             font-weight: 500;
             margin-top: 12px;
+            border: 1px solid transparent;
+            transition: all 0.15s;
         }
 
         .log-link:hover { background: var(--accent-secondary); }
         .log-link svg { width: 14px; height: 14px; }
+        
+        .log-link.secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+        .log-link.secondary:hover {
+            background: var(--bg-hover);
+            border-color: var(--accent-primary);
+        }
+        
+        .log-link.outline {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+        }
+        .log-link.outline:hover {
+            background: var(--bg-tertiary);
+            border-color: var(--text-muted);
+        }
 
         /* Empty State */
         .empty-state {
@@ -1096,20 +1118,20 @@
                             </div>
                             
                             <div class="detail-block" style="display: flex; gap: 10px; flex-wrap: wrap;">
-                                <a href="timeline.html?run=${currentRunId}&test=${test.test_result_id}&theme=${document.documentElement.getAttribute('data-theme') || 'dark'}" class="log-link" style="background: var(--accent-primary);">
+                                <a href="timeline.html?run=${currentRunId}&test=${test.test_result_id}&theme=${document.documentElement.getAttribute('data-theme') || 'dark'}" class="log-link">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <circle cx="12" cy="12" r="3"/><path d="M12 3v3m0 12v3M3 12h3m12 0h3"/>
                                     </svg>
                                     View Timeline
                                 </a>
-                                <a href="log-details.html?run=${currentRunId}&test=${test.test_result_id}&theme=${document.documentElement.getAttribute('data-theme') || 'dark'}" class="log-link" style="background: var(--bg-tertiary);">
+                                <a href="log-details.html?run=${currentRunId}&test=${test.test_result_id}&theme=${document.documentElement.getAttribute('data-theme') || 'dark'}" class="log-link secondary">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>
                                     </svg>
                                     Error Analysis
                                 </a>
                                 ${test.log_url ? `
-                                    <a href="${test.log_url}" target="_blank" class="log-link" style="background: var(--bg-secondary);">
+                                    <a href="${test.log_url}" target="_blank" class="log-link outline">
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
                                             <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
