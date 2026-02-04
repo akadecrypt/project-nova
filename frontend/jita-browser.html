@@ -111,8 +111,87 @@
         .main {
             flex: 1;
             margin-left: 280px;
+            margin-right: 260px;
             padding: 32px 40px;
-            max-width: 1000px;
+            max-width: 900px;
+        }
+        
+        .in-iframe .main {
+            margin-right: 260px;
+        }
+        
+        /* Right Sidebar - Recent Runs */
+        .right-sidebar {
+            width: 260px;
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border-color);
+            padding: 20px;
+            position: fixed;
+            right: 0;
+            top: 0;
+            height: 100vh;
+            overflow-y: auto;
+        }
+        
+        .right-sidebar h3 {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .right-sidebar h3 svg {
+            width: 14px;
+            height: 14px;
+        }
+        
+        .recent-run {
+            padding: 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        
+        .recent-run:hover {
+            border-color: var(--accent-primary);
+            background: var(--bg-hover);
+        }
+        
+        .recent-run-id {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--accent-primary);
+            margin-bottom: 6px;
+        }
+        
+        .recent-run-info {
+            font-size: 11px;
+            color: var(--text-muted);
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .recent-run-stat {
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .recent-run-stat.failed { color: var(--error); }
+        .recent-run-stat.passed { color: var(--success); }
+        
+        .recent-empty {
+            color: var(--text-muted);
+            font-size: 12px;
+            text-align: center;
+            padding: 20px;
         }
 
         /* Header */
@@ -669,7 +748,7 @@
                     </button>
                 </div>
                 <div class="input-hint">
-                    Analysis runs in the background. You can continue using the app while it processes.
+                    💡 If the run is already analyzed, it will load instantly. New runs are analyzed in the background.
                 </div>
             </div>
 
@@ -725,6 +804,20 @@
                 <div id="testCasesList"></div>
             </div>
         </main>
+        
+        <!-- Right Sidebar - Recent Runs -->
+        <aside class="right-sidebar">
+            <h3>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <polyline points="12 6 12 12 16 14"/>
+                </svg>
+                Recent Analyzed Runs
+            </h3>
+            <div id="recentRunsList">
+                <div class="recent-empty">No analyzed runs yet</div>
+            </div>
+        </aside>
     </div>
 
     <div id="toast" class="toast"></div>
@@ -787,6 +880,9 @@
                 // Update main area with rich cards
                 mainSection.style.display = 'block';
                 filterRecentRuns();
+                
+                // Also populate right sidebar with recent runs
+                updateRightSidebar(allRuns.slice(0, 10));
             } catch (e) {
                 console.error('Error loading recent runs:', e);
                 // Fallback to simple list
@@ -799,6 +895,48 @@
                     `).join('') || '<div style="color: var(--text-muted);">No runs</div>';
                 } catch (e2) {}
             }
+        }
+
+        function updateRightSidebar(runs) {
+            const container = document.getElementById('recentRunsList');
+            if (!runs || runs.length === 0) {
+                container.innerHTML = '<div class="recent-empty">No analyzed runs yet</div>';
+                return;
+            }
+            
+            container.innerHTML = runs.map(run => {
+                const id = run.run_id || '';
+                const label = run.label || id.slice(0, 16) + '...';
+                const total = run.total_tests || 0;
+                const failed = run.failed_tests || 0;
+                const passed = total - failed;
+                const date = run.analyzed_at ? new Date(run.analyzed_at).toLocaleDateString() : '';
+                
+                return `
+                    <div class="recent-run" onclick="loadResults('${id}')">
+                        <div class="recent-run-id">${id.slice(0, 20)}...</div>
+                        <div class="recent-run-info">
+                            ${label !== id.slice(0, 16) + '...' ? `<div style="margin-bottom: 4px;">${label.slice(0, 25)}${label.length > 25 ? '...' : ''}</div>` : ''}
+                            <div class="recent-run-stat">
+                                <span>Tests:</span>
+                                <span>${total}</span>
+                            </div>
+                            ${failed > 0 ? `
+                                <div class="recent-run-stat failed">
+                                    <span>Failed:</span>
+                                    <span>${failed}</span>
+                                </div>
+                            ` : `
+                                <div class="recent-run-stat passed">
+                                    <span>All Passed</span>
+                                    <span>✓</span>
+                                </div>
+                            `}
+                            ${date ? `<div class="recent-run-stat"><span>Analyzed:</span><span>${date}</span></div>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
         }
 
         function filterRecentRuns() {
