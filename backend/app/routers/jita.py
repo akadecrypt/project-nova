@@ -414,6 +414,162 @@ async def get_run_operations(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/runs/{run_id}/ai-analyze")
+async def ai_analyze_test(
+    run_id: str,
+    test_result_id: str = Query(..., description="Test result ID to analyze"),
+    llm_provider: str = Query("openai", description="LLM provider: openai or gemini")
+):
+    """
+    Analyze logs for a test using AI (LLM) to identify real errors.
+    
+    This uses an AI model to intelligently analyze logs and:
+    - Filter out false positives (e.g., "error_count=0")
+    - Identify real errors with high confidence
+    - Classify errors by category and severity
+    - Provide root cause analysis
+    - Suggest fixes
+    
+    Args:
+        run_id: JITA run ID
+        test_result_id: Specific test result to analyze
+        llm_provider: Which LLM to use (openai or gemini)
+        
+    Returns:
+        AI-analyzed errors with classifications and suggestions
+    """
+    try:
+        from ..services.ai_log_analyzer import get_ai_analyzer_service
+        
+        # Get the AI analyzer service
+        ai_service = get_ai_analyzer_service(llm_provider=llm_provider)
+        
+        # Get log content for this test
+        jita_service = get_jita_service()
+        
+        # First, get test summary for context
+        summary = jita_service.get_run_summary(run_id)
+        test_info = None
+        for test in summary.get('tests', []):
+            if test.get('test_result_id') == test_result_id:
+                test_info = test
+                break
+        
+        if not test_info:
+            raise HTTPException(status_code=404, detail=f"Test result {test_result_id} not found")
+        
+        # Get log contents from the database
+        import re
+        safe_id = re.sub(r'[^a-zA-Z0-9]', '', run_id)
+        logs_table = f"jita_{safe_id}_logs"
+        
+        from ..services.jita_service import execute_sql
+        
+        # Get all log entries for this test
+        logs_result = execute_sql(f"""
+            SELECT log_source, message, stack_trace
+            FROM {logs_table}
+            WHERE test_result_id = '{test_result_id}'
+            ORDER BY timestamp
+        """)
+        
+        # Group logs by source and build content
+        log_contents = {}
+        for row in logs_result.get('rows', []):
+            source = row.get('log_source', 'unknown')
+            message = row.get('message', '')
+            stack = row.get('stack_trace', '')
+            
+            if source not in log_contents:
+                log_contents[source] = []
+            
+            log_contents[source].append(message)
+            if stack:
+                log_contents[source].append(stack)
+        
+        # Combine into single strings per source
+        log_contents = {
+            source: '\n'.join(lines)
+            for source, lines in log_contents.items()
+        }
+        
+        # Build context
+        context = {
+            'test_status': test_info.get('status'),
+            'cluster_info': test_info.get('cluster_info'),
+            'exception_summary': test_info.get('exception_summary')
+        }
+        
+        # Run AI analysis
+        result = await ai_service.analyze_test_logs(
+            run_id=run_id,
+            test_result_id=test_result_id,
+            log_contents=log_contents,
+            test_name=test_info.get('test_name', ''),
+            context=context
+        )
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in AI analysis for run {run_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/runs/{run_id}/ai-status")
+async def get_ai_analysis_status(
+    run_id: str,
+    test_result_id: str = Query(..., description="Test result ID")
+):
+    """
+    Check if AI analysis results are cached for a test.
+    """
+    try:
+        from ..services.ai_log_analyzer import get_ai_analyzer_service
+        
+        ai_service = get_ai_analyzer_service()
+        cache_key = f"{run_id}:{test_result_id}"
+        
+        has_cache = cache_key in ai_service._results_cache
+        cached_count = len(ai_service._results_cache.get(cache_key, []))
+        
+        return {
+            "status": "success",
+            "has_cached_analysis": has_cache,
+            "cached_error_count": cached_count if has_cache else None
+        }
+        
+    except Exception as e:
+        logger.error(f"Error checking AI status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/runs/{run_id}/ai-cache")
+async def clear_ai_analysis_cache(
+    run_id: str,
+    test_result_id: Optional[str] = Query(None, description="Specific test, or all for run")
+):
+    """
+    Clear cached AI analysis results.
+    """
+    try:
+        from ..services.ai_log_analyzer import get_ai_analyzer_service
+        
+        ai_service = get_ai_analyzer_service()
+        ai_service.clear_cache(run_id=run_id, test_result_id=test_result_id)
+        
+        return {
+            "status": "success",
+            "message": f"Cleared AI cache for run {run_id}"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error clearing AI cache: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.delete("/runs/{run_id}")
 async def delete_run_analysis(run_id: str):
     """

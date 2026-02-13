@@ -487,6 +487,191 @@
             color: var(--bg-primary);
         }
 
+        /* AI Results Section */
+        .ai-results-section {
+            margin-top: 32px;
+            margin-bottom: 32px;
+        }
+        
+        .ai-badge {
+            background: var(--accent-primary);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 12px;
+        }
+        
+        .ai-error-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            margin-bottom: 16px;
+            overflow: hidden;
+        }
+        
+        .ai-error-card.critical { border-left: 4px solid var(--error); }
+        .ai-error-card.high { border-left: 4px solid var(--warning); }
+        .ai-error-card.medium { border-left: 4px solid var(--info); }
+        .ai-error-card.low { border-left: 4px solid var(--text-muted); }
+        
+        .ai-error-header {
+            padding: 16px 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+        
+        .ai-error-header:hover {
+            background: var(--bg-tertiary);
+        }
+        
+        .ai-severity {
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            flex-shrink: 0;
+        }
+        
+        .ai-severity.critical { background: var(--error-bg); color: var(--error); }
+        .ai-severity.high { background: var(--warning-bg); color: var(--warning); }
+        .ai-severity.medium { background: var(--info-bg); color: var(--info); }
+        .ai-severity.low { background: var(--bg-tertiary); color: var(--text-muted); }
+        
+        .ai-category {
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            flex-shrink: 0;
+        }
+        
+        .ai-error-info { flex: 1; }
+        
+        .ai-error-title {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 4px;
+            color: var(--text-primary);
+        }
+        
+        .ai-error-summary {
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+        
+        .ai-confidence {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+        
+        .ai-error-details {
+            display: none;
+            background: var(--bg-primary);
+            border-top: 1px solid var(--border-color);
+            padding: 20px;
+        }
+        
+        .ai-error-card.expanded .ai-error-details {
+            display: block;
+        }
+        
+        .ai-detail-section {
+            margin-bottom: 16px;
+        }
+        
+        .ai-detail-section:last-child {
+            margin-bottom: 0;
+        }
+        
+        .ai-detail-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .ai-detail-content {
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            padding: 12px;
+            background: var(--bg-secondary);
+            border-radius: 6px;
+        }
+        
+        .ai-fix-suggestion {
+            background: var(--success-bg, rgba(34, 197, 94, 0.1));
+            border: 1px solid var(--success, #22c55e);
+            border-radius: 8px;
+            padding: 14px;
+        }
+        
+        .ai-fix-suggestion .ai-detail-label {
+            color: var(--success, #22c55e);
+        }
+        
+        .ai-components {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        
+        .ai-component-tag {
+            background: var(--bg-tertiary);
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        
+        .ai-log-snippet {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            background: var(--bg-primary);
+            padding: 12px;
+            border-radius: 6px;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        
+        .ai-intro {
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .ai-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        
+        #aiAnalyzeBtn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        #aiAnalyzeBtn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+
         /* Toast */
         .toast {
             position: fixed;
@@ -563,11 +748,39 @@
                 <div class="ai-icon">
                     <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
                 </div>
-                <h2>AI Analysis & Debug Suggestions</h2>
+                <h2>AI-Powered Error Analysis</h2>
+                <button class="btn btn-primary" id="aiAnalyzeBtn" onclick="runAIAnalysis()" style="margin-left: auto;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M12 6v6l4 2"/>
+                    </svg>
+                    <span id="aiAnalyzeBtnText">Run AI Analysis</span>
+                </button>
             </div>
             <div class="ai-content" id="aiContent">
-                <div style="color: var(--text-muted);">Analyzing errors...</div>
+                <div class="ai-intro">
+                    <p style="color: var(--text-secondary); margin-bottom: 12px;">
+                        Click <strong>"Run AI Analysis"</strong> to use AI to intelligently analyze the logs and identify <strong>only real errors</strong> - filtering out false positives like "error_count=0" or error handling code.
+                    </p>
+                    <p style="color: var(--text-muted); font-size: 12px;">
+                        The AI will provide: root cause analysis, severity classification, affected components, and suggested fixes.
+                    </p>
+                </div>
             </div>
+        </div>
+        
+        <!-- AI Results Section (hidden until analysis runs) -->
+        <div class="ai-results-section" id="aiResultsSection" style="display: none;">
+            <div class="section-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--accent-primary);">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                    <path d="M2 17l10 5 10-5"/>
+                    <path d="M2 12l10 5 10-5"/>
+                </svg>
+                AI-Identified Issues
+                <span class="ai-badge" id="aiErrorCount">0 real errors found</span>
+            </div>
+            <div id="aiErrorList" class="error-list"></div>
         </div>
 
         <!-- Error List -->
@@ -790,7 +1003,9 @@
                 
                 displayErrors(logEvents);
                 updateLoadMoreButton();
-                generateAIAnalysis();
+                
+                // Check if we have cached AI analysis
+                checkAIAnalysisStatus();
 
             } catch (e) {
                 console.error(e);
@@ -1075,80 +1290,21 @@
             }).join('');
         }
 
-        function generateAIAnalysis() {
-            const container = document.getElementById('aiContent');
-            const suggestions = [];
-
-            // Analyze main exception
-            if (testData && testData.exception_summary) {
-                const errorType = extractErrorType(testData.exception_summary);
-                const knowledge = ERROR_KNOWLEDGE[errorType] || ERROR_KNOWLEDGE['default'];
+        async function checkAIAnalysisStatus() {
+            try {
+                const response = await fetch(`${API}/runs/${runId}/ai-status?test_result_id=${testId}`);
+                const data = await response.json();
                 
-                suggestions.push({
-                    title: `${knowledge.category} Detected`,
-                    points: knowledge.suggestions
-                });
+                if (data.has_cached_analysis && data.cached_error_count > 0) {
+                    // We have cached results, show a message
+                    const btn = document.getElementById('aiAnalyzeBtn');
+                    const btnText = document.getElementById('aiAnalyzeBtnText');
+                    btnText.textContent = `Run AI Analysis (${data.cached_error_count} cached)`;
+                }
+            } catch (e) {
+                // Silently fail - not critical
+                console.log('Could not check AI cache status');
             }
-
-            // Analyze patterns in log errors
-            const errorTypes = {};
-            logEvents.filter(e => e.severity === 'ERROR').forEach(e => {
-                const type = e.event_type || 'UNKNOWN';
-                errorTypes[type] = (errorTypes[type] || 0) + 1;
-            });
-
-            if (Object.keys(errorTypes).length > 0) {
-                const topErrors = Object.entries(errorTypes)
-                    .sort((a, b) => b[1] - a[1])
-                    .slice(0, 3);
-
-                suggestions.push({
-                    title: 'Error Pattern Analysis',
-                    points: topErrors.map(([type, count]) => 
-                        `<code>${type}</code> occurred ${count} time(s) - ${getQuickFix(type)}`
-                    )
-                });
-            }
-
-            // Add general recommendations
-            suggestions.push({
-                title: 'Recommended Next Steps',
-                points: [
-                    'Review the stack trace to identify the exact failure point',
-                    'Check cluster health and resource availability',
-                    'Compare with recent successful runs for differences',
-                    'Click "View Raw Logs" to examine detailed log files'
-                ]
-            });
-
-            container.innerHTML = suggestions.map(s => `
-                <div class="ai-suggestion">
-                    <div class="ai-suggestion-title">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                            <polyline points="22 4 12 14.01 9 11.01"/>
-                        </svg>
-                        ${s.title}
-                    </div>
-                    <div class="ai-suggestion-text">
-                        <ul style="margin: 0; padding-left: 20px;">
-                            ${s.points.map(p => `<li style="margin-bottom: 6px;">${p}</li>`).join('')}
-                        </ul>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function getQuickFix(errorType) {
-            const fixes = {
-                'TIMEOUT': 'Check service responsiveness and increase timeout if needed',
-                'CONNECTION_ERROR': 'Verify network connectivity and service availability',
-                'AUTH_FAIL': 'Check credentials and authentication configuration',
-                'NOT_FOUND': 'Verify resource exists and path is correct',
-                'ASSERTION_ERROR': 'Review test expectations vs actual values',
-                'RESOURCE_ERROR': 'Check resource allocation and availability'
-            };
-            return fixes[errorType] || 'Review the error context and logs';
         }
 
         function toggleError(i) {
@@ -1193,6 +1349,206 @@
             t.textContent = msg;
             t.classList.add('show');
             setTimeout(() => t.classList.remove('show'), 3000);
+        }
+        
+        // ============================================
+        // AI Analysis Functions
+        // ============================================
+        
+        let aiErrors = [];
+        
+        async function runAIAnalysis() {
+            const btn = document.getElementById('aiAnalyzeBtn');
+            const btnText = document.getElementById('aiAnalyzeBtnText');
+            const content = document.getElementById('aiContent');
+            
+            btn.disabled = true;
+            btnText.innerHTML = '<div class="spinner-sm"></div> Analyzing with AI...';
+            
+            content.innerHTML = `
+                <div style="text-align: center; padding: 40px;">
+                    <div class="spinner"></div>
+                    <p style="color: var(--text-secondary); margin-top: 16px;">AI is analyzing the logs...</p>
+                    <p style="color: var(--text-muted); font-size: 12px;">This may take 10-30 seconds depending on log size</p>
+                </div>
+            `;
+            
+            try {
+                const response = await fetch(
+                    `${API}/runs/${runId}/ai-analyze?test_result_id=${testId}&llm_provider=openai`,
+                    { method: 'POST' }
+                );
+                
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    aiErrors = data.errors || [];
+                    displayAIResults(data);
+                    showToast(`AI found ${aiErrors.length} real errors`);
+                } else {
+                    throw new Error(data.detail || 'Analysis failed');
+                }
+                
+            } catch (e) {
+                console.error('AI Analysis error:', e);
+                content.innerHTML = `
+                    <div style="text-align: center; padding: 20px; color: var(--error);">
+                        <p>AI analysis failed: ${escapeHtml(e.message)}</p>
+                        <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">
+                            Make sure the API key is configured in config.json
+                        </p>
+                    </div>
+                `;
+                showToast('AI analysis failed');
+            } finally {
+                btn.disabled = false;
+                btnText.textContent = 'Run AI Analysis';
+            }
+        }
+        
+        function displayAIResults(data) {
+            const content = document.getElementById('aiContent');
+            const resultsSection = document.getElementById('aiResultsSection');
+            const errorList = document.getElementById('aiErrorList');
+            const errorCount = document.getElementById('aiErrorCount');
+            
+            const errors = data.errors || [];
+            const summary = data.summary || {};
+            
+            // Update summary section
+            if (errors.length === 0) {
+                content.innerHTML = `
+                    <div style="text-align: center; padding: 30px;">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2" style="margin-bottom: 12px;">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                            <polyline points="22 4 12 14.01 9 11.01"/>
+                        </svg>
+                        <h3 style="color: var(--success); margin-bottom: 8px;">No Real Errors Found!</h3>
+                        <p style="color: var(--text-secondary);">
+                            The AI analyzed the logs and found no actual errors requiring attention.
+                        </p>
+                        <p style="color: var(--text-muted); font-size: 12px; margin-top: 8px;">
+                            Any "ERROR" text in the logs appears to be false positives (error handling, counts, etc.)
+                        </p>
+                    </div>
+                `;
+                resultsSection.style.display = 'none';
+                return;
+            }
+            
+            // Show summary
+            const bySeverity = summary.by_severity || {};
+            const byCategory = summary.by_category || {};
+            
+            content.innerHTML = `
+                <div class="ai-summary">
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px;">
+                        <div style="text-align: center; padding: 12px; background: var(--bg-primary); border-radius: 8px;">
+                            <div style="font-size: 24px; font-weight: 700; color: var(--error);">${bySeverity.CRITICAL || 0}</div>
+                            <div style="font-size: 11px; color: var(--text-muted);">Critical</div>
+                        </div>
+                        <div style="text-align: center; padding: 12px; background: var(--bg-primary); border-radius: 8px;">
+                            <div style="font-size: 24px; font-weight: 700; color: var(--warning);">${bySeverity.HIGH || 0}</div>
+                            <div style="font-size: 11px; color: var(--text-muted);">High</div>
+                        </div>
+                        <div style="text-align: center; padding: 12px; background: var(--bg-primary); border-radius: 8px;">
+                            <div style="font-size: 24px; font-weight: 700; color: var(--info);">${bySeverity.MEDIUM || 0}</div>
+                            <div style="font-size: 11px; color: var(--text-muted);">Medium</div>
+                        </div>
+                        <div style="text-align: center; padding: 12px; background: var(--bg-primary); border-radius: 8px;">
+                            <div style="font-size: 24px; font-weight: 700; color: var(--text-muted);">${bySeverity.LOW || 0}</div>
+                            <div style="font-size: 11px; color: var(--text-muted);">Low</div>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        ${Object.entries(byCategory).map(([cat, count]) => 
+                            `<span class="ai-component-tag">${escapeHtml(cat)}: ${count}</span>`
+                        ).join('')}
+                    </div>
+                </div>
+            `;
+            
+            // Show results section
+            resultsSection.style.display = 'block';
+            errorCount.textContent = `${errors.length} real error${errors.length > 1 ? 's' : ''} found`;
+            
+            // Render error cards
+            errorList.innerHTML = errors.map((err, i) => `
+                <div class="ai-error-card ${err.severity.toLowerCase()}" id="ai-err-${i}">
+                    <div class="ai-error-header" onclick="toggleAIError(${i})">
+                        <span class="ai-severity ${err.severity.toLowerCase()}">${err.severity}</span>
+                        <span class="ai-category">${escapeHtml(err.category)}</span>
+                        <div class="ai-error-info">
+                            <div class="ai-error-title">${escapeHtml(err.title)}</div>
+                            <div class="ai-error-summary">${escapeHtml(err.summary)}</div>
+                            <div class="ai-confidence">
+                                Confidence: ${Math.round(err.confidence * 100)}% • 
+                                Type: ${escapeHtml(err.error_type)} •
+                                Source: ${escapeHtml(err.source_file)}
+                            </div>
+                        </div>
+                        <svg class="error-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                    </div>
+                    <div class="ai-error-details">
+                        <div class="ai-detail-section">
+                            <div class="ai-detail-label">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>
+                                </svg>
+                                Root Cause
+                            </div>
+                            <div class="ai-detail-content">${escapeHtml(err.root_cause)}</div>
+                        </div>
+                        
+                        <div class="ai-detail-section">
+                            <div class="ai-detail-label">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                </svg>
+                                Impact
+                            </div>
+                            <div class="ai-detail-content">${escapeHtml(err.impact)}</div>
+                        </div>
+                        
+                        <div class="ai-detail-section ai-fix-suggestion">
+                            <div class="ai-detail-label">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                                    <polyline points="22 4 12 14.01 9 11.01"/>
+                                </svg>
+                                Suggested Fix
+                            </div>
+                            <div class="ai-detail-content" style="background: transparent;">${escapeHtml(err.suggested_fix)}</div>
+                        </div>
+                        
+                        ${err.related_components && err.related_components.length > 0 ? `
+                            <div class="ai-detail-section">
+                                <div class="ai-detail-label">Related Components</div>
+                                <div class="ai-components">
+                                    ${err.related_components.map(c => `<span class="ai-component-tag">${escapeHtml(c)}</span>`).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
+                        
+                        ${err.log_snippet ? `
+                            <div class="ai-detail-section">
+                                <div class="ai-detail-label">Log Snippet (Lines ${err.line_numbers[0]}-${err.line_numbers[1]})</div>
+                                <div class="ai-log-snippet">${escapeHtml(err.log_snippet)}</div>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function toggleAIError(i) {
+            document.getElementById(`ai-err-${i}`).classList.toggle('expanded');
         }
     </script>
 </body>
