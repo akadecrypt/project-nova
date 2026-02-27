@@ -37,33 +37,45 @@ class AnalyzeResponse(BaseModel):
 
 
 def _run_analysis_background(run_id: str):
-    """Background task to run analysis."""
+    """Background task to run AI-powered analysis."""
+    import asyncio
     task_manager = get_task_manager()
     task = task_manager.get_task(f"jita_{run_id}")
     
     try:
-        logger.info(f"Background: Starting analysis for {run_id}")
+        logger.info(f"Background: Starting AI analysis for {run_id}")
         if task:
             task.start()
             task.update_progress(10, "Fetching task details from JITA...")
         
         service = get_jita_service()
-        result = service.analyze_run(run_id)
+        
+        # Use the new AI-powered analysis
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            if task:
+                task.update_progress(20, "Analyzing logs with AI...")
+            result = loop.run_until_complete(service.analyze_run_with_ai(run_id))
+        finally:
+            loop.close()
         
         if "error" in result:
             if task:
                 task.fail(result["error"])
-            logger.error(f"Background: Analysis failed for {run_id}: {result['error']}")
+            logger.error(f"Background: AI analysis failed for {run_id}: {result['error']}")
         else:
             if task:
                 task.complete({
                     "tests_analyzed": result.get("tests_analyzed", 0),
-                    "log_events_found": result.get("log_events_found", 0)
+                    "ai_errors_found": result.get("ai_errors_found", 0)
                 })
-            logger.info(f"Background: Completed analysis for {run_id}")
+            logger.info(f"Background: Completed AI analysis for {run_id}")
         
     except Exception as e:
-        logger.error(f"Background: Error analyzing {run_id}: {e}")
+        logger.error(f"Background: Error in AI analysis for {run_id}: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         if task:
             task.fail(str(e))
 
@@ -359,6 +371,7 @@ async def get_run_logs(
     Get paginated logs for a run with filters.
     
     Supports infinite scroll / load more functionality.
+    NOTE: This endpoint returns legacy regex-parsed logs. Use /runs/{run_id}/errors for AI-analyzed errors.
     """
     try:
         service = get_jita_service()
@@ -379,6 +392,77 @@ async def get_run_logs(
         
     except Exception as e:
         logger.error(f"Error getting logs for run {run_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/runs/{run_id}/errors")
+async def get_ai_errors(
+    run_id: str,
+    test_result_id: Optional[str] = Query(None, description="Filter by specific test result"),
+    severity: Optional[str] = Query(None, description="Filter by severity (CRITICAL, HIGH, MEDIUM, LOW)"),
+    category: Optional[str] = Query(None, description="Filter by error category"),
+    limit: int = Query(100, description="Number of errors to return"),
+    offset: int = Query(0, description="Offset for pagination")
+):
+    """
+    Get AI-identified errors for a run.
+    
+    Returns errors identified by AI analysis with root cause, impact, and suggested fixes.
+    This is the primary endpoint for viewing test failures and issues.
+    
+    Args:
+        run_id: JITA run ID
+        test_result_id: Optional filter for specific test
+        severity: Filter by CRITICAL, HIGH, MEDIUM, LOW
+        category: Filter by error category
+        limit: Max results (default 100)
+        offset: Pagination offset
+        
+    Returns:
+        AI-analyzed errors with full context and suggestions
+    """
+    try:
+        service = get_jita_service()
+        result = service.get_ai_errors(
+            run_id,
+            test_result_id=test_result_id,
+            severity=severity,
+            category=category,
+            limit=limit,
+            offset=offset
+        )
+        
+        return {
+            "status": "success",
+            **result
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting AI errors for run {run_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/runs/{run_id}/errors/stats")
+async def get_ai_error_stats(
+    run_id: str,
+    test_result_id: Optional[str] = Query(None, description="Filter by specific test result")
+):
+    """
+    Get aggregated AI error statistics.
+    
+    Returns counts by severity and category for dashboard display.
+    """
+    try:
+        service = get_jita_service()
+        result = service.get_ai_error_stats(run_id, test_result_id)
+        
+        return {
+            "status": "success",
+            **result
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting AI error stats for run {run_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -417,128 +501,79 @@ async def get_run_operations(
 @router.post("/runs/{run_id}/ai-analyze")
 async def ai_analyze_test(
     run_id: str,
-    test_result_id: str = Query(..., description="Test result ID to analyze"),
-    llm_provider: str = Query("openai", description="LLM provider: openai or gemini")
+    test_result_id: str = Query(..., description="Test result ID to analyze")
 ):
     """
-    Analyze logs for a test using AI (LLM) to identify real errors.
+    Analyze logs for a specific test using AI.
     
-    This uses an AI model to intelligently analyze logs and:
-    - Filter out false positives (e.g., "error_count=0")
-    - Identify real errors with high confidence
-    - Classify errors by category and severity
-    - Provide root cause analysis
-    - Suggest fixes
+    Fetches raw logs directly from JITA and analyzes them with AI to identify:
+    - Real errors vs false positives
+    - Root causes
+    - Impact assessment
+    - Suggested fixes
     
     Args:
         run_id: JITA run ID
         test_result_id: Specific test result to analyze
-        llm_provider: Which LLM to use (openai or gemini)
         
     Returns:
         AI-analyzed errors with classifications and suggestions
     """
     try:
-        from ..services.ai_log_analyzer import get_ai_analyzer_service
+        from ..services.jita_ai_analyzer import get_jita_ai_analyzer
         
-        # Get the AI analyzer service
-        ai_service = get_ai_analyzer_service(llm_provider=llm_provider)
-        
-        # Get log content for this test
         jita_service = get_jita_service()
+        ai_analyzer = get_jita_ai_analyzer()
         
-        # First, get test summary for context
-        summary = jita_service.get_run_summary(run_id)
-        test_info = None
-        for test in summary.get('tests', []):
-            if test.get('test_result_id') == test_result_id:
-                test_info = test
-                break
-        
-        if not test_info:
+        # Get test result from JITA
+        test_result = jita_service.get_test_result(test_result_id)
+        if not test_result:
             raise HTTPException(status_code=404, detail=f"Test result {test_result_id} not found")
         
-        # Get log contents from the database
-        import re
-        safe_id = re.sub(r'[^a-zA-Z0-9]', '', run_id)
-        logs_table = f"jita_{safe_id}_logs"
-        
-        from ..services.jita_service import execute_sql
-        
-        # Get all log entries for this test
-        logs_result = execute_sql(f"""
-            SELECT log_source, message, stack_trace
-            FROM {logs_table}
-            WHERE test_result_id = '{test_result_id}'
-            ORDER BY timestamp
-        """)
-        
-        # Group logs by source and build content
-        log_contents = {}
-        for row in logs_result.get('rows', []):
-            source = row.get('log_source', 'unknown')
-            message = row.get('message', '')
-            stack = row.get('stack_trace', '')
-            
-            if source not in log_contents:
-                log_contents[source] = []
-            
-            log_contents[source].append(message)
-            if stack:
-                log_contents[source].append(stack)
-        
-        # Combine into single strings per source
-        log_contents = {
-            source: '\n'.join(lines)
-            for source, lines in log_contents.items()
-        }
-        
-        # Build context
-        context = {
-            'test_status': test_info.get('status'),
-            'cluster_info': test_info.get('cluster_info'),
-            'exception_summary': test_info.get('exception_summary')
-        }
-        
         # Run AI analysis
-        result = await ai_service.analyze_test_logs(
-            run_id=run_id,
-            test_result_id=test_result_id,
-            log_contents=log_contents,
-            test_name=test_info.get('test_name', ''),
-            context=context
-        )
+        result = await ai_analyzer.analyze_test(run_id, test_result)
         
-        return result
+        # Store results in database
+        if result.get('errors'):
+            jita_service._insert_ai_errors(run_id, [e.__dict__ if hasattr(e, '__dict__') else e for e in result['errors']])
+        
+        if result.get('log_urls'):
+            jita_service._insert_log_urls(run_id, result['log_urls'])
+        
+        return {
+            "status": "success",
+            "run_id": run_id,
+            "test_result_id": test_result_id,
+            "errors_found": len(result.get('errors', [])),
+            "log_urls_found": len(result.get('log_urls', [])),
+            "summary": result.get('summary', {}),
+            "errors": [e.__dict__ if hasattr(e, '__dict__') else e for e in result.get('errors', [])]
+        }
         
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error in AI analysis for run {run_id}: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/runs/{run_id}/ai-status")
-async def get_ai_analysis_status(
-    run_id: str,
-    test_result_id: str = Query(..., description="Test result ID")
-):
+async def get_ai_analysis_status(run_id: str):
     """
-    Check if AI analysis results are cached for a test.
+    Check if AI analysis has been completed for a run.
     """
     try:
-        from ..services.ai_log_analyzer import get_ai_analyzer_service
-        
-        ai_service = get_ai_analyzer_service()
-        cache_key = f"{run_id}:{test_result_id}"
-        
-        has_cache = cache_key in ai_service._results_cache
-        cached_count = len(ai_service._results_cache.get(cache_key, []))
+        service = get_jita_service()
+        stats = service.get_ai_error_stats(run_id)
         
         return {
             "status": "success",
-            "has_cached_analysis": has_cache,
-            "cached_error_count": cached_count if has_cache else None
+            "has_analysis": stats.get('total', 0) > 0,
+            "error_count": stats.get('total', 0),
+            "severity_counts": stats.get('by_severity', {}),
+            "category_counts": stats.get('by_category', {})
         }
         
     except Exception as e:
@@ -546,27 +581,32 @@ async def get_ai_analysis_status(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/runs/{run_id}/ai-cache")
-async def clear_ai_analysis_cache(
-    run_id: str,
-    test_result_id: Optional[str] = Query(None, description="Specific test, or all for run")
-):
+@router.post("/runs/{run_id}/reanalyze")
+async def reanalyze_run(run_id: str):
     """
-    Clear cached AI analysis results.
+    Re-run AI analysis for a run, clearing previous results.
     """
     try:
-        from ..services.ai_log_analyzer import get_ai_analyzer_service
+        import re
+        from ..tools.sql_tools import execute_sql
         
-        ai_service = get_ai_analyzer_service()
-        ai_service.clear_cache(run_id=run_id, test_result_id=test_result_id)
+        # Clear existing AI errors
+        safe_id = re.sub(r'[^a-zA-Z0-9]', '', run_id)
+        execute_sql(f"DELETE FROM jita_{safe_id}_ai_errors")
+        execute_sql(f"DELETE FROM jita_{safe_id}_log_urls")
+        
+        # Trigger new analysis
+        service = get_jita_service()
+        result = await service.analyze_run_with_ai(run_id)
         
         return {
             "status": "success",
-            "message": f"Cleared AI cache for run {run_id}"
+            "message": f"Re-analysis started for run {run_id}",
+            **result
         }
         
     except Exception as e:
-        logger.error(f"Error clearing AI cache: {e}")
+        logger.error(f"Error re-analyzing run {run_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -588,14 +628,16 @@ async def delete_run_analysis(run_id: str):
         import re
         
         safe_id = re.sub(r'[^a-zA-Z0-9]', '', run_id)
-        logs_table = f"jita_{safe_id}_logs"
         summary_table = f"jita_{safe_id}_summary"
         timeline_table = f"jita_{safe_id}_timeline"
+        ai_errors_table = f"jita_{safe_id}_ai_errors"
+        log_urls_table = f"jita_{safe_id}_log_urls"
         
-        # Drop tables
-        execute_sql(f"DROP TABLE IF EXISTS {logs_table}")
+        # Drop tables (new schema)
         execute_sql(f"DROP TABLE IF EXISTS {summary_table}")
         execute_sql(f"DROP TABLE IF EXISTS {timeline_table}")
+        execute_sql(f"DROP TABLE IF EXISTS {ai_errors_table}")
+        execute_sql(f"DROP TABLE IF EXISTS {log_urls_table}")
         
         logger.info(f"Deleted analysis for run {run_id}")
         
@@ -646,4 +688,62 @@ async def get_jita_task(task_id: str):
         raise
     except Exception as e:
         logger.error(f"Error getting task {task_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/runs/{run_id}/raw-log")
+async def get_raw_log(
+    run_id: str,
+    url: str = Query(..., description="Log URL to fetch"),
+    max_lines: int = Query(1000, description="Maximum number of lines to return")
+):
+    """
+    Proxy endpoint to fetch raw log content from JITA log servers.
+    
+    Used by the UI to display raw log content when user wants to see full details.
+    
+    Args:
+        run_id: JITA run ID (for authorization context)
+        url: The log URL to fetch (can be JITA API URL or direct log server URL)
+        max_lines: Maximum lines to return (default 1000)
+        
+    Returns:
+        Raw log content
+    """
+    try:
+        import requests
+        from ..services.jita_ai_analyzer import get_jita_ai_analyzer
+        
+        analyzer = get_jita_ai_analyzer()
+        
+        # Resolve JITA URL if needed
+        if 'jita.eng.nutanix.com' in url:
+            resolved_url = analyzer._resolve_jita_log_url(url)
+            if not resolved_url:
+                raise HTTPException(status_code=404, detail="Could not resolve log URL")
+            url = resolved_url
+        
+        # Fetch the log content
+        content = analyzer._fetch_log_content(url, max_size=max_lines * 200)  # ~200 chars per line
+        
+        if not content:
+            raise HTTPException(status_code=404, detail="Could not fetch log content")
+        
+        # Limit lines
+        lines = content.split('\n')
+        if len(lines) > max_lines:
+            lines = lines[-max_lines:]  # Get last N lines
+            content = '\n'.join(lines)
+        
+        return {
+            "status": "success",
+            "url": url,
+            "lines": len(lines),
+            "content": content
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching raw log: {e}")
         raise HTTPException(status_code=500, detail=str(e))

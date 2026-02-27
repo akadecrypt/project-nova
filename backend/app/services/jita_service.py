@@ -101,13 +101,16 @@ class JitaService:
     
     def analyze_run(self, run_id: str) -> Dict[str, Any]:
         """
-        Analyze a JITA run and store results in SQL.
+        Analyze a JITA run and store results in SQL (metadata only, no regex parsing).
+        
+        This method stores test metadata and timeline. For full AI-powered error analysis,
+        use analyze_run_with_ai() which fetches raw logs and analyzes them with AI.
         
         Args:
             run_id: JITA task/run ID (e.g., '697a296e8e79ce6b2202f970')
             
         Returns:
-            Analysis summary with task info, test counts, and error summary
+            Analysis summary with task info and test counts
         """
         logger.info(f"Analyzing JITA run: {run_id}")
         
@@ -116,7 +119,7 @@ class JitaService:
         if not task:
             return {"error": f"Task {run_id} not found"}
         
-        # 2. Create tables for this run
+        # 2. Create tables for this run (includes new AI tables)
         self.create_run_tables(run_id)
         
         # 3. Get all test results
@@ -124,9 +127,8 @@ class JitaService:
         logger.info(f"Found {len(test_result_ids)} test results")
         
         test_summaries = []
-        all_log_events = []
         
-        # 4. Process each test result
+        # 4. Process each test result (metadata only, no regex parsing)
         for result_id in test_result_ids:
             result = self.get_test_result(result_id)
             if not result:
@@ -136,30 +138,32 @@ class JitaService:
             summary = self._extract_test_summary(result_id, result)
             test_summaries.append(summary)
             
-            # Extract timeline phases
+            # Extract and insert timeline phases
             timeline_phases = self._extract_timeline_phases(result_id, result)
-            
-            # Extract log events from exception/stack trace
-            events = self._extract_events_from_result(result_id, result)
-            all_log_events.extend(events)
-            
-            # Fetch and parse logs with timeline correlation
-            log_events = self._fetch_and_parse_logs(result_id, result, timeline_phases)
-            all_log_events.extend(log_events)
-            
-            # Insert timeline data
             self._insert_timeline(run_id, timeline_phases)
         
-        # 5. Insert data into SQL
+        # 5. Insert test summaries
         self._insert_summaries(run_id, test_summaries)
-        self._insert_log_events(run_id, all_log_events)
         
-        # 6. Save run metadata for quick listing
+        # 6. Save run metadata
         test_counts = task.get('test_result_count', {})
         self.save_run_metadata(run_id, task, test_counts)
         
-        # 7. Return analysis summary
-        return self._build_analysis_response(run_id, task, test_summaries, all_log_events)
+        # 7. Return summary (AI analysis is triggered separately)
+        return {
+            "status": "success",
+            "run_id": run_id,
+            "task": {
+                "label": task.get("label", ""),
+                "service": task.get("service", ""),
+                "created_by": task.get("created_by", ""),
+                "status": task.get("status", "")
+            },
+            "test_result_count": test_counts,
+            "tests_analyzed": len(test_summaries),
+            "ai_errors_found": 0,  # Will be updated after AI analysis
+            "message": "Metadata saved. AI analysis will run in background."
+        }
     
     def get_task_details(self, task_id: str) -> Optional[Dict]:
         """Fetch task details from JITA API."""
@@ -217,25 +221,44 @@ class JitaService:
         # Sanitize run_id for table name (only alphanumeric)
         safe_id = re.sub(r'[^a-zA-Z0-9]', '', run_id)
         
-        # Create logs table
-        logs_table = f"jita_{safe_id}_logs"
-        create_logs_sql = f"""
-        CREATE TABLE IF NOT EXISTS {logs_table} (
-            log_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        # Create AI errors table (replaces old regex-based logs table)
+        ai_errors_table = f"jita_{safe_id}_ai_errors"
+        create_ai_errors_sql = f"""
+        CREATE TABLE IF NOT EXISTS {ai_errors_table} (
+            error_id TEXT PRIMARY KEY,
             test_result_id TEXT,
-            test_name TEXT,
-            log_source TEXT,
-            timestamp INTEGER,
             severity TEXT,
-            event_type TEXT,
-            message TEXT,
-            stack_trace TEXT,
-            line_number INTEGER,
-            phase TEXT,
-            priority TEXT
+            category TEXT,
+            error_type TEXT,
+            title TEXT,
+            summary TEXT,
+            root_cause TEXT,
+            impact TEXT,
+            suggested_fix TEXT,
+            confidence REAL,
+            log_source TEXT,
+            log_snippet TEXT,
+            line_range TEXT,
+            related_components TEXT,
+            log_url TEXT,
+            created_at INTEGER
         )
         """
-        execute_sql(create_logs_sql)
+        execute_sql(create_ai_errors_sql)
+        
+        # Create log URLs table (stores raw log URLs for reference)
+        log_urls_table = f"jita_{safe_id}_log_urls"
+        create_log_urls_sql = f"""
+        CREATE TABLE IF NOT EXISTS {log_urls_table} (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            test_result_id TEXT,
+            log_type TEXT,
+            log_url TEXT,
+            resolved_url TEXT,
+            analyzed INTEGER DEFAULT 0
+        )
+        """
+        execute_sql(create_log_urls_sql)
         
         # Create summary table
         summary_table = f"jita_{safe_id}_summary"
@@ -251,7 +274,9 @@ class JitaService:
             duration_seconds INTEGER,
             cluster_info TEXT,
             cmd_executed TEXT,
-            log_url TEXT
+            log_url TEXT,
+            ai_error_count INTEGER DEFAULT 0,
+            ai_analysis_summary TEXT
         )
         """
         execute_sql(create_summary_sql)
@@ -267,7 +292,8 @@ class JitaService:
                 total_tests INTEGER,
                 passed_tests INTEGER,
                 failed_tests INTEGER,
-                analyzed_at TEXT
+                analyzed_at TEXT,
+                ai_total_errors INTEGER DEFAULT 0
             )
         """)
         
@@ -294,13 +320,14 @@ class JitaService:
         
         # Clear existing data if re-analyzing (to avoid duplicates)
         if clear_existing:
-            execute_sql(f"DELETE FROM {logs_table}")
+            execute_sql(f"DELETE FROM {ai_errors_table}")
+            execute_sql(f"DELETE FROM {log_urls_table}")
             execute_sql(f"DELETE FROM {summary_table}")
-            logger.info(f"Cleared existing data from tables: {logs_table}, {summary_table}")
+            logger.info(f"Cleared existing data from tables: {ai_errors_table}, {summary_table}")
         
-        logger.info(f"Tables ready: {logs_table}, {summary_table}")
+        logger.info(f"Tables ready: {ai_errors_table}, {log_urls_table}, {summary_table}")
     
-    def save_run_metadata(self, run_id: str, task: Dict, test_counts: Dict):
+    def save_run_metadata(self, run_id: str, task: Dict, test_counts: Dict, ai_error_count: int = 0):
         """Save run metadata for quick listing."""
         from datetime import datetime
         
@@ -311,7 +338,7 @@ class JitaService:
         
         sql = f"""
             INSERT OR REPLACE INTO jita_runs_metadata 
-            (run_id, label, service, created_by, task_status, total_tests, passed_tests, failed_tests, analyzed_at)
+            (run_id, label, service, created_by, task_status, total_tests, passed_tests, failed_tests, analyzed_at, ai_total_errors)
             VALUES (
                 '{run_id}',
                 '{escape(task.get("label", ""))}',
@@ -321,7 +348,8 @@ class JitaService:
                 {test_counts.get("Total", 0)},
                 {test_counts.get("Succeeded", 0)},
                 {test_counts.get("Failed", 0)},
-                '{datetime.now().isoformat()}'
+                '{datetime.now().isoformat()}',
+                {ai_error_count}
             )
         """
         execute_sql(sql)
@@ -2030,7 +2058,8 @@ class JitaService:
             sql = f"""
                 INSERT OR REPLACE INTO {table} 
                 (test_result_id, test_name, status, total_ops, successful_ops, 
-                 exception_summary, exception_full, duration_seconds, cluster_info, cmd_executed, log_url)
+                 exception_summary, exception_full, duration_seconds, cluster_info, 
+                 cmd_executed, log_url, ai_error_count, ai_analysis_summary)
                 VALUES (
                     '{escape(summary["test_result_id"])}',
                     '{escape(summary["test_name"])}',
@@ -2042,7 +2071,9 @@ class JitaService:
                     {summary["duration_seconds"]},
                     '{escape(summary["cluster_info"])}',
                     '{escape(summary["cmd_executed"])}',
-                    '{escape(summary.get("log_url", ""))}'
+                    '{escape(summary.get("log_url", ""))}',
+                    {summary.get("ai_error_count", 0)},
+                    '{escape(summary.get("ai_analysis_summary", "{}"))}'
                 )
             """
             execute_sql(sql)
@@ -2122,6 +2153,343 @@ class JitaService:
             'error_counts': error_counts,
             'event_types': event_types,
             'summaries': summaries
+        }
+    
+    async def analyze_run_with_ai(self, run_id: str) -> Dict[str, Any]:
+        """
+        Analyze a JITA run using AI for intelligent error detection.
+        
+        This is the new AI-powered analysis that replaces regex-based parsing.
+        
+        Args:
+            run_id: JITA task/run ID
+            
+        Returns:
+            Analysis summary with AI-identified errors
+        """
+        from .jita_ai_analyzer import get_jita_ai_analyzer
+        
+        logger.info(f"AI analyzing JITA run: {run_id}")
+        
+        # 1. Get task details
+        task = self.get_task_details(run_id)
+        if not task:
+            return {"error": f"Task {run_id} not found"}
+        
+        # 2. Create tables for this run
+        self.create_run_tables(run_id)
+        
+        # 3. Get all test results
+        test_result_ids = self._extract_test_result_ids(task)
+        logger.info(f"Found {len(test_result_ids)} test results")
+        
+        # Get the AI analyzer
+        ai_analyzer = get_jita_ai_analyzer()
+        
+        test_summaries = []
+        all_ai_errors = []
+        all_log_urls = []
+        
+        # 4. Process each test result with AI
+        for result_id in test_result_ids:
+            result = self.get_test_result(result_id)
+            if not result:
+                continue
+            
+            # Extract basic summary
+            summary = self._extract_test_summary(result_id, result)
+            
+            # Extract timeline phases
+            timeline_phases = self._extract_timeline_phases(result_id, result)
+            
+            # AI-powered log analysis
+            try:
+                ai_result = await ai_analyzer.analyze_test(
+                    run_id=run_id,
+                    test_result=result,
+                    include_raw_logs=True
+                )
+                
+                # Collect AI errors
+                ai_errors = ai_result.get('errors', [])
+                all_ai_errors.extend(ai_errors)
+                
+                # Update summary with AI error count
+                summary['ai_error_count'] = len(ai_errors)
+                summary['ai_analysis_summary'] = json.dumps(ai_result.get('summary', {}))
+                
+                # Collect log URLs
+                if isinstance(ai_result.get('analyzed_logs'), list):
+                    for log_info in ai_result['analyzed_logs']:
+                        all_log_urls.append({
+                            'test_result_id': result_id,
+                            'log_type': log_info.get('log_type', ''),
+                            'log_url': log_info.get('log_url', ''),
+                            'resolved_url': log_info.get('resolved_url', ''),
+                            'analyzed': 1
+                        })
+                
+                logger.info(f"AI found {len(ai_errors)} errors in test {result_id}")
+                
+            except Exception as e:
+                logger.error(f"AI analysis error for {result_id}: {e}")
+                summary['ai_error_count'] = 0
+                summary['ai_analysis_summary'] = '{}'
+            
+            test_summaries.append(summary)
+            
+            # Insert timeline data
+            self._insert_timeline(run_id, timeline_phases)
+        
+        # 5. Insert data into SQL
+        self._insert_summaries(run_id, test_summaries)
+        self._insert_ai_errors(run_id, all_ai_errors)
+        self._insert_log_urls(run_id, all_log_urls)
+        
+        # 6. Save run metadata
+        test_counts = task.get('test_result_count', {})
+        self.save_run_metadata(run_id, task, test_counts, ai_error_count=len(all_ai_errors))
+        
+        # 7. Return analysis summary
+        return self._build_ai_analysis_response(run_id, task, test_summaries, all_ai_errors)
+    
+    def _insert_ai_errors(self, run_id: str, errors: List[Dict]):
+        """Insert AI-identified errors into SQL table."""
+        if not errors:
+            return
+        
+        safe_id = re.sub(r'[^a-zA-Z0-9]', '', run_id)
+        table = f"jita_{safe_id}_ai_errors"
+        
+        for error in errors:
+            def escape(val):
+                if isinstance(val, str):
+                    return val.replace("'", "''")
+                return val if val is not None else ''
+            
+            # Handle both dict and object formats
+            if hasattr(error, 'to_dict'):
+                error = error.to_dict() if hasattr(error, 'to_dict') else error
+            
+            related = error.get('related_components', [])
+            if isinstance(related, list):
+                related = json.dumps(related)
+            
+            sql = f"""
+                INSERT OR REPLACE INTO {table}
+                (error_id, test_result_id, severity, category, error_type, title,
+                 summary, root_cause, impact, suggested_fix, confidence,
+                 log_source, log_snippet, line_range, related_components, log_url, created_at)
+                VALUES (
+                    '{escape(error.get("error_id", ""))}',
+                    '{escape(error.get("test_result_id", ""))}',
+                    '{escape(error.get("severity", "MEDIUM"))}',
+                    '{escape(error.get("category", "Unknown"))}',
+                    '{escape(error.get("error_type", "Unknown"))}',
+                    '{escape(error.get("title", "")[:80])}',
+                    '{escape(error.get("summary", ""))}',
+                    '{escape(error.get("root_cause", ""))}',
+                    '{escape(error.get("impact", ""))}',
+                    '{escape(error.get("suggested_fix", ""))}',
+                    {float(error.get("confidence", 0.5))},
+                    '{escape(error.get("log_source", ""))}',
+                    '{escape(error.get("log_snippet", "")[:1000])}',
+                    '{escape(error.get("line_range", ""))}',
+                    '{escape(related)}',
+                    '{escape(error.get("log_url", ""))}',
+                    {int(error.get("created_at", 0))}
+                )
+            """
+            execute_sql(sql)
+        
+        logger.info(f"Inserted {len(errors)} AI errors for run {run_id}")
+    
+    def _insert_log_urls(self, run_id: str, log_urls: List[Dict]):
+        """Insert log URLs for reference."""
+        if not log_urls:
+            return
+        
+        safe_id = re.sub(r'[^a-zA-Z0-9]', '', run_id)
+        table = f"jita_{safe_id}_log_urls"
+        
+        for log in log_urls:
+            def escape(val):
+                if isinstance(val, str):
+                    return val.replace("'", "''")
+                return val if val is not None else ''
+            
+            sql = f"""
+                INSERT INTO {table}
+                (test_result_id, log_type, log_url, resolved_url, analyzed)
+                VALUES (
+                    '{escape(log.get("test_result_id", ""))}',
+                    '{escape(log.get("log_type", ""))}',
+                    '{escape(log.get("log_url", ""))}',
+                    '{escape(log.get("resolved_url", ""))}',
+                    {log.get("analyzed", 0)}
+                )
+            """
+            execute_sql(sql)
+    
+    def _build_ai_analysis_response(
+        self, 
+        run_id: str, 
+        task: Dict, 
+        summaries: List[Dict],
+        ai_errors: List[Dict]
+    ) -> Dict[str, Any]:
+        """Build the AI analysis response."""
+        task_info = {
+            'run_id': run_id,
+            'label': task.get('label', ''),
+            'service': task.get('service', ''),
+            'created_by': task.get('created_by', ''),
+            'status': task.get('status', ''),
+        }
+        
+        result_counts = task.get('test_result_count', {})
+        
+        # AI error summary
+        severity_counts = {}
+        category_counts = {}
+        for error in ai_errors:
+            sev = error.get('severity', 'UNKNOWN')
+            cat = error.get('category', 'Unknown')
+            severity_counts[sev] = severity_counts.get(sev, 0) + 1
+            category_counts[cat] = category_counts.get(cat, 0) + 1
+        
+        # Top issues
+        top_issues = [
+            {
+                'title': e.get('title', ''),
+                'severity': e.get('severity', ''),
+                'category': e.get('category', ''),
+                'root_cause': e.get('root_cause', ''),
+                'suggested_fix': e.get('suggested_fix', '')
+            }
+            for e in ai_errors[:5]
+        ]
+        
+        return {
+            'task': task_info,
+            'test_result_count': result_counts,
+            'tests_analyzed': len(summaries),
+            'ai_errors_found': len(ai_errors),
+            'severity_counts': severity_counts,
+            'category_counts': category_counts,
+            'top_issues': top_issues,
+            'summaries': summaries
+        }
+    
+    def get_ai_errors(
+        self,
+        run_id: str,
+        test_result_id: str = None,
+        severity: str = None,
+        category: str = None,
+        limit: int = 100,
+        offset: int = 0
+    ) -> Dict[str, Any]:
+        """
+        Get AI-identified errors for a run.
+        
+        Args:
+            run_id: JITA run ID
+            test_result_id: Filter by specific test
+            severity: Filter by severity (CRITICAL, HIGH, MEDIUM, LOW)
+            category: Filter by category
+            limit: Max results
+            offset: Pagination offset
+            
+        Returns:
+            Dict with errors and metadata
+        """
+        safe_id = re.sub(r'[^a-zA-Z0-9]', '', run_id)
+        table = f"jita_{safe_id}_ai_errors"
+        
+        # Build query
+        where_clauses = []
+        if test_result_id:
+            where_clauses.append(f"test_result_id = '{test_result_id}'")
+        if severity:
+            where_clauses.append(f"severity = '{severity}'")
+        if category:
+            where_clauses.append(f"category = '{category}'")
+        
+        where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+        
+        # Get total count
+        count_result = execute_sql(f"SELECT COUNT(*) as count FROM {table} {where_sql}")
+        total = count_result.get('rows', [{}])[0].get('count', 0)
+        
+        # Get errors
+        sql = f"""
+            SELECT * FROM {table}
+            {where_sql}
+            ORDER BY 
+                CASE severity 
+                    WHEN 'CRITICAL' THEN 1 
+                    WHEN 'HIGH' THEN 2 
+                    WHEN 'MEDIUM' THEN 3 
+                    ELSE 4 
+                END,
+                confidence DESC
+            LIMIT {limit} OFFSET {offset}
+        """
+        
+        result = execute_sql(sql)
+        errors = result.get('rows', [])
+        
+        # Parse related_components JSON
+        for error in errors:
+            if error.get('related_components'):
+                try:
+                    error['related_components'] = json.loads(error['related_components'])
+                except:
+                    error['related_components'] = []
+        
+        return {
+            'run_id': run_id,
+            'test_result_id': test_result_id,
+            'errors': errors,
+            'total': total,
+            'limit': limit,
+            'offset': offset
+        }
+    
+    def get_ai_error_stats(self, run_id: str, test_result_id: str = None) -> Dict[str, Any]:
+        """Get aggregated AI error statistics."""
+        safe_id = re.sub(r'[^a-zA-Z0-9]', '', run_id)
+        table = f"jita_{safe_id}_ai_errors"
+        
+        where_clause = f"WHERE test_result_id = '{test_result_id}'" if test_result_id else ""
+        
+        # Severity counts
+        sev_result = execute_sql(f"""
+            SELECT severity, COUNT(*) as count 
+            FROM {table} {where_clause}
+            GROUP BY severity
+        """)
+        severity_counts = {r['severity']: r['count'] for r in sev_result.get('rows', [])}
+        
+        # Category counts
+        cat_result = execute_sql(f"""
+            SELECT category, COUNT(*) as count 
+            FROM {table} {where_clause}
+            GROUP BY category
+        """)
+        category_counts = {r['category']: r['count'] for r in cat_result.get('rows', [])}
+        
+        # Total count
+        total_result = execute_sql(f"SELECT COUNT(*) as count FROM {table} {where_clause}")
+        total = total_result.get('rows', [{}])[0].get('count', 0)
+        
+        return {
+            'run_id': run_id,
+            'test_result_id': test_result_id,
+            'total_errors': total,
+            'severity_counts': severity_counts,
+            'category_counts': category_counts
         }
 
 

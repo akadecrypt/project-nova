@@ -1,16 +1,6 @@
 # ObjectsAI - NOVA
 ## Nutanix Objects Virtual Assistant
 
-**Hackathon XII Project**
-
-| | |
-|---|---|
-| **Code** | D2761 |
-| **Submitter** | Vignesh Chandrasekar |
-| **Project URL** | https://nutanix.brightidea.com/D2761 |
-
----
-
 An AI-powered chat interface for managing Nutanix Object Storage using natural language.
 
 ## Features

@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Error Analysis - NOVA</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/design-system.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 24px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            margin-bottom: 24px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .header-info h1 {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header-meta {
+            display: flex;
+            gap: 16px;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .status-badge {
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-badge.failed { background: var(--error-bg); color: var(--error); }
+        .status-badge.passed { background: var(--success-bg); color: var(--success); }
+
+        .back-link {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .back-link:hover { color: var(--accent-primary); }
+
+        /* AI Summary Dashboard */
+        .ai-dashboard {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .stat-card .number {
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .stat-card .label {
+            font-size: 12px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-card.critical .number { color: #ef4444; }
+        .stat-card.high .number { color: #f97316; }
+        .stat-card.medium .number { color: #eab308; }
+        .stat-card.low .number { color: #22c55e; }
+
+        /* Primary Cause Section */
+        .primary-cause {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.05));
+            border: 1px solid var(--accent-primary);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+
+        .primary-cause-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .ai-badge {
+            background: var(--accent-primary);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .primary-cause h2 {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .primary-cause-content {
+            font-size: 14px;
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
+
+        .recommended-action {
+            margin-top: 12px;
+            padding: 12px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+        }
+
+        .recommended-action strong {
+            color: var(--accent-primary);
+        }
+
+        /* Root Causes List */
+        .root-causes-section {
+            margin-bottom: 24px;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .root-cause-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .root-cause-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .root-cause-header {
+            padding: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .root-cause-header:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .severity-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .severity-badge.critical { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+        .severity-badge.high { background: rgba(249, 115, 22, 0.2); color: #f97316; }
+        .severity-badge.medium { background: rgba(234, 179, 8, 0.2); color: #eab308; }
+        .severity-badge.low { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+
+        .category-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 500;
+            background: var(--bg-tertiary);
+            color: var(--text-muted);
+        }
+
+        .root-cause-title {
+            flex: 1;
+            font-weight: 500;
+        }
+
+        .root-cause-confidence {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .expand-icon {
+            width: 20px;
+            height: 20px;
+            transition: transform 0.2s;
+        }
+
+        .root-cause-card.expanded .expand-icon {
+            transform: rotate(180deg);
+        }
+
+        .root-cause-details {
+            display: none;
+            padding: 0 16px 16px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .root-cause-card.expanded .root-cause-details {
+            display: block;
+        }
+
+        .detail-section {
+            margin-top: 16px;
+        }
+
+        .detail-section h4 {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .detail-section p {
+            font-size: 14px;
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
+
+        .log-snippet {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            line-height: 1.5;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .component-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .component-tag {
+            padding: 4px 10px;
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .view-raw-log {
+            margin-top: 12px;
+            padding: 8px 16px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 12px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .view-raw-log:hover {
+            background: var(--border-hover);
+        }
+
+        /* Loading State */
+        .loading-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px;
+            color: var(--text-muted);
+        }
+
+        .loading-spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px;
+            color: var(--text-muted);
+        }
+
+        .empty-state h3 {
+            font-size: 18px;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        /* Raw Log Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            width: 90%;
+            max-width: 1000px;
+            max-height: 80vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .modal-header h3 {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 8px;
+        }
+
+        .modal-close:hover {
+            color: var(--text-primary);
+        }
+
+        .modal-content {
+            flex: 1;
+            overflow: auto;
+            padding: 16px;
+        }
+
+        .raw-log-content {
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            padding: 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .ai-dashboard {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-info">
+                <a href="javascript:history.back()" class="back-link">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                        <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+                    </svg>
+                    Back to Results
+                </a>
+                <h1>
+                    <span id="testName">Loading...</span>
+                    <span id="testStatus" class="status-badge">...</span>
+                </h1>
+                <div class="header-meta">
+                    <span id="duration">Duration: --</span>
+                    <span id="operations">Ops: --</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="loading-container">
+            <div class="loading-spinner"></div>
+            <p>Loading AI Analysis...</p>
+        </div>
+
+        <!-- Main Content (hidden until loaded) -->
+        <div id="mainContent" style="display: none;">
+            <!-- AI Summary Dashboard -->
+            <div class="ai-dashboard">
+                <div class="stat-card critical">
+                    <div class="number" id="criticalCount">0</div>
+                    <div class="label">Critical</div>
+                </div>
+                <div class="stat-card high">
+                    <div class="number" id="highCount">0</div>
+                    <div class="label">High</div>
+                </div>
+                <div class="stat-card medium">
+                    <div class="number" id="mediumCount">0</div>
+                    <div class="label">Medium</div>
+                </div>
+                <div class="stat-card low">
+                    <div class="number" id="lowCount">0</div>
+                    <div class="label">Low</div>
+                </div>
+            </div>
+
+            <!-- Primary Cause -->
+            <div class="primary-cause" id="primaryCause" style="display: none;">
+                <div class="primary-cause-header">
+                    <span class="ai-badge">AI Analysis</span>
+                    <h2>Primary Cause of Failure</h2>
+                </div>
+                <div class="primary-cause-content" id="primaryCauseContent">
+                    <!-- Filled by JS -->
+                </div>
+                <div class="recommended-action" id="recommendedAction">
+                    <!-- Filled by JS -->
+                </div>
+            </div>
+
+            <!-- Root Causes List -->
+            <div class="root-causes-section">
+                <h3 class="section-title">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                    </svg>
+                    AI-Identified Issues (<span id="totalIssues">0</span>)
+                </h3>
+                
+                <div id="rootCauseList" class="root-cause-list">
+                    <!-- Filled by JS -->
+                </div>
+            </div>
+
+            <!-- Empty State -->
+            <div id="emptyState" class="empty-state" style="display: none;">
+                <h3>No Issues Found</h3>
+                <p>AI analysis did not identify any errors for this test.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Raw Log Modal -->
+    <div class="modal-overlay" id="rawLogModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="modalTitle">Raw Log</h3>
+                <button class="modal-close" onclick="closeRawLogModal()">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-content">
+                <div class="raw-log-content" id="rawLogContent">
+                    Loading...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Get URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const runId = urlParams.get('run');
+        const testId = urlParams.get('test');
+        const theme = urlParams.get('theme') || 'dark';
+        
+        // Apply theme
+        document.documentElement.setAttribute('data-theme', theme);
+        
+        // API base URL
+        const hostname = window.location.hostname;
+        const API_BASE = `http://${hostname}:9360/api/jita`;
+        
+        // State
+        let aiErrors = [];
+        let testInfo = null;
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!runId || !testId) {
+                showError('Missing run ID or test ID');
+                return;
+            }
+            loadAnalysis();
+        });
+        
+        async function loadAnalysis() {
+            try {
+                // Load test summary first
+                const summaryResponse = await fetch(`${API_BASE}/runs/${runId}/summary`);
+                const summaryData = await summaryResponse.json();
+                
+                // Find test info
+                testInfo = summaryData.tests?.find(t => t.test_result_id === testId);
+                if (testInfo) {
+                    updateHeader(testInfo);
+                }
+                
+                // Load AI errors
+                const errorsResponse = await fetch(`${API_BASE}/runs/${runId}/errors?test_result_id=${testId}`);
+                const errorsData = await errorsResponse.json();
+                
+                aiErrors = errorsData.errors || [];
+                
+                // Update UI
+                document.getElementById('loadingState').style.display = 'none';
+                document.getElementById('mainContent').style.display = 'block';
+                
+                if (aiErrors.length === 0) {
+                    document.getElementById('emptyState').style.display = 'block';
+                } else {
+                    displayAnalysis();
+                }
+                
+            } catch (error) {
+                console.error('Error loading analysis:', error);
+                showError('Failed to load AI analysis');
+            }
+        }
+        
+        function updateHeader(test) {
+            document.getElementById('testName').textContent = test.test_name || 'Unknown Test';
+            
+            const statusBadge = document.getElementById('testStatus');
+            statusBadge.textContent = test.status || 'Unknown';
+            statusBadge.className = `status-badge ${(test.status || '').toLowerCase()}`;
+            
+            document.getElementById('duration').textContent = 
+                `Duration: ${formatDuration(test.duration_seconds || 0)}`;
+            document.getElementById('operations').textContent = 
+                `Ops: ${test.successful_ops || 0}/${test.total_ops || 0}`;
+        }
+        
+        function displayAnalysis() {
+            // Update severity counts
+            const counts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
+            aiErrors.forEach(e => {
+                counts[e.severity] = (counts[e.severity] || 0) + 1;
+            });
+            
+            document.getElementById('criticalCount').textContent = counts.CRITICAL;
+            document.getElementById('highCount').textContent = counts.HIGH;
+            document.getElementById('mediumCount').textContent = counts.MEDIUM;
+            document.getElementById('lowCount').textContent = counts.LOW;
+            document.getElementById('totalIssues').textContent = aiErrors.length;
+            
+            // Show primary cause (first error)
+            if (aiErrors.length > 0) {
+                const primary = aiErrors[0];
+                document.getElementById('primaryCause').style.display = 'block';
+                document.getElementById('primaryCauseContent').textContent = primary.summary;
+                document.getElementById('recommendedAction').innerHTML = 
+                    `<strong>Recommended Action:</strong> ${primary.suggested_fix}`;
+            }
+            
+            // Render all errors
+            const container = document.getElementById('rootCauseList');
+            container.innerHTML = aiErrors.map((error, index) => `
+                <div class="root-cause-card" data-index="${index}">
+                    <div class="root-cause-header" onclick="toggleCard(${index})">
+                        <span class="severity-badge ${error.severity.toLowerCase()}">${error.severity}</span>
+                        <span class="category-badge">${error.category}</span>
+                        <span class="root-cause-title">${escapeHtml(error.title)}</span>
+                        <span class="root-cause-confidence">${Math.round(error.confidence * 100)}%</span>
+                        <svg class="expand-icon" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
+                        </svg>
+                    </div>
+                    <div class="root-cause-details">
+                        <div class="detail-section">
+                            <h4>Summary</h4>
+                            <p>${escapeHtml(error.summary)}</p>
+                        </div>
+                        <div class="detail-section">
+                            <h4>Root Cause</h4>
+                            <p>${escapeHtml(error.root_cause)}</p>
+                        </div>
+                        <div class="detail-section">
+                            <h4>Impact</h4>
+                            <p>${escapeHtml(error.impact)}</p>
+                        </div>
+                        <div class="detail-section">
+                            <h4>Suggested Fix</h4>
+                            <p>${escapeHtml(error.suggested_fix)}</p>
+                        </div>
+                        ${error.related_components?.length ? `
+                            <div class="detail-section">
+                                <h4>Related Components</h4>
+                                <div class="component-tags">
+                                    ${(error.related_components || []).map(c => 
+                                        `<span class="component-tag">${escapeHtml(c)}</span>`
+                                    ).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${error.log_snippet ? `
+                            <div class="detail-section">
+                                <h4>Log Snippet</h4>
+                                <div class="log-snippet">${escapeHtml(error.log_snippet)}</div>
+                            </div>
+                        ` : ''}
+                        ${error.log_url ? `
+                            <button class="view-raw-log" onclick="viewRawLog('${encodeURIComponent(error.log_url)}', '${escapeHtml(error.log_source)}')">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                                    <path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
+                                </svg>
+                                View Raw Log
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function toggleCard(index) {
+            const card = document.querySelector(`.root-cause-card[data-index="${index}"]`);
+            card.classList.toggle('expanded');
+        }
+        
+        async function viewRawLog(url, source) {
+            const modal = document.getElementById('rawLogModal');
+            const content = document.getElementById('rawLogContent');
+            const title = document.getElementById('modalTitle');
+            
+            modal.classList.add('active');
+            title.textContent = `Raw Log: ${source}`;
+            content.textContent = 'Loading...';
+            
+            try {
+                const response = await fetch(
+                    `${API_BASE}/runs/${runId}/raw-log?url=${url}&max_lines=500`
+                );
+                const data = await response.json();
+                content.textContent = data.content || 'No content available';
+            } catch (error) {
+                content.textContent = `Error loading log: ${error.message}`;
+            }
+        }
+        
+        function closeRawLogModal() {
+            document.getElementById('rawLogModal').classList.remove('active');
+        }
+        
+        function showError(message) {
+            document.getElementById('loadingState').innerHTML = `
+                <div style="color: var(--error); text-align: center;">
+                    <h3>Error</h3>
+                    <p>${message}</p>
+                </div>
+            `;
+        }
+        
+        function formatDuration(seconds) {
+            if (seconds < 60) return `${seconds}s`;
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            if (mins < 60) return `${mins}m ${secs}s`;
+            const hours = Math.floor(mins / 60);
+            return `${hours}h ${mins % 60}m`;
+        }
+        
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Close modal on escape
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeRawLogModal();
+        });
+        
+        // Close modal on overlay click
+        document.getElementById('rawLogModal').addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal-overlay')) closeRawLogModal();
+        });
+    </script>
+</body>
+</html>

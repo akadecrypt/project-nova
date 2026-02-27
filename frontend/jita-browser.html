@@ -1055,7 +1055,7 @@
                             <span class="test-status ${isFailed ? 'failed' : 'passed'}">${test.status}</span>
                             <div class="test-case-info">
                                 <div class="test-case-name">${name}</div>
-                                <div class="test-case-meta">${duration} · ${test.successful_ops || 0}/${test.total_ops || 0} operations</div>
+                                <div class="test-case-meta">${duration} · ${test.successful_ops || 0}/${test.total_ops || 0} operations${test.ai_error_count > 0 ? ` · <span style="color: var(--accent-primary);">✨ ${test.ai_error_count} AI issues</span>` : ''}</div>
                             </div>
                             <svg class="test-case-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="6 9 12 15 18 9"/>
@@ -1103,11 +1103,11 @@
                                     </svg>
                                     View Timeline
                                 </a>
-                                <a href="log-details.html?run=${currentRunId}&test=${test.test_result_id}&theme=${document.documentElement.getAttribute('data-theme') || 'dark'}" class="log-link secondary">
+                                <a href="error-analysis.html?run=${currentRunId}&test=${test.test_result_id}&theme=${document.documentElement.getAttribute('data-theme') || 'dark'}" class="log-link secondary">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>
                                     </svg>
-                                    Error Analysis
+                                    AI Analysis
                                 </a>
                                 ${test.log_url ? `
                                     <a href="${test.log_url}" target="_blank" class="log-link outline">
