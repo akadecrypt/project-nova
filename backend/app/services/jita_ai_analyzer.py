@@ -225,12 +225,21 @@ class JitaAIAnalyzer:
     
     def _build_test_context(self, test_result: Dict) -> Dict[str, Any]:
         """Build context information from test result."""
+        # Handle exception which can be string or dict
+        exception = test_result.get('exception', {})
+        if isinstance(exception, str):
+            exception_summary = exception
+        elif isinstance(exception, dict):
+            exception_summary = exception.get('message', '') or exception.get('msg', '')
+        else:
+            exception_summary = str(exception) if exception else ''
+        
         return {
             "test_status": test_result.get('status', 'Unknown'),
             "test_name": test_result.get('testcase', ''),
             "cluster_info": test_result.get('cluster_name', ''),
             "duration": test_result.get('duration', 0),
-            "exception_summary": test_result.get('exception', {}).get('message', ''),
+            "exception_summary": exception_summary,
             "total_ops": test_result.get('total_ops', 0),
             "successful_ops": test_result.get('successful_ops', 0),
         }
@@ -326,9 +335,17 @@ class JitaAIAnalyzer:
         """Analyze the test exception directly from test result."""
         errors = []
         
+        # Handle exception which can be string or dict
         exception = test_result.get('exception', {})
-        exception_message = exception.get('message', '')
-        exception_trace = exception.get('stack_trace', '') or exception.get('stackTrace', '')
+        if isinstance(exception, str):
+            exception_message = exception
+            exception_trace = ''
+        elif isinstance(exception, dict):
+            exception_message = exception.get('message', '') or exception.get('msg', '')
+            exception_trace = exception.get('stack_trace', '') or exception.get('stackTrace', '') or exception.get('traceback', '')
+        else:
+            exception_message = str(exception) if exception else ''
+            exception_trace = ''
         
         if not exception_message and not exception_trace:
             return errors
